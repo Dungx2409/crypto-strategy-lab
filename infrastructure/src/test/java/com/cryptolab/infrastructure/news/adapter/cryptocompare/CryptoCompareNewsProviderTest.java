@@ -17,7 +17,7 @@ class CryptoCompareNewsProviderTest {
         CryptoCompareTransport transport = uri -> {
             requested.set(uri);
             return """
-                    {"Type":1000,"Data":[
+                    {"Type":100,"Message":"News list successfully returned","Data":[
                       {"id":"42","source":"feed-a","title":"Bitcoin rally",
                        "url":"https://example.test/42","published_on":1787054400,
                        "body":"<p>Adoption &amp; growth</p>","source_info":{"name":"Example Feed"}},
@@ -47,7 +47,7 @@ class CryptoCompareNewsProviderTest {
     @Test
     void rejectsProviderErrorWithoutLeakingMalformedItems() {
         CryptoCompareNewsProvider provider = new CryptoCompareNewsProvider(
-                uri -> "{\"Type\":\"100\",\"Message\":\"rate limited\"}",
+                uri -> "{\"Type\":2,\"Message\":\"rate limited\"}",
                 new ObjectMapper(),
                 URI.create("https://news.test/api"),
                 10);
@@ -55,5 +55,18 @@ class CryptoCompareNewsProviderTest {
         assertThatThrownBy(() -> provider.fetchSince(Instant.EPOCH))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("rate limited");
+    }
+
+    @Test
+    void rejectsSuccessfulEnvelopeWithoutDataArray() {
+        CryptoCompareNewsProvider provider = new CryptoCompareNewsProvider(
+                uri -> "{\"Type\":100,\"Message\":\"missing data\"}",
+                new ObjectMapper(),
+                URI.create("https://news.test/api"),
+                10);
+
+        assertThatThrownBy(() -> provider.fetchSince(Instant.EPOCH))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("missing data");
     }
 }

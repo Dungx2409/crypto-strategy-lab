@@ -39,11 +39,12 @@ class NewsRuntimeConfiguration {
             ObjectMapper objectMapper,
             @Value("${crypto.news.cryptocompare.url:https://min-api.cryptocompare.com/data/v2/news/}")
                     URI endpoint,
+            @Value("${crypto.news.cryptocompare.api-key:}") String apiKey,
             @Value("${crypto.news.connect-timeout:5s}") Duration connectTimeout,
             @Value("${crypto.news.request-timeout:10s}") Duration requestTimeout,
             @Value("${crypto.news.maximum-items:50}") int maximumItems) {
         return new CryptoCompareNewsProvider(
-                objectMapper, endpoint, connectTimeout, requestTimeout, maximumItems);
+                objectMapper, endpoint, apiKey, connectTimeout, requestTimeout, maximumItems);
     }
 
     @Bean

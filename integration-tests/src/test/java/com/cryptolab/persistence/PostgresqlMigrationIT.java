@@ -35,7 +35,7 @@ class PostgresqlMigrationIT {
         MigrateResult result = flyway.migrate();
 
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(7);
+        assertThat(result.migrationsExecuted).isEqualTo(8);
 
         Set<String> tables = readPublicTables();
         assertThat(tables)
@@ -54,6 +54,8 @@ class PostgresqlMigrationIT {
                         "sentiment_predictions",
                         "outbox_events",
                         "processed_events");
+        assertThat(readColumnLength("news_items", "input_version")).isEqualTo(128);
+        assertThat(readColumnLength("sentiment_predictions", "input_version")).isEqualTo(128);
     }
 
     private Set<String> readPublicTables() throws Exception {
@@ -67,5 +69,24 @@ class PostgresqlMigrationIT {
             }
         }
         return tables;
+    }
+
+    private int readColumnLength(String table, String column) throws Exception {
+        try (Connection connection = POSTGRES.createConnection("");
+                var statement = connection.prepareStatement(
+                        """
+                        SELECT character_maximum_length
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = ?
+                          AND column_name = ?
+                        """)) {
+            statement.setString(1, table);
+            statement.setString(2, column);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                assertThat(resultSet.next()).isTrue();
+                return resultSet.getInt("character_maximum_length");
+            }
+        }
     }
 }

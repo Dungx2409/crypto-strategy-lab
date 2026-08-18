@@ -11,20 +11,17 @@ final class JdkCryptoCompareTransport implements CryptoCompareTransport {
 
     private final HttpClient client;
     private final Duration requestTimeout;
+    private final String apiKey;
 
-    JdkCryptoCompareTransport(Duration connectTimeout, Duration requestTimeout) {
+    JdkCryptoCompareTransport(Duration connectTimeout, Duration requestTimeout, String apiKey) {
         client = HttpClient.newBuilder().connectTimeout(connectTimeout).build();
         this.requestTimeout = requestTimeout;
+        this.apiKey = apiKey == null ? "" : apiKey.strip();
     }
 
     @Override
     public String get(URI uri) {
-        HttpRequest request = HttpRequest.newBuilder(uri)
-                .timeout(requestTimeout)
-                .header("Accept", "application/json")
-                .header("User-Agent", "CryptoStrategyLab/0.1")
-                .GET()
-                .build();
+        HttpRequest request = request(uri);
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
@@ -38,5 +35,16 @@ final class JdkCryptoCompareTransport implements CryptoCompareTransport {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("CryptoCompare request interrupted", failure);
         }
+    }
+
+    HttpRequest request(URI uri) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
+                .timeout(requestTimeout)
+                .header("Accept", "application/json")
+                .header("User-Agent", "CryptoStrategyLab/0.1");
+        if (!apiKey.isEmpty()) {
+            builder.header("Authorization", "Apikey " + apiKey);
+        }
+        return builder.GET().build();
     }
 }

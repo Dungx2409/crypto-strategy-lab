@@ -159,8 +159,11 @@ outbox rows. They are exposed through `/actuator/metrics`; health components are
 available under `/actuator/health`.
 
 News collection is enabled by default and configured through
-`NEWS_PROVIDER`, `NEWS_API_URL`, and the timeout/schedule properties under
-`crypto.news`. `SENTIMENT_PROVIDER=keyword` selects the default local analyzer.
+`NEWS_PROVIDER`, `NEWS_API_URL`, `NEWS_API_KEY`, and the timeout/schedule
+properties under `crypto.news`. The CryptoCompare key is sent in the
+`Authorization` header and must be stored in the git-ignored `.env` file, never
+in `docker-compose.yml`. `SENTIMENT_PROVIDER=keyword` selects the default local
+analyzer.
 Failure counters and inference latency are exported as
 `crypto.news.collection.failures`, `crypto.sentiment.inference.failures`, and
 `crypto.sentiment.inference.duration`.

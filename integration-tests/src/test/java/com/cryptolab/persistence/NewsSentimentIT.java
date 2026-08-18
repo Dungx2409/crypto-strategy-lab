@@ -91,7 +91,7 @@ class NewsSentimentIT {
                 "https://example.test/" + id,
                 NOW.minusSeconds(id.endsWith("positive") ? 30 : 60),
                 text,
-                "input-v1");
+                "sha256:" + "a".repeat(64));
     }
 
     private static final class MutableProvider implements NewsProvider {

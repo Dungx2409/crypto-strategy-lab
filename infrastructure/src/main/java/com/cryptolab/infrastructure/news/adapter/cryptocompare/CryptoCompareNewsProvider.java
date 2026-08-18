@@ -26,10 +26,15 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
     public CryptoCompareNewsProvider(
             ObjectMapper objectMapper,
             URI endpoint,
+            String apiKey,
             Duration connectTimeout,
             Duration requestTimeout,
             int maximumItems) {
-        this(new JdkCryptoCompareTransport(connectTimeout, requestTimeout), objectMapper, endpoint, maximumItems);
+        this(
+                new JdkCryptoCompareTransport(connectTimeout, requestTimeout, apiKey),
+                objectMapper,
+                endpoint,
+                maximumItems);
     }
 
     CryptoCompareNewsProvider(
@@ -50,7 +55,7 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
     public List<NewsItem> fetchSince(Instant since) {
         Objects.requireNonNull(since, "since must not be null");
         JsonNode root = parse(transport.get(requestUri()));
-        if ("100".equals(root.path("Type").asText()) || !root.path("Data").isArray()) {
+        if (!"100".equals(root.path("Type").asText()) || !root.path("Data").isArray()) {
             throw new IllegalStateException(
                     "CryptoCompare response error: " + root.path("Message").asText("missing Data array"));
         }
