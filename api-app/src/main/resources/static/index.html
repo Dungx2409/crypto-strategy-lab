@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Crypto Strategy Lab</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main>
+    <header class="hero">
+        <div>
+            <p class="eyebrow">Software Architecture Laboratory</p>
+            <h1>Crypto Strategy Lab</h1>
+            <p>Reproducible strategy search over normalized market data. Research only—no order execution.</p>
+        </div>
+        <span class="release">Java 21 · Modular Monolith + Workers</span>
+    </header>
+
+    <section class="panel status-panel" aria-labelledby="status-title">
+        <div class="panel-heading">
+            <div><p class="eyebrow">Operations</p><h2 id="status-title">System status</h2></div>
+            <span id="status-updated" class="muted">Checking…</span>
+        </div>
+        <div class="status-grid">
+            <article><span>Market Data</span><strong id="system-market" class="health down">DOWN</strong></article>
+            <article><span>News</span><strong id="system-news" class="health down">DOWN</strong></article>
+            <article><span>Sentiment</span><strong id="system-sentiment" class="health down">DOWN</strong></article>
+            <article><span>Queue</span><strong id="system-queue" class="health down">DOWN</strong></article>
+            <article><span>Queue depth</span><strong id="system-queue-depth">0</strong></article>
+            <article><span>Worker consumers</span><strong id="system-workers">0</strong></article>
+            <article><span>Running jobs</span><strong id="system-running">0</strong></article>
+            <article><span>Pending outbox</span><strong id="system-outbox">0</strong></article>
+        </div>
+    </section>
+
+    <section class="panel market-panel" aria-labelledby="market-title">
+        <div class="panel-heading">
+            <div><p class="eyebrow">Live market</p><h2 id="market-title">Candlestick chart</h2></div>
+            <span id="connection-status" class="status status-offline">OFFLINE</span>
+        </div>
+        <div class="controls">
+            <label>Symbol<select id="symbol"><option value="BTCUSDT">BTC / USDT</option></select></label>
+            <label>Timeframe<select id="timeframe">
+                <option value="5m">5 minutes</option><option value="15m">15 minutes</option>
+                <option value="1h">1 hour</option><option value="4h">4 hours</option>
+            </select></label>
+        </div>
+        <div id="market-message" role="status"></div>
+        <canvas id="candle-chart" width="1100" height="460" aria-label="Market candlestick chart"></canvas>
+    </section>
+
+    <div class="two-column">
+        <section class="panel" aria-labelledby="strategy-title">
+            <div class="panel-heading"><div><p class="eyebrow">Plugins</p><h2 id="strategy-title">Strategy configuration</h2></div></div>
+            <p class="muted">Select plugins and edit comma-separated deterministic parameter choices.</p>
+            <div id="strategy-list" class="strategy-list" aria-live="polite"></div>
+            <div class="controls compact">
+                <label>Combination policy<select id="combination-policy"><option value="MAJORITY">Majority</option><option value="WEIGHTED">Weighted</option></select></label>
+                <label>Threshold<input id="policy-threshold" type="number" value="0.5" min="0" max="1" step="0.05"></label>
+                <label>Generator<select id="generator"></select></label>
+            </div>
+        </section>
+
+        <section class="panel" aria-labelledby="search-title">
+            <div class="panel-heading"><div><p class="eyebrow">Continuous loop</p><h2 id="search-title">Search run</h2></div><span id="search-status" class="status status-offline">IDLE</span></div>
+            <div class="controls compact">
+                <label>Max candidates<input id="max-candidates" type="number" value="125" min="1" max="100000"></label>
+                <label>Random seed<input id="random-seed" type="number" value="20260818"></label>
+                <label>Batch size<input id="batch-size" type="number" value="25" min="1" max="1000"></label>
+            </div>
+            <div class="button-row"><button id="start-search" type="button">Start search</button><button id="cancel-search" class="secondary" type="button" disabled>Cancel</button></div>
+            <p id="search-message" class="message" role="status">Waiting for a market dataset.</p>
+            <div class="progress-track"><span id="search-progress-bar"></span></div>
+            <div class="metric-grid">
+                <article><span>Generated</span><strong id="generated-count">0</strong></article>
+                <article><span>Pending</span><strong id="pending-count">0</strong></article>
+                <article><span>Queued</span><strong id="queued-count">0</strong></article>
+                <article><span>Running</span><strong id="running-count">0</strong></article>
+                <article><span>Completed</span><strong id="completed-count">0</strong></article>
+                <article><span>Failed</span><strong id="failed-count">0</strong></article>
+                <article><span>Elapsed</span><strong id="elapsed-time">0s</strong></article>
+                <article><span>Best score</span><strong id="best-score">—</strong></article>
+            </div>
+        </section>
+    </div>
+
+    <section class="panel" aria-labelledby="leaderboard-title">
+        <div class="panel-heading"><div><p class="eyebrow">Projection</p><h2 id="leaderboard-title">Leaderboard</h2></div><span class="muted">Click a row to inspect provenance</span></div>
+        <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Strategy</th><th>Return</th><th>MDD</th><th>Trades</th><th>Score</th></tr></thead><tbody id="leaderboard-body"><tr><td colspan="6" class="empty">No completed experiments yet.</td></tr></tbody></table></div>
+    </section>
+
+    <section class="panel" aria-labelledby="experiment-title">
+        <div class="panel-heading"><div><p class="eyebrow">Reproducibility</p><h2 id="experiment-title">Top #1 / Experiment details</h2></div><span id="experiment-rank" class="status status-offline">NO SELECTION</span></div>
+        <p id="experiment-message" class="muted">Select a leaderboard result.</p>
+        <div id="provenance-grid" class="provenance-grid"></div>
+        <div class="artifact-grid">
+            <article><h3>Signals</h3><div id="signals" class="artifact-list empty">No signals.</div></article>
+            <article><h3>Trades</h3><div id="trades" class="artifact-list empty">No trades.</div></article>
+        </div>
+        <details><summary>Immutable provenance JSON</summary><pre id="provenance-json">{}</pre></details>
+    </section>
+
+    <section class="panel news-panel" aria-labelledby="news-title">
+        <div class="panel-heading"><div><p class="eyebrow">News intelligence</p><h2 id="news-title">News + Sentiment</h2></div><div class="news-actions"><span id="news-status" class="status status-offline">DOWN</span><button id="refresh-news" type="button">Refresh news</button></div></div>
+        <p id="news-message" role="status">Loading stored news…</p><div id="news-list" class="news-list" aria-live="polite"></div>
+    </section>
+</main>
+<script src="/market.js"></script>
+<script src="/news.js"></script>
+<script src="/lab.js"></script>
+</body>
+</html>

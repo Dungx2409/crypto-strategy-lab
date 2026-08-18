@@ -1,0 +1,61 @@
+package com.cryptolab.architecture;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.cryptolab.experiment.application.GeneticStrategyGenerator;
+import com.cryptolab.experiment.application.RandomStrategyGenerator;
+import com.cryptolab.experiment.domain.MarketDatasetRef;
+import com.cryptolab.experiment.domain.SearchContext;
+import com.cryptolab.experiment.domain.SearchParameterSpace;
+import com.cryptolab.experiment.domain.StopConditions;
+import com.cryptolab.infrastructure.strategy.adapter.MovingAverageStrategyFactory;
+import com.cryptolab.infrastructure.strategy.adapter.SpringStrategyRegistry;
+import com.cryptolab.marketdata.domain.Timeframe;
+import com.cryptolab.strategy.domain.CombinationPolicyDefinition;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+
+class GeneratorReplacementArchitectureTest {
+
+    @Test
+    void randomAndGeneticProduceTheSameCandidateContractBehindOnePort() {
+        var registry = new SpringStrategyRegistry(List.of(new MovingAverageStrategyFactory()));
+        var random = new RandomStrategyGenerator(registry);
+        var genetic = new GeneticStrategyGenerator(registry);
+        SearchContext context = context();
+
+        var randomCandidate = random.generate(context).findFirst().orElseThrow();
+        var geneticCandidate = genetic.generate(context).findFirst().orElseThrow();
+
+        assertThat(random.type()).isEqualTo("random");
+        assertThat(genetic.type()).isEqualTo("genetic");
+        assertThat(randomCandidate.getClass()).isEqualTo(geneticCandidate.getClass());
+        assertThat(randomCandidate.strategies()).isEqualTo(geneticCandidate.strategies());
+        assertThat(randomCandidate.combinationPolicy()).isEqualTo(geneticCandidate.combinationPolicy());
+    }
+
+    private static SearchContext context() {
+        UUID runId = UUID.fromString("70000000-0000-0000-0000-000000000001");
+        return new SearchContext(
+                runId,
+                new MarketDatasetRef(
+                        "BTCUSDT",
+                        Timeframe.M5,
+                        Instant.parse("2026-08-18T00:00:00Z"),
+                        Instant.parse("2026-08-18T01:00:00Z"),
+                        "proof-v1",
+                        "proof-checksum"),
+                List.of("MA"),
+                Map.of("MA", "1.0"),
+                new SearchParameterSpace(Map.of(
+                        "MA", Map.of("fastPeriod", List.of(10), "slowPeriod", List.of(20)))),
+                new CombinationPolicyDefinition("MAJORITY", "1.0", Map.of(), BigDecimal.ZERO),
+                42L,
+                new StopConditions(1L, null, null),
+                1);
+    }
+}

@@ -1,0 +1,89 @@
+spring:
+  application:
+    name: crypto-strategy-lab-api
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/crypto_strategy_lab}
+    username: ${POSTGRES_USER:crypto_lab}
+    password: ${POSTGRES_PASSWORD:crypto_lab_dev}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  jackson:
+    time-zone: UTC
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:crypto_lab}
+    password: ${RABBITMQ_PASSWORD:crypto_lab_dev}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+
+server:
+  port: ${API_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-components: always
+      show-details: when_authorized
+
+crypto:
+  market:
+    provider: binance
+    symbol-default: BTCUSDT
+    supported-symbols: BTCUSDT
+    maximum-limit: 1000
+    binance:
+      rest-url: ${BINANCE_REST_URL:https://api.binance.com/api/v3/klines}
+      websocket-url: ${BINANCE_WEBSOCKET_URL:wss://stream.binance.com:9443/ws}
+      connect-timeout: 5s
+      request-timeout: 10s
+    reconnect:
+      initial-delay-ms: 1000
+      max-delay-ms: 30000
+  search:
+    generator: ${CRYPTO_SEARCH_GENERATOR:random}
+    default-max-candidates: 125
+  backtest:
+    queue: crypto.backtest.jobs
+    max-retries: 3
+    dispatch:
+      publisher-enabled: true
+      batch-size: 50
+      poll-interval: 500
+      confirm-timeout: 5s
+  domain-events:
+    publisher-enabled: true
+    batch-size: 50
+    poll-interval: 500
+    confirm-timeout: 5s
+    realtime:
+      concurrency: ${REALTIME_EVENT_CONCURRENCY:1}
+      prefetch: ${REALTIME_EVENT_PREFETCH:10}
+  news:
+    provider: ${NEWS_PROVIDER:cryptocompare}
+    connect-timeout: 5s
+    request-timeout: 10s
+    maximum-items: 50
+    initial-lookback: 24h
+    cryptocompare:
+      url: ${NEWS_API_URL:https://min-api.cryptocompare.com/data/v2/news/}
+    collection:
+      initial-delay: 30s
+      interval: 5m
+  sentiment:
+    provider: ${SENTIMENT_PROVIDER:keyword}
+    max-attempts: 2
+  provenance:
+    git-commit: ${APP_GIT_COMMIT:dev}
+    build-version: ${APP_BUILD_VERSION:dev}

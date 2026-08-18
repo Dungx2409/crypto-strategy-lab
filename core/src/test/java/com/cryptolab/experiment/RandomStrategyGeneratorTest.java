@@ -1,0 +1,128 @@
+package com.cryptolab.experiment;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.cryptolab.experiment.application.RandomStrategyGenerator;
+import com.cryptolab.experiment.application.GeneticStrategyGenerator;
+import com.cryptolab.experiment.domain.SearchContext;
+import com.cryptolab.experiment.domain.SearchParameterSpace;
+import com.cryptolab.experiment.domain.StopConditions;
+import com.cryptolab.strategy.domain.CombinationPolicyDefinition;
+import com.cryptolab.strategy.domain.Strategy;
+import com.cryptolab.strategy.domain.StrategyDefinition;
+import com.cryptolab.strategy.domain.StrategyPluginDescriptor;
+import com.cryptolab.strategy.port.StrategyFactory;
+import com.cryptolab.strategy.port.StrategyRegistry;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Test;
+
+class RandomStrategyGeneratorTest {
+
+    @Test
+    void sameSeedVersionsAndParameterSpaceProduceTheSameLazySequence() {
+        CountingRegistry firstRegistry = new CountingRegistry();
+        CountingRegistry secondRegistry = new CountingRegistry();
+        RandomStrategyGenerator first = new RandomStrategyGenerator(firstRegistry);
+        RandomStrategyGenerator second = new RandomStrategyGenerator(secondRegistry);
+        SearchContext context = context(41L);
+
+        var firstStream = first.generate(context);
+
+        assertThat(firstRegistry.created.get()).isZero();
+        var firstCandidates = firstStream.limit(6).toList();
+        var secondCandidates = second.generate(context).limit(6).toList();
+        assertThat(firstCandidates).isEqualTo(secondCandidates);
+        assertThat(firstCandidates).extracting(candidate -> candidate.candidateHash()).doesNotHaveDuplicates();
+        assertThat(firstRegistry.created).hasValue(12);
+    }
+
+    @Test
+    void differentSeedChangesOrderWithoutChangingTheFiniteCandidateSet() {
+        RandomStrategyGenerator generator = new RandomStrategyGenerator(new CountingRegistry());
+
+        var first = generator.generate(context(10L)).toList();
+        var second = generator.generate(context(11L)).toList();
+
+        assertThat(first).extracting(candidate -> candidate.candidateHash())
+                .containsExactlyInAnyOrderElementsOf(second.stream().map(candidate -> candidate.candidateHash()).toList());
+        assertThat(first).extracting(candidate -> candidate.candidateHash())
+                .isNotEqualTo(second.stream().map(candidate -> candidate.candidateHash()).toList());
+        assertThat(first).hasSize(8);
+    }
+
+    @Test
+    void geneticGeneratorIsLazyDeterministicAndProducesValidCandidatesAcrossGenerations() {
+        CountingRegistry firstRegistry = new CountingRegistry();
+        CountingRegistry secondRegistry = new CountingRegistry();
+        GeneticStrategyGenerator first = new GeneticStrategyGenerator(firstRegistry);
+        GeneticStrategyGenerator second = new GeneticStrategyGenerator(secondRegistry);
+
+        var stream = first.generate(context(73L));
+
+        assertThat(firstRegistry.created).hasValue(0);
+        var firstSequence = stream.limit(24).toList();
+        var secondSequence = second.generate(context(73L)).limit(24).toList();
+        assertThat(firstSequence).isEqualTo(secondSequence);
+        assertThat(firstSequence).allSatisfy(candidate -> {
+            assertThat(candidate.strategies()).hasSize(2);
+            assertThat(candidate.candidateHash()).isNotBlank();
+        });
+        assertThat(first.type()).isEqualTo("genetic");
+        assertThat(first.version()).isEqualTo("1.0");
+    }
+
+    private static SearchContext context(long seed) {
+        return new SearchContext(
+                ExperimentTestFixtures.EXPERIMENT_ID,
+                ExperimentTestFixtures.dataset().reference(),
+                List.of("RSI", "MA"),
+                Map.of("MA", "1.0", "RSI", "1.0"),
+                new SearchParameterSpace(Map.of(
+                        "MA", Map.of(
+                                "fastPeriod", List.of(10, 20),
+                                "slowPeriod", List.of(50, 100)),
+                        "RSI", Map.of(
+                                "period", List.of(14, 21),
+                                "oversold", List.of(30),
+                                "overbought", List.of(70)))),
+                new CombinationPolicyDefinition("MAJORITY", "1.0", Map.of(), BigDecimal.ZERO),
+                seed,
+                new StopConditions(100L, null, null),
+                3);
+    }
+
+    private static final class CountingRegistry implements StrategyRegistry {
+
+        private final AtomicInteger created = new AtomicInteger();
+
+        @Override
+        public Strategy create(StrategyDefinition definition) {
+            created.incrementAndGet();
+            return null;
+        }
+
+        @Override
+        public void register(StrategyFactory factory) {}
+
+        @Override
+        public Set<String> registeredTypes() {
+            return Set.of("MA", "RSI");
+        }
+
+        @Override
+        public List<StrategyPluginDescriptor> availableStrategies() {
+            return List.of(
+                    new StrategyPluginDescriptor("MA", "1.0", Map.of(
+                            "fastPeriod", Map.of("default", 10),
+                            "slowPeriod", Map.of("default", 20))),
+                    new StrategyPluginDescriptor("RSI", "1.0", Map.of(
+                            "period", Map.of("default", 14),
+                            "oversold", Map.of("default", 30),
+                            "overbought", Map.of("default", 70))));
+        }
+    }
+}

@@ -1,0 +1,66 @@
+spring:
+  application:
+    name: crypto-strategy-lab-worker
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/crypto_strategy_lab}
+    username: ${POSTGRES_USER:crypto_lab}
+    password: ${POSTGRES_PASSWORD:crypto_lab_dev}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  jackson:
+    time-zone: UTC
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:crypto_lab}
+    password: ${RABBITMQ_PASSWORD:crypto_lab_dev}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        acknowledge-mode: manual
+
+server:
+  port: ${WORKER_MANAGEMENT_PORT:8081}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+
+crypto:
+  backtest:
+    queue: crypto.backtest.jobs
+    max-retries: 3
+    dispatch:
+      publisher-enabled: true
+      batch-size: 50
+      poll-interval: 500
+      confirm-timeout: 5s
+    worker:
+      id: ${WORKER_ID:${HOSTNAME:crypto-worker}}
+      claim-lease: 5m
+      concurrency: ${WORKER_CONCURRENCY:1}
+      prefetch: ${WORKER_PREFETCH:1}
+  domain-events:
+    publisher-enabled: true
+    batch-size: 50
+    poll-interval: 500
+    confirm-timeout: 5s
+    consumer:
+      concurrency: ${DOMAIN_EVENT_CONCURRENCY:1}
+      prefetch: ${DOMAIN_EVENT_PREFETCH:10}
+  provenance:
+    git-commit: ${APP_GIT_COMMIT:dev}
+    build-version: ${APP_BUILD_VERSION:dev}

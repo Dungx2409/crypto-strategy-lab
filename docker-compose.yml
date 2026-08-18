@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-crypto_strategy_lab}
+      POSTGRES_USER: ${POSTGRES_USER:-crypto_lab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crypto_lab_dev}
+      TZ: UTC
+    ports:
+      - "${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-crypto_lab}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-crypto_lab_dev}
+      TZ: UTC
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  api:
+    build:
+      context: .
+      args:
+        APP_MODULE: api-app
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-crypto_strategy_lab}
+      POSTGRES_USER: ${POSTGRES_USER:-crypto_lab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crypto_lab_dev}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-crypto_lab}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-crypto_lab_dev}
+      CRYPTO_SEARCH_GENERATOR: ${CRYPTO_SEARCH_GENERATOR:-random}
+      NEWS_PROVIDER: ${NEWS_PROVIDER:-cryptocompare}
+      NEWS_API_URL: ${NEWS_API_URL:-https://min-api.cryptocompare.com/data/v2/news/}
+      SENTIMENT_PROVIDER: ${SENTIMENT_PROVIDER:-keyword}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      args:
+        APP_MODULE: worker-app
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-crypto_strategy_lab}
+      POSTGRES_USER: ${POSTGRES_USER:-crypto_lab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crypto_lab_dev}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-crypto_lab}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-crypto_lab_dev}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
