@@ -102,7 +102,7 @@ class SearchRunControllerTest {
         mockMvc.perform(get("/api/v1/search-runs/{id}", SEARCH_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.batchSize").value(2))
-                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.status").value("EVALUATING"))
                 .andExpect(jsonPath("$.generatedCandidates").value(5))
                 .andExpect(jsonPath("$.persistedCandidates").value(5))
                 .andExpect(jsonPath("$.pendingDispatchJobs").value(5))
@@ -111,7 +111,7 @@ class SearchRunControllerTest {
 
         mockMvc.perform(post("/api/v1/search-runs/{id}/cancel", SEARCH_ID))
                 .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.status").value("COMPLETED"));
+                .andExpect(jsonPath("$.status").value("EVALUATING"));
     }
 
     @Test
@@ -196,6 +196,17 @@ class SearchRunControllerTest {
                     target == SearchRunStatus.RUNNING ? at : run.startedAt(),
                     target == SearchRunStatus.COMPLETED || target == SearchRunStatus.CANCELLED ? at : null,
                     run.cancelRequested());
+        }
+
+        @Override
+        public void finishGeneration(
+                UUID searchRunId, SearchStopReason stopReason, Instant at) {
+            transition(
+                    searchRunId,
+                    SearchRunStatus.RUNNING,
+                    SearchRunStatus.EVALUATING,
+                    stopReason,
+                    at);
         }
 
         @Override

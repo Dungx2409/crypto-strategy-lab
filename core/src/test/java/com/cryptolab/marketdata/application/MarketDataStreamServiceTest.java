@@ -3,6 +3,7 @@ package com.cryptolab.marketdata.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cryptolab.marketdata.domain.Candle;
+import com.cryptolab.marketdata.domain.CandleUpdate;
 import com.cryptolab.marketdata.domain.MarketDataHealthStatus;
 import com.cryptolab.marketdata.domain.Timeframe;
 import com.cryptolab.marketdata.domain.TradingPair;
@@ -38,7 +39,7 @@ class MarketDataStreamServiceTest {
         store.saveIfAbsent(duplicate);
         FakeProvider provider = new FakeProvider();
         provider.historical = List.of(duplicate, recovered);
-        List<Candle> published = new ArrayList<>();
+        List<CandleUpdate> published = new ArrayList<>();
         FakeScheduler scheduler = new FakeScheduler();
         FakeTelemetry telemetry = new FakeTelemetry();
         MarketDataStreamService service = service(provider, store, published::add, scheduler, telemetry);
@@ -48,12 +49,12 @@ class MarketDataStreamServiceTest {
 
         assertThat(service.healthStatus()).isEqualTo(MarketDataHealthStatus.UP);
         assertThat(store.candles).containsExactly(duplicate, recovered);
-        assertThat(published).containsExactly(recovered);
+        assertThat(published).containsExactly(CandleUpdate.closed(recovered));
         assertThat(telemetry.recovered).isEqualTo(1);
 
-        provider.listeners.getFirst().onCandle(recovered);
-        provider.listeners.getFirst().onCandle(realtime);
-        assertThat(published).containsExactly(recovered, realtime);
+        provider.listeners.getFirst().onCandle(CandleUpdate.closed(recovered));
+        provider.listeners.getFirst().onCandle(CandleUpdate.closed(realtime));
+        assertThat(published).containsExactly(CandleUpdate.closed(recovered), CandleUpdate.closed(realtime));
         assertThat(store.candles).hasSize(3);
 
         provider.listeners.getFirst().onDisconnected(new IllegalStateException("network lost"));
@@ -63,7 +64,7 @@ class MarketDataStreamServiceTest {
 
         scheduler.runLatest();
         assertThat(provider.listeners).hasSize(2);
-        provider.listeners.getFirst().onCandle(candle("2026-08-18T01:40:00Z"));
+        provider.listeners.getFirst().onCandle(CandleUpdate.closed(candle("2026-08-18T01:40:00Z")));
         assertThat(store.candles).hasSize(3);
         provider.listeners.get(1).onConnected();
         assertThat(service.healthStatus()).isEqualTo(MarketDataHealthStatus.UP);
@@ -71,6 +72,41 @@ class MarketDataStreamServiceTest {
         registration.close();
         assertThat(service.activeStreamCount()).isZero();
         assertThat(provider.subscriptions.get(1).active).isFalse();
+    }
+
+    @Test
+    void publishesInProgressReplacementsAndPersistsOnlyTheFirstClosedCandle() {
+        FakeProvider provider = new FakeProvider();
+        InMemoryStore store = new InMemoryStore();
+        List<CandleUpdate> published = new ArrayList<>();
+        FakeTelemetry telemetry = new FakeTelemetry();
+        MarketDataStreamService service =
+                service(provider, store, published::add, new FakeScheduler(), telemetry);
+        Candle firstVersion = candle("2026-08-18T01:50:00Z");
+        Candle replacement = new Candle(
+                PAIR.symbol(),
+                Timeframe.M5,
+                firstVersion.openTime(),
+                firstVersion.open(),
+                new BigDecimal("112"),
+                firstVersion.low(),
+                new BigDecimal("108"),
+                new BigDecimal("14"));
+        Candle next = candle("2026-08-18T01:55:00Z");
+
+        service.open(PAIR, Timeframe.M5);
+        provider.listeners.getFirst().onCandle(CandleUpdate.inProgress(firstVersion));
+        provider.listeners.getFirst().onCandle(CandleUpdate.inProgress(replacement));
+        provider.listeners.getFirst().onCandle(CandleUpdate.closed(replacement));
+        provider.listeners.getFirst().onCandle(CandleUpdate.closed(replacement));
+        provider.listeners.getFirst().onCandle(CandleUpdate.inProgress(next));
+
+        assertThat(published).containsExactly(
+                CandleUpdate.inProgress(firstVersion),
+                CandleUpdate.inProgress(replacement),
+                CandleUpdate.closed(replacement),
+                CandleUpdate.inProgress(next));
+        assertThat(store.candles).containsExactly(replacement);
     }
 
     @Test

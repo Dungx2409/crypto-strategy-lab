@@ -1,6 +1,7 @@
 package com.cryptolab.infrastructure.marketdata.adapter.binance;
 
 import com.cryptolab.marketdata.domain.Candle;
+import com.cryptolab.marketdata.domain.CandleUpdate;
 import com.cryptolab.marketdata.domain.Timeframe;
 import com.cryptolab.marketdata.domain.TradingPair;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -10,7 +11,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 final class BinancePayloadMapper {
 
@@ -47,7 +47,7 @@ final class BinancePayloadMapper {
         }
     }
 
-    Optional<Candle> realtime(String payload) {
+    CandleUpdate realtime(String payload) {
         try {
             JsonNode root = objectMapper.readTree(payload);
             JsonNode kline = root.path("k");
@@ -62,12 +62,9 @@ final class BinancePayloadMapper {
                     requiredText(kline, "c"),
                     requiredText(kline, "v"),
                     kline.path("x").asBoolean(false));
-            if (!dto.closed()) {
-                return Optional.empty();
-            }
             TradingPair pair = new TradingPair(requiredText(root, "s"));
             Timeframe timeframe = Timeframe.fromExchangeCode(requiredText(kline, "i"));
-            return Optional.of(toCandle(dto, pair, timeframe));
+            return new CandleUpdate(toCandle(dto, pair, timeframe), dto.closed());
         } catch (JsonProcessingException exception) {
             throw new IllegalArgumentException("Cannot parse Binance realtime event", exception);
         }

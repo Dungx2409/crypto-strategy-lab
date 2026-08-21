@@ -1,6 +1,6 @@
 package com.cryptolab.api.marketdata;
 
-import com.cryptolab.marketdata.domain.Candle;
+import com.cryptolab.marketdata.domain.CandleUpdate;
 import com.cryptolab.marketdata.port.CandleUpdatePublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
@@ -15,11 +15,12 @@ final class StompCandleUpdatePublisher implements CandleUpdatePublisher {
     }
 
     @Override
-    public void publishClosed(Candle candle) {
+    public void publish(CandleUpdate update) {
+        var candle = update.candle();
         String destination = "/topic/market/"
                 + candle.symbol()
                 + "/"
                 + candle.timeframe().exchangeCode();
-        messagingTemplate.convertAndSend(destination, MarketCandleEvent.closed(candle));
+        messagingTemplate.convertAndSend(destination, MarketCandleEvent.from(update));
     }
 }

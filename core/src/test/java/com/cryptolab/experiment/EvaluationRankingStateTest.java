@@ -11,6 +11,7 @@ import com.cryptolab.experiment.domain.Evaluation;
 import com.cryptolab.experiment.domain.EvaluationMetrics;
 import com.cryptolab.experiment.domain.ExperimentStateMachine;
 import com.cryptolab.experiment.domain.ExperimentStatus;
+import com.cryptolab.experiment.domain.Trade;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -24,7 +25,10 @@ class EvaluationRankingStateTest {
         BacktestResult result = new BacktestResult(
                 ExperimentTestFixtures.EXPERIMENT_ID,
                 ExperimentTestFixtures.CANDIDATE_ID,
-                List.of(),
+                List.of(
+                        trade("10", 0),
+                        trade("-4", 1),
+                        trade("6", 2)),
                 List.of(),
                 List.of(
                         equity("10000", 0),
@@ -43,8 +47,31 @@ class EvaluationRankingStateTest {
 
         assertThat(evaluation.metrics().totalReturnPct()).isEqualByComparingTo("10");
         assertThat(evaluation.metrics().maxDrawdownPct()).isEqualByComparingTo("-25");
+        assertThat(evaluation.metrics().totalTrades()).isEqualTo(3);
+        assertThat(evaluation.metrics().winRatePct()).isEqualByComparingTo("66.66666667");
         assertThat(evaluation.metrics().score()).isEqualByComparingTo("-2.5");
         assertThat(evaluation.evaluatorVersion()).isEqualTo(DefaultExperimentEvaluator.VERSION);
+    }
+
+    @Test
+    void evaluatorUsesZeroWinRateWhenThereAreNoTrades() {
+        BacktestResult result = new BacktestResult(
+                ExperimentTestFixtures.EXPERIMENT_ID,
+                ExperimentTestFixtures.CANDIDATE_ID,
+                List.of(),
+                List.of(),
+                List.of(equity("10000", 0)),
+                new BigDecimal("10000"),
+                ExperimentTestFixtures.START,
+                ExperimentTestFixtures.START.plusSeconds(1),
+                "engine-v1");
+
+        Evaluation evaluation = new DefaultExperimentEvaluator().evaluate(
+                result,
+                ExperimentTestFixtures.executionConfig(),
+                ExperimentTestFixtures.START.plusSeconds(2));
+
+        assertThat(evaluation.metrics().winRatePct()).isZero();
     }
 
     @Test
@@ -77,6 +104,18 @@ class EvaluationRankingStateTest {
 
     private static EquityPoint equity(String value, int minute) {
         return new EquityPoint(ExperimentTestFixtures.START.plusSeconds(minute * 60L), new BigDecimal(value));
+    }
+
+    private static Trade trade(String pnl, int minute) {
+        Instant entry = ExperimentTestFixtures.START.plusSeconds(minute * 60L);
+        return new Trade(
+                entry,
+                new BigDecimal("100"),
+                entry.plusSeconds(30),
+                new BigDecimal("101"),
+                BigDecimal.ONE,
+                BigDecimal.ZERO,
+                new BigDecimal(pnl));
     }
 
     private static Evaluation evaluation(UUID id, String score, String returns, String drawdown) {

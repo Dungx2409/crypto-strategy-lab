@@ -98,11 +98,13 @@ public final class BinanceMarketDataProvider implements MarketDataProvider {
         return transport.connect(
                 uri,
                 listener::onConnected,
-                payload -> mapper.realtime(payload).ifPresent(candle -> {
+                payload -> {
+                    var update = mapper.realtime(payload);
+                    var candle = update.candle();
                     if (candle.symbol().equals(pair.symbol()) && candle.timeframe() == timeframe) {
-                        listener.onCandle(candle);
+                        listener.onCandle(update);
                     }
-                }),
+                },
                 listener::onDisconnected);
     }
 

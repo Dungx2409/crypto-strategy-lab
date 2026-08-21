@@ -170,7 +170,8 @@ public class JdbcExperimentRepository
         return jdbcTemplate.query(
                 """
                 SELECT e.id, e.evaluator_version, e.completed_at,
-                       m.total_return_pct, m.max_drawdown_pct, m.total_trades, m.score
+                       m.total_return_pct, m.max_drawdown_pct, m.total_trades,
+                       m.win_rate_pct, m.score
                 FROM experiments e
                 JOIN evaluation_metrics m ON m.experiment_id = e.id
                 WHERE e.search_run_id = ? AND e.status = 'COMPLETED'
@@ -192,8 +193,8 @@ public class JdbcExperimentRepository
                     """
                     INSERT INTO leaderboard_entries (
                         search_run_id, experiment_id, rank, score, return_pct,
-                        max_drawdown_pct, total_trades, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        max_drawdown_pct, total_trades, win_rate_pct, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     searchRunId,
                     ranking.experimentId(),
@@ -202,6 +203,7 @@ public class JdbcExperimentRepository
                     ranking.metrics().totalReturnPct(),
                     ranking.metrics().maxDrawdownPct(),
                     ranking.metrics().totalTrades(),
+                    ranking.metrics().winRatePct(),
                     timestamp(updatedAt));
         }
     }
@@ -211,7 +213,7 @@ public class JdbcExperimentRepository
         return jdbcTemplate.query(
                 """
                 SELECT l.search_run_id, l.rank, l.experiment_id, l.score, l.return_pct,
-                       l.max_drawdown_pct, l.total_trades, c.candidate_spec_json
+                       l.max_drawdown_pct, l.total_trades, l.win_rate_pct, c.candidate_spec_json
                 FROM leaderboard_entries l
                 JOIN experiments e ON e.id = l.experiment_id
                 JOIN candidates c ON c.id = e.candidate_id
@@ -226,6 +228,7 @@ public class JdbcExperimentRepository
                             resultSet.getBigDecimal("return_pct"),
                             resultSet.getBigDecimal("max_drawdown_pct"),
                             resultSet.getInt("total_trades"),
+                            resultSet.getBigDecimal("win_rate_pct"),
                             resultSet.getBigDecimal("score"));
                     Ranking ranking = new Ranking(
                             resultSet.getInt("rank"),
@@ -247,7 +250,7 @@ public class JdbcExperimentRepository
         List<DetailsRow> rows = jdbcTemplate.query(
                 """
                 SELECT e.*, c.candidate_spec_json, m.total_return_pct, m.max_drawdown_pct,
-                       m.total_trades, m.score,
+                       m.total_trades, m.win_rate_pct, m.score,
                        (SELECT l.rank FROM leaderboard_entries l
                         WHERE l.search_run_id = e.search_run_id AND l.experiment_id = e.id) AS leaderboard_rank
                 FROM experiments e
@@ -472,13 +475,15 @@ public class JdbcExperimentRepository
         jdbcTemplate.update(
                 """
                 INSERT INTO evaluation_metrics (
-                    experiment_id, total_return_pct, max_drawdown_pct, total_trades, score, metrics_json
-                ) VALUES (?, ?, ?, ?, ?, CAST(? AS jsonb))
+                    experiment_id, total_return_pct, max_drawdown_pct, total_trades,
+                    win_rate_pct, score, metrics_json
+                ) VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb))
                 """,
                 experimentId,
                 metrics.totalReturnPct(),
                 metrics.maxDrawdownPct(),
                 metrics.totalTrades(),
+                metrics.winRatePct(),
                 metrics.score(),
                 json(metrics));
     }
@@ -569,6 +574,7 @@ public class JdbcExperimentRepository
                 resultSet.getBigDecimal("total_return_pct"),
                 resultSet.getBigDecimal("max_drawdown_pct"),
                 resultSet.getInt("total_trades"),
+                resultSet.getBigDecimal("win_rate_pct"),
                 resultSet.getBigDecimal("score"));
     }
 

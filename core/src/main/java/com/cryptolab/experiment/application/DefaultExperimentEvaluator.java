@@ -5,6 +5,7 @@ import com.cryptolab.experiment.domain.EquityPoint;
 import com.cryptolab.experiment.domain.Evaluation;
 import com.cryptolab.experiment.domain.EvaluationMetrics;
 import com.cryptolab.experiment.domain.ExecutionConfig;
+import com.cryptolab.experiment.domain.Trade;
 import com.cryptolab.experiment.port.ExperimentEvaluator;
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -33,13 +34,28 @@ public final class DefaultExperimentEvaluator implements ExperimentEvaluator {
                 .divide(executionConfig.initialCapital(), MATH_CONTEXT)
                 .multiply(ONE_HUNDRED);
         BigDecimal maxDrawdown = calculateMaxDrawdown(result);
+        BigDecimal winRate = calculateWinRate(result);
         BigDecimal score = totalReturn.subtract(maxDrawdown.abs().multiply(HALF));
         EvaluationMetrics metrics = new EvaluationMetrics(
                 normalize(totalReturn),
                 normalize(maxDrawdown),
                 result.trades().size(),
+                normalize(winRate),
                 normalize(score));
         return new Evaluation(result.experimentId(), metrics, VERSION, evaluatedAt);
+    }
+
+    private static BigDecimal calculateWinRate(BacktestResult result) {
+        if (result.trades().isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        long winningTrades = result.trades().stream()
+                .map(Trade::pnl)
+                .filter(pnl -> pnl.signum() > 0)
+                .count();
+        return BigDecimal.valueOf(winningTrades)
+                .divide(BigDecimal.valueOf(result.trades().size()), MATH_CONTEXT)
+                .multiply(ONE_HUNDRED);
     }
 
     private static BigDecimal calculateMaxDrawdown(BacktestResult result) {

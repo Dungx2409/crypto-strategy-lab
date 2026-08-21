@@ -1,6 +1,7 @@
 package com.cryptolab.marketdata.application;
 
 import com.cryptolab.marketdata.domain.Candle;
+import com.cryptolab.marketdata.domain.CandleUpdate;
 import com.cryptolab.marketdata.domain.MarketDataHealthStatus;
 import com.cryptolab.marketdata.domain.Timeframe;
 import com.cryptolab.marketdata.domain.TradingPair;
@@ -113,8 +114,8 @@ public final class MarketDataStreamService implements AutoCloseable {
             state.subscription = provider.subscribe(
                     state.key.pair(), state.key.timeframe(), new CandleListener() {
                         @Override
-                        public void onCandle(Candle candle) {
-                            acceptRealtime(state, generation, candle);
+                        public void onCandle(CandleUpdate update) {
+                            acceptRealtime(state, generation, update);
                         }
 
                         @Override
@@ -158,7 +159,7 @@ public final class MarketDataStreamService implements AutoCloseable {
                     state.key.pair(), state.key.timeframe(), lastOpenTime, now)) {
                 if (store.saveIfAbsent(candle)) {
                     recovered++;
-                    publisher.publishClosed(candle);
+                    publisher.publish(CandleUpdate.closed(candle));
                     recordLatency(candle);
                 }
             }
@@ -166,13 +167,18 @@ public final class MarketDataStreamService implements AutoCloseable {
         });
     }
 
-    private void acceptRealtime(StreamState state, long generation, Candle candle) {
+    private void acceptRealtime(StreamState state, long generation, CandleUpdate update) {
         synchronized (state) {
             if (!isCurrent(state, generation)) {
                 return;
             }
+            if (!update.closed()) {
+                publisher.publish(update);
+                return;
+            }
+            Candle candle = update.candle();
             if (store.saveIfAbsent(candle)) {
-                publisher.publishClosed(candle);
+                publisher.publish(update);
                 recordLatency(candle);
             }
         }

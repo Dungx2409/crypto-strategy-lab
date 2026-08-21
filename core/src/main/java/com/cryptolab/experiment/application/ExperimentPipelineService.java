@@ -112,6 +112,7 @@ public final class ExperimentPipelineService {
         }
         return close(left.totalReturnPct(), right.totalReturnPct())
                 && close(left.maxDrawdownPct(), right.maxDrawdownPct())
+                && close(left.winRatePct(), right.winRatePct())
                 && close(left.score(), right.score());
     }
 

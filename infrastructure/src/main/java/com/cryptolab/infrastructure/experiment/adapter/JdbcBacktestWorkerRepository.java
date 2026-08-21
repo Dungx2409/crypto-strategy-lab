@@ -165,6 +165,7 @@ public class JdbcBacktestWorkerRepository implements BacktestWorkerRepository {
                 DomainEventTopology.EXCHANGE,
                 DomainEventTopology.BACKTEST_COMPLETED_ROUTING_KEY,
                 timestamp(completedEvent.occurredAt()));
+        completeSearchRunIfDrained(claim.searchRunId(), completedAt);
     }
 
     @Override
@@ -261,6 +262,7 @@ public class JdbcBacktestWorkerRepository implements BacktestWorkerRepository {
             throw new ConcurrentModificationException(
                     "cannot cancel active worker claim: " + claim.experimentId());
         }
+        completeSearchRunIfDrained(claim.searchRunId(), cancelledAt);
     }
 
     @Override
@@ -297,6 +299,23 @@ public class JdbcBacktestWorkerRepository implements BacktestWorkerRepository {
         if (experimentUpdated != 1) {
             throw new ConcurrentModificationException("experiment failure claim lost: " + claim.experimentId());
         }
+        completeSearchRunIfDrained(claim.searchRunId(), failedAt);
+    }
+
+    private void completeSearchRunIfDrained(UUID searchRunId, Instant completedAt) {
+        jdbcTemplate.update(
+                """
+                UPDATE search_runs sr
+                SET status = 'COMPLETED', ended_at = ?
+                WHERE sr.id = ? AND sr.status = 'EVALUATING'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM backtest_jobs job
+                      WHERE job.search_run_id = sr.id
+                        AND job.status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED')
+                  )
+                """,
+                timestamp(completedAt),
+                searchRunId);
     }
 
     private BacktestJobClaim currentDecision(UUID experimentId) {
@@ -375,13 +394,15 @@ public class JdbcBacktestWorkerRepository implements BacktestWorkerRepository {
         jdbcTemplate.update(
                 """
                 INSERT INTO evaluation_metrics (
-                    experiment_id, total_return_pct, max_drawdown_pct, total_trades, score, metrics_json
-                ) VALUES (?, ?, ?, ?, ?, CAST(? AS jsonb))
+                    experiment_id, total_return_pct, max_drawdown_pct, total_trades,
+                    win_rate_pct, score, metrics_json
+                ) VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb))
                 """,
                 experimentId,
                 metrics.totalReturnPct(),
                 metrics.maxDrawdownPct(),
                 metrics.totalTrades(),
+                metrics.winRatePct(),
                 metrics.score(),
                 json(metrics));
     }

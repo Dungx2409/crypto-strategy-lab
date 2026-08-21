@@ -59,7 +59,8 @@ public class JdbcAsyncEventRepository implements AsyncEvaluationRepository, Asyn
         return jdbcTemplate.query(
                 """
                 SELECT e.id, e.evaluator_version, e.completed_at,
-                       m.total_return_pct, m.max_drawdown_pct, m.total_trades, m.score
+                       m.total_return_pct, m.max_drawdown_pct, m.total_trades,
+                       m.win_rate_pct, m.score
                 FROM experiments e
                 JOIN evaluation_metrics m ON m.experiment_id = e.id
                 WHERE e.search_run_id = ? AND e.status = 'COMPLETED'
@@ -108,7 +109,8 @@ public class JdbcAsyncEventRepository implements AsyncEvaluationRepository, Asyn
         List<PersistedCompletion> rows = jdbcTemplate.query(
                 """
                 SELECT e.search_run_id, e.status, e.evaluator_version,
-                       m.total_return_pct, m.max_drawdown_pct, m.total_trades, m.score
+                       m.total_return_pct, m.max_drawdown_pct, m.total_trades,
+                       m.win_rate_pct, m.score
                 FROM experiments e
                 JOIN evaluation_metrics m ON m.experiment_id = e.id
                 WHERE e.id = ?
@@ -158,7 +160,8 @@ public class JdbcAsyncEventRepository implements AsyncEvaluationRepository, Asyn
     private List<Ranking> currentRankings(UUID searchRunId) {
         return jdbcTemplate.query(
                 """
-                SELECT rank, experiment_id, score, return_pct, max_drawdown_pct, total_trades
+                SELECT rank, experiment_id, score, return_pct, max_drawdown_pct,
+                       total_trades, win_rate_pct
                 FROM leaderboard_entries
                 WHERE search_run_id = ?
                 ORDER BY rank
@@ -170,6 +173,7 @@ public class JdbcAsyncEventRepository implements AsyncEvaluationRepository, Asyn
                                 resultSet.getBigDecimal("return_pct"),
                                 resultSet.getBigDecimal("max_drawdown_pct"),
                                 resultSet.getInt("total_trades"),
+                                resultSet.getBigDecimal("win_rate_pct"),
                                 resultSet.getBigDecimal("score"))),
                 searchRunId);
     }
@@ -181,8 +185,8 @@ public class JdbcAsyncEventRepository implements AsyncEvaluationRepository, Asyn
                     """
                     INSERT INTO leaderboard_entries (
                         search_run_id, experiment_id, rank, score, return_pct,
-                        max_drawdown_pct, total_trades, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        max_drawdown_pct, total_trades, win_rate_pct, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     searchRunId,
                     ranking.experimentId(),
@@ -191,6 +195,7 @@ public class JdbcAsyncEventRepository implements AsyncEvaluationRepository, Asyn
                     ranking.metrics().totalReturnPct(),
                     ranking.metrics().maxDrawdownPct(),
                     ranking.metrics().totalTrades(),
+                    ranking.metrics().winRatePct(),
                     timestamp(updatedAt));
         }
     }
@@ -220,6 +225,7 @@ public class JdbcAsyncEventRepository implements AsyncEvaluationRepository, Asyn
                 resultSet.getBigDecimal("total_return_pct"),
                 resultSet.getBigDecimal("max_drawdown_pct"),
                 resultSet.getInt("total_trades"),
+                resultSet.getBigDecimal("win_rate_pct"),
                 resultSet.getBigDecimal("score"));
     }
 
@@ -243,6 +249,7 @@ public class JdbcAsyncEventRepository implements AsyncEvaluationRepository, Asyn
         return left.totalTrades() == right.totalTrades()
                 && left.totalReturnPct().compareTo(right.totalReturnPct()) == 0
                 && left.maxDrawdownPct().compareTo(right.maxDrawdownPct()) == 0
+                && left.winRatePct().compareTo(right.winRatePct()) == 0
                 && left.score().compareTo(right.score()) == 0;
     }
 

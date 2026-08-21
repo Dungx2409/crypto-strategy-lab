@@ -114,7 +114,8 @@ class ExperimentControllerTest {
                 .andExpect(jsonPath("$.generator.type").value("manual"))
                 .andExpect(jsonPath("$.signals.length()").value(6))
                 .andExpect(jsonPath("$.trades.length()").value(1))
-                .andExpect(jsonPath("$.metrics.totalTrades").value(1));
+                .andExpect(jsonPath("$.metrics.totalTrades").value(1))
+                .andExpect(jsonPath("$.metrics.winRatePct").value(100));
 
         mockMvc.perform(get("/api/v1/experiments/{id}", EXPERIMENT_ID))
                 .andExpect(status().isOk())
@@ -128,14 +129,16 @@ class ExperimentControllerTest {
                 .andExpect(jsonPath("$.dataset.timeframe").value("5m"))
                 .andExpect(jsonPath("$.dataset.datasetVersion").value("api-test-v1"))
                 .andExpect(jsonPath("$.executionConfig.feeRate").value(0.001))
-                .andExpect(jsonPath("$.evaluatorVersion").value(DefaultExperimentEvaluator.VERSION));
+                .andExpect(jsonPath("$.evaluatorVersion").value(DefaultExperimentEvaluator.VERSION))
+                .andExpect(jsonPath("$.metrics.winRatePct").value(100));
 
         mockMvc.perform(get("/api/v1/leaderboard")
                         .param("searchRunId", SEARCH_RUN_ID.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].rank").value(1))
                 .andExpect(jsonPath("$.items[0].experimentId").value(EXPERIMENT_ID.toString()))
-                .andExpect(jsonPath("$.items[0].strategySummary").value("TEST"));
+                .andExpect(jsonPath("$.items[0].strategySummary").value("TEST"))
+                .andExpect(jsonPath("$.items[0].winRatePct").value(100));
 
         mockMvc.perform(post("/api/v1/experiments/{id}/rerun", EXPERIMENT_ID))
                 .andExpect(status().isOk())

@@ -4,6 +4,7 @@ public enum SearchRunStatus {
     CREATED,
     RUNNING,
     PAUSED,
+    EVALUATING,
     COMPLETED,
     CANCELLED,
     FAILED

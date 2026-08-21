@@ -36,7 +36,32 @@ function renderStrategies() {
         label.append(check, document.createTextNode(` ${plugin.type}`)); const version = document.createElement("span"); version.className = "muted"; version.textContent = plugin.version; header.append(label, version); card.append(header);
         const grid = document.createElement("div"); grid.className = "parameter-grid";
         Object.entries(plugin.parameterSchema).forEach(([name, schema]) => { const field = document.createElement("label"); field.textContent = name; const input = document.createElement("input"); input.dataset.parameter = name; input.dataset.parameterType = schema.type; input.value = suggestedValues(name, schema); field.append(input); grid.append(field); });
-        card.append(grid); host.append(card);
+        const weightField = document.createElement("label");
+        weightField.className = "weight-field";
+        weightField.textContent = "Voting weight";
+        const weight = document.createElement("input");
+        weight.type = "range";
+        weight.min = "0.1";
+        weight.max = "1";
+        weight.step = "0.1";
+        weight.value = "1";
+        weight.className = "strategy-weight";
+        weightField.append(weight);
+        check.addEventListener("change", renderSelectedStrategyChips);
+        card.append(grid, weightField); host.append(card);
+    });
+    renderSelectedStrategyChips();
+}
+
+function renderSelectedStrategyChips() {
+    const host = byId("selected-strategy-chips");
+    host.replaceChildren();
+    document.querySelectorAll(".strategy-card").forEach(card => {
+        if (!card.querySelector(".strategy-enabled").checked) return;
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.textContent = card.dataset.type;
+        host.append(chip);
     });
 }
 
@@ -50,7 +75,7 @@ function selectedSearchConfiguration() {
     const strategyTypes = [], strategyVersions = {}, parameterSpace = {}, weights = {};
     document.querySelectorAll(".strategy-card").forEach(card => {
         if (!card.querySelector(".strategy-enabled").checked) return;
-        const type = card.dataset.type; strategyTypes.push(type); strategyVersions[type] = card.dataset.version; weights[type] = 1; parameterSpace[type] = {};
+        const type = card.dataset.type; strategyTypes.push(type); strategyVersions[type] = card.dataset.version; weights[type] = Number(card.querySelector(".strategy-weight").value); parameterSpace[type] = {};
         card.querySelectorAll("[data-parameter]").forEach(input => { parameterSpace[type][input.dataset.parameter] = input.value.split(",").map(raw => raw.trim()).filter(Boolean).map(raw => input.dataset.parameterType === "integer" ? Number.parseInt(raw,10) : Number(raw)); });
     });
     if (!strategyTypes.length) throw new Error("Select at least one strategy.");
@@ -88,8 +113,8 @@ function renderSearch(run) {
 function beginPolling() { clearInterval(labState.poll); labState.poll = setInterval(async () => { if (!labState.searchRunId) return; try { const run = await api(`/api/v1/search-runs/${labState.searchRunId}`); renderSearch(run); await loadLeaderboard(); } catch (error) { byId("search-message").textContent = error.message; } }, 2000); }
 async function loadLeaderboard() {
     if (!labState.searchRunId) return; const data = await api(`/api/v1/leaderboard?searchRunId=${labState.searchRunId}&limit=50`); const body = byId("leaderboard-body"); body.replaceChildren();
-    if (!data.items.length) { const row = body.insertRow(); const cell = row.insertCell(); cell.colSpan = 6; cell.className = "empty"; cell.textContent = "No completed experiments yet."; return; }
-    data.items.forEach(item => { const row = body.insertRow(); row.dataset.experimentId = item.experimentId; [item.rank,item.strategySummary,`${item.returnPct}%`,`${item.maxDrawdownPct}%`,item.totalTrades,item.score].forEach(value => { const cell = row.insertCell(); cell.textContent = value; }); row.addEventListener("click", () => loadExperiment(item.experimentId)); });
+    if (!data.items.length) { const row = body.insertRow(); const cell = row.insertCell(); cell.colSpan = 7; cell.className = "empty"; cell.textContent = "No completed experiments yet."; return; }
+    data.items.forEach(item => { const row = body.insertRow(); row.dataset.experimentId = item.experimentId; [item.rank,item.strategySummary,`${item.returnPct}%`,`${item.winRatePct ?? "-"}%`,`${item.maxDrawdownPct}%`,item.totalTrades,item.score].forEach(value => { const cell = row.insertCell(); cell.textContent = value; }); row.addEventListener("click", () => loadExperiment(item.experimentId)); });
     if (!document.querySelector("[data-selected-experiment]") && data.items[0]) loadExperiment(data.items[0].experimentId);
 }
 
@@ -99,8 +124,15 @@ async function loadExperiment(experimentId) {
     byId("experiment-message").textContent = "Loading immutable result…";
     try {
         const [details, provenance] = await Promise.all([api(`/api/v1/experiments/${experimentId}`), api(`/api/v1/experiments/${experimentId}/provenance`)]); byId("experiment-rank").textContent = details.rank ? `TOP #${details.rank}` : details.status; byId("experiment-rank").className = "status status-online"; byId("experiment-message").textContent = `${details.strategies.map(s => `${s.type}@${s.version}`).join(" + ")} · ${details.dataset.symbol} ${details.dataset.timeframe}`;
-        const grid = byId("provenance-grid"); grid.replaceChildren(provenanceItem("Experiment",details.experimentId),provenanceItem("Candidate hash",details.candidateHash),provenanceItem("Dataset checksum",details.dataset.checksum),provenanceItem("Dataset range",`${details.dataset.from} → ${details.dataset.to}`),provenanceItem("Generator",`${details.generator.type}@${details.generator.version}`),provenanceItem("Evaluator",details.evaluatorVersion),provenanceItem("Engine",`${details.executionConfig.engineVersion} · ${details.executionConfig.fillPolicy}`),provenanceItem("Code / build",`${details.codeCommit} / ${details.buildVersion}`),provenanceItem("Return",details.metrics ? `${details.metrics.totalReturnPct}%` : "—"),provenanceItem("MDD",details.metrics ? `${details.metrics.maxDrawdownPct}%` : "—"),provenanceItem("Trades",details.metrics?.totalTrades),provenanceItem("Score",details.metrics?.score));
-        renderArtifacts("signals", details.signals, signal => `${signal.at} · ${signal.strategyType}@${signal.strategyVersion} · ${signal.type} (${signal.strength}) · ${signal.reason}`); renderArtifacts("trades", details.trades, trade => `${trade.entryTime} @ ${trade.entryPrice} → ${trade.exitTime} @ ${trade.exitPrice} · PnL ${trade.pnl}`); byId("provenance-json").textContent = JSON.stringify(provenance,null,2);
+        byId("backtest-timeframe").value = details.dataset.timeframe;
+        byId("backtest-strategy").value = details.strategies.map(strategy => strategy.type).join(" + ");
+        byId("metric-win-rate").textContent = details.metrics ? `${details.metrics.winRatePct ?? "-"}%` : "-";
+        byId("metric-return").textContent = details.metrics ? `${details.metrics.totalReturnPct}%` : "-";
+        byId("metric-drawdown").textContent = details.metrics ? `${details.metrics.maxDrawdownPct}%` : "-";
+        byId("metric-trades").textContent = details.metrics?.totalTrades ?? "-";
+        const grid = byId("provenance-grid"); grid.replaceChildren(provenanceItem("Experiment",details.experimentId),provenanceItem("Candidate hash",details.candidateHash),provenanceItem("Dataset checksum",details.dataset.checksum),provenanceItem("Dataset range",`${details.dataset.from} to ${details.dataset.to}`),provenanceItem("Generator",`${details.generator.type}@${details.generator.version}`),provenanceItem("Evaluator",details.evaluatorVersion),provenanceItem("Engine",`${details.executionConfig.engineVersion} · ${details.executionConfig.fillPolicy}`),provenanceItem("Code / build",`${details.codeCommit} / ${details.buildVersion}`),provenanceItem("Return",details.metrics ? `${details.metrics.totalReturnPct}%` : "-"),provenanceItem("Win rate",details.metrics ? `${details.metrics.winRatePct ?? "-"}%` : "-"),provenanceItem("MDD",details.metrics ? `${details.metrics.maxDrawdownPct}%` : "-"),provenanceItem("Trades",details.metrics?.totalTrades),provenanceItem("Score",details.metrics?.score));
+        renderArtifacts("signals", details.signals, signal => `${signal.at} · ${signal.strategyType}@${signal.strategyVersion} · ${signal.type} (${signal.strength}) · ${signal.reason}`); renderArtifacts("trades", details.trades, trade => `${trade.entryTime} @ ${trade.entryPrice} to ${trade.exitTime} @ ${trade.exitPrice} · PnL ${trade.pnl}`); byId("provenance-json").textContent = JSON.stringify(provenance,null,2);
+        window.cryptoLabBacktest.render(details);
     } catch (error) { byId("experiment-message").textContent = error.message; }
 }
 function renderArtifacts(id, items, describe) { const host = byId(id); host.replaceChildren(); if (!items?.length) { host.className = "artifact-list empty"; host.textContent = `No ${id}.`; return; } host.className = "artifact-list"; items.forEach(item => { const row = document.createElement("div"); row.className = "artifact-row"; row.textContent = describe(item); host.append(row); }); }

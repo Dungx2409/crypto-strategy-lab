@@ -1,6 +1,5 @@
 package com.cryptolab.api.experiment;
 
-import com.cryptolab.experiment.domain.EvaluationMetrics;
 import com.cryptolab.experiment.domain.ExperimentDetails;
 import com.cryptolab.experiment.domain.ExperimentStatus;
 import com.cryptolab.experiment.domain.GeneratorSnapshot;
@@ -31,7 +30,7 @@ public record ExperimentDetailsResponse(
         UUID reproductionOfExperimentId,
         Instant startedAt,
         Instant completedAt,
-        EvaluationMetrics metrics,
+        EvaluationMetricsResponse metrics,
         List<SignalResponse> signals,
         List<Trade> trades) {
 
@@ -55,7 +54,7 @@ public record ExperimentDetailsResponse(
                 experiment.reproductionOfExperimentId(),
                 experiment.startedAt(),
                 experiment.completedAt(),
-                details.metrics(),
+                EvaluationMetricsResponse.from(details.metrics()),
                 details.signals().stream().map(SignalResponse::from).toList(),
                 details.trades());
     }

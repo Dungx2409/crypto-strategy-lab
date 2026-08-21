@@ -40,11 +40,11 @@ The detailed normative requirements remain in `FEATURE_SPEC.md`.
 | Requirement | Evidence |
 |---|---|
 | Historical Binance candles | `BinanceMarketDataProvider`, payload/provider tests, and `/api/v1/market/candles` |
-| Realtime closed candles | Java HTTP WebSocket transport, normalized mapper, STOMP `/topic/market/{symbol}/{timeframe}` |
+| Realtime open and closed candle updates | Normalized `CandleUpdate`, Java HTTP WebSocket transport, and STOMP `/topic/market/{symbol}/{timeframe}`; open updates replace the current browser candle while only closed candles persist |
 | Provider DTO isolation | Package-private `BinanceKlineDto` plus ArchUnit no-leak rule |
 | Reconnect and gap recovery | `MarketDataStreamServiceTest` fake disconnect/reconnect/repeated-candle scenario |
 | Duplicate protection | PostgreSQL primary key, `ON CONFLICT DO NOTHING`, and `CandleStoreIT` |
-| Timeframe isolation | Reference-counted STOMP subscription tracker and `MarketDashboardIsolationTest` |
+| Four independent timeframes | Four browser chart states, independent STOMP subscription IDs, reference-counted backend streams, 1m/5m/15m/1h/4h support, `ReferenceDashboardTest`, and `MarketDashboardIsolationTest` |
 | Basic observability | Market health indicator and reconnect/recovery/UI-latency Micrometer meters |
 | M3 remained outside M2 | M2 verification predates the MA/RSI/BB/SR and combination implementations delivered in M3 |
 
@@ -68,7 +68,7 @@ The detailed normative requirements remain in `FEATURE_SPEC.md`.
 | Candidate → Backtest → Evaluate → Rank | `ExperimentPipelineService` and its operation-order unit test |
 | No look-ahead bias | `DeterministicBacktestEngine` exposes only candle prefixes and fills a candle-N signal at candle-N+1 open; price/time assertions cover the rule |
 | Deterministic identity | Canonical SHA-256 candidate hash and ordered candle dataset checksum tests |
-| Required metrics and tie-break | Versioned evaluator plus ranking unit tests for score, return, absolute drawdown, and lexical experiment ID |
+| Required metrics and tie-break | Versioned evaluator plus ranking tests for return, win rate, maximum drawdown, trade count, score, and lexical experiment ID; Flyway V9 stores win rate in evaluation and leaderboard projections |
 | Durable artifacts | `JdbcExperimentRepository` transactionally persists signals, trades, metrics, completion state, and leaderboard projection |
 | Immutable provenance | PostgreSQL integration test reconstructs candidate, dataset candles/checksum, execution/generator/evaluator/code snapshots and verifies stored JSON remains unchanged |
 | Reproduction | Provenance/detail/rerun REST tests and PostgreSQL rerun test compare metrics within the configured tolerance and record `reproductionOfExperimentId` |
@@ -79,13 +79,13 @@ The detailed normative requirements remain in `FEATURE_SPEC.md`.
 
 | Requirement | Evidence |
 |---|---|
-| Deterministic Random generation | `RandomStrategyGeneratorTest` proves equal seed/version/parameter-space produces the same ordered candidate sequence and a different seed changes only ordering |
+| Deterministic Random generation | `RandomStrategyGeneratorTest` proves equal seed/version/parameter-space produces the same ordered candidate sequence, varies non-empty strategy membership subsets, and changes only ordering for another seed |
 | Exact reproducible search input | `SearchContext` persists dataset reference, selected strategy versions, immutable parameter choices, policy, seed, stops, and batch size |
 | Streaming rather than materialization | Lazy deterministic permutation spliterator plus coordinator test showing an infinite source is requested only up to `maxCandidates` |
 | Bounded batch persistence | `SearchCoordinatorTest` verifies batch sizes; `SearchRunIT` verifies PostgreSQL counts and configuration snapshots |
 | Stop conditions | `StopConditionEvaluator` covers candidate count, duration, and no-improvement feedback; finite parameter-space exhaustion is an explicit reason |
 | Cancellation | API cancel endpoint plus concurrent PostgreSQL integration test proving cancellation is observed at the next batch boundary |
-| Search lifecycle | State-machine tests protect terminal states; JDBC transitions use expected-status compare/update |
+| Search lifecycle | Generation hands `RUNNING` to nonterminal `EVALUATING`; the last durable terminal worker transaction changes the run to `COMPLETED`; cancellation accepts `EVALUATING`; state-machine, PostgreSQL, and RabbitMQ tests cover handoff and races |
 | Schema evolution | Flyway `V2__add_search_run_progress.sql` adds counters, evaluation feedback, terminal reason, and failure fields |
 | Architecture isolation | Search controller cannot depend on Infrastructure; generators cannot depend on Backtester, Evaluator, or Ranking |
 | M5.1 checkpoint boundary | The M5.1 evidence predates M5.2; at that checkpoint no messaging behavior was claimed |
@@ -155,7 +155,7 @@ The detailed normative requirements remain in `FEATURE_SPEC.md`.
 
 | Requirement | Evidence |
 |---|---|
-| Complete backend-driven dashboard | Market, Strategy, Search, Leaderboard, Experiment Details/Provenance, News/Sentiment, and System Status panels in `index.html`; `lab.js`, `market.js`, and `news.js` call only REST/STOMP contracts; `M7DashboardTest` rejects missing panels and fabricated data |
+| Complete backend-driven dashboard | Separate light-theme Realtime, Strategy, Discovery, Backtest, News, and Settings views; four independent charts with candles, volume, MA20, and signals; result metrics, trade rows, entry/exit markers, leaderboard, provenance, and sentiment counts; static scripts call only REST/STOMP contracts; `ReferenceDashboardTest` and `M7DashboardTest` reject missing screens and fabricated data |
 | Reproducible search input | `POST /api/v1/datasets` materializes the exact displayed candle snapshot with deterministic checksum and idempotent persistence before SearchRun creation; unit/controller/PostgreSQL tests cover the path |
 | Generator runtime replacement | Both Random and Genetic implementations are registered behind `StrategyGenerator`; `?generator=` selects per run and the selected type is persisted; replacement and architecture tests prove downstream independence |
 | Operational visibility | `GET /api/v1/system/status`, independent Actuator health components, and Micrometer meters cover active searches, candidates, queue depth, job outcomes/duration/duplicates, outbox backlog, Market recovery/UI latency, and News/Sentiment failure/duration |

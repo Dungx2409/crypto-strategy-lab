@@ -20,6 +20,7 @@ public record LeaderboardResponse(UUID searchRunId, List<Item> items) {
             BigDecimal returnPct,
             BigDecimal maxDrawdownPct,
             int totalTrades,
+            BigDecimal winRatePct,
             BigDecimal score) {
 
         private static Item from(LeaderboardEntry entry) {
@@ -31,6 +32,7 @@ public record LeaderboardResponse(UUID searchRunId, List<Item> items) {
                     ranking.metrics().totalReturnPct(),
                     ranking.metrics().maxDrawdownPct(),
                     ranking.metrics().totalTrades(),
+                    ranking.metrics().winRatePct(),
                     ranking.metrics().score());
         }
     }

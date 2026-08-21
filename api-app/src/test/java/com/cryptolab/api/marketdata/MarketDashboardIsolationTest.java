@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class MarketDashboardIsolationTest {
 
     @Test
-    void timeframeChangeOnlyReplacesTheMarketSubscriptionAndMarketData() throws IOException {
+    void timeframeChangeOnlyReloadsTheSelectedChartSubscriptionAndData() throws IOException {
         String javascript;
         try (var input = getClass().getResourceAsStream("/static/market.js")) {
             if (input == null) {
@@ -19,10 +19,12 @@ class MarketDashboardIsolationTest {
         }
 
         assertThat(javascript)
-                .contains("timeframeSelect.addEventListener(\"change\", reloadMarketSlice)")
-                .contains("unsubscribeMarketStream();")
+                .contains("chartStates")
+                .contains("state.timeframeSelect.addEventListener(\"change\", () => reloadChart(state.index))")
+                .contains("unsubscribeChart(index);")
                 .contains("/api/v1/market/candles")
-                .contains("subscribeMarketStream();")
+                .contains("subscribeChart(index);")
+                .contains("event.type !== \"CANDLE_UPDATE\"")
                 .doesNotContain("location.reload")
                 .doesNotContain("/api/v1/news")
                 .doesNotContain("/api/v1/leaderboard")

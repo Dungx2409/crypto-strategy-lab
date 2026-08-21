@@ -46,7 +46,7 @@ class SearchCoordinatorTest {
 
         SearchRunSummary result = coordinator.start(command(new StopConditions(7L, null, null), 3));
 
-        assertThat(result.run().status()).isEqualTo(SearchRunStatus.COMPLETED);
+        assertThat(result.run().status()).isEqualTo(SearchRunStatus.EVALUATING);
         assertThat(result.stopReason()).isEqualTo(SearchStopReason.MAX_CANDIDATES);
         assertThat(result.generatedCandidates()).isEqualTo(7);
         assertThat(result.persistedCandidates()).isEqualTo(7);
@@ -82,7 +82,7 @@ class SearchCoordinatorTest {
     }
 
     @Test
-    void publishesCreatedRunningBatchAndTerminalProgressWithoutCouplingToWebsocket() {
+    void publishesCreatedRunningBatchAndEvaluatingProgressWithoutCouplingToWebsocket() {
         RecordingRepository repository = new RecordingRepository();
         List<SearchRunSummary> updates = new ArrayList<>();
         SearchCoordinator coordinator = new SearchCoordinator(
@@ -97,7 +97,7 @@ class SearchCoordinatorTest {
 
         assertThat(updates).extracting(update -> update.run().status())
                 .containsSequence(SearchRunStatus.CREATED, SearchRunStatus.RUNNING)
-                .endsWith(SearchRunStatus.COMPLETED);
+                .endsWith(SearchRunStatus.EVALUATING);
         assertThat(updates).extracting(SearchRunSummary::generatedCandidates)
                 .contains(2L, 3L);
     }
@@ -231,6 +231,17 @@ class SearchCoordinatorTest {
                     target == SearchRunStatus.COMPLETED || target == SearchRunStatus.CANCELLED
                             || target == SearchRunStatus.FAILED ? at : null,
                     run.cancelRequested());
+        }
+
+        @Override
+        public void finishGeneration(
+                UUID searchRunId, SearchStopReason stopReason, Instant at) {
+            transition(
+                    searchRunId,
+                    SearchRunStatus.RUNNING,
+                    SearchRunStatus.EVALUATING,
+                    stopReason,
+                    at);
         }
 
         @Override

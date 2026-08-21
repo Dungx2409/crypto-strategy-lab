@@ -209,6 +209,8 @@ class BacktestWorkerIT {
         UUID experimentId = createConfirmedJob();
         Message message = jobMessage(experimentId);
 
+        assertThat(searchRunStatus(experimentId)).isEqualTo("EVALUATING");
+
         rabbitTemplate.send(
                 BacktestJobTopology.JOB_EXCHANGE, BacktestJobTopology.JOB_ROUTING_KEY, message);
         rabbitTemplate.send(
@@ -224,6 +226,20 @@ class BacktestWorkerIT {
         assertThat(afterDuplicate.trades()).isPositive();
         assertThat(afterDuplicate.completedEvents()).isEqualTo(1);
         assertThat(status("experiments", experimentId)).isEqualTo("COMPLETED");
+        assertThat(searchRunStatus(experimentId)).isEqualTo("COMPLETED");
+        BigDecimal persistedWinRate = jdbc.queryForObject(
+                "SELECT win_rate_pct FROM evaluation_metrics WHERE experiment_id = ?",
+                BigDecimal.class,
+                experimentId);
+        BigDecimal calculatedWinRate = jdbc.queryForObject(
+                """
+                SELECT 100.0 * COUNT(*) FILTER (WHERE pnl > 0) / COUNT(*)
+                FROM trades
+                WHERE experiment_id = ?
+                """,
+                BigDecimal.class,
+                experimentId);
+        assertThat(persistedWinRate).isEqualByComparingTo(calculatedWinRate);
 
         rabbitTemplate.send(
                 BacktestJobTopology.JOB_EXCHANGE, BacktestJobTopology.JOB_ROUTING_KEY, jobMessage(experimentId));
@@ -300,6 +316,8 @@ class BacktestWorkerIT {
                 UUID.class,
                 experimentId);
 
+        assertThat(searchRuns.findSummary(searchRunId).orElseThrow().run().status())
+                .isEqualTo(SearchRunStatus.EVALUATING);
         assertThat(searchRuns.cancel(searchRunId, Instant.now())).isTrue();
         rabbitTemplate.send(
                 BacktestJobTopology.JOB_EXCHANGE,
@@ -318,7 +336,7 @@ class BacktestWorkerIT {
             throws Exception {
         listenerContainers.get(1).stop();
         listenerContainers.get(2).stop();
-        trackingBacktest.enableDelay(Duration.ofMillis(150));
+        trackingBacktest.enableDelay(Duration.ofMillis(400));
         trackingBacktest.resetMaximumConcurrency();
         List<UUID> singleReplicaJobs = createConfirmedJobs(6);
 
@@ -448,6 +466,8 @@ class BacktestWorkerIT {
                 "UPDATE experiments SET status = 'QUEUED', version = version + 1 "
                         + "WHERE id = ? AND status = 'CREATED'",
                 experimentId);
+        searchRuns.finishGeneration(searchRunId, com.cryptolab.experiment.domain.SearchStopReason.MAX_CANDIDATES,
+                Instant.now());
         return experimentId;
     }
 
@@ -490,6 +510,18 @@ class BacktestWorkerIT {
         String identity = table.equals("experiments") ? "id" : "experiment_id";
         return jdbc.queryForObject(
                 "SELECT status FROM " + table + " WHERE " + identity + " = ?",
+                String.class,
+                experimentId);
+    }
+
+    private static String searchRunStatus(UUID experimentId) {
+        return jdbc.queryForObject(
+                """
+                SELECT sr.status
+                FROM search_runs sr
+                JOIN backtest_jobs job ON job.search_run_id = sr.id
+                WHERE job.experiment_id = ?
+                """,
                 String.class,
                 experimentId);
     }

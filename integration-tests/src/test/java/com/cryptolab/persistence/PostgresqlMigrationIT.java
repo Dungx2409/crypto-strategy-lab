@@ -35,7 +35,7 @@ class PostgresqlMigrationIT {
         MigrateResult result = flyway.migrate();
 
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(8);
+        assertThat(result.migrationsExecuted).isEqualTo(9);
 
         Set<String> tables = readPublicTables();
         assertThat(tables)
@@ -56,6 +56,8 @@ class PostgresqlMigrationIT {
                         "processed_events");
         assertThat(readColumnLength("news_items", "input_version")).isEqualTo(128);
         assertThat(readColumnLength("sentiment_predictions", "input_version")).isEqualTo(128);
+        assertThat(hasColumn("evaluation_metrics", "win_rate_pct")).isTrue();
+        assertThat(hasColumn("leaderboard_entries", "win_rate_pct")).isTrue();
     }
 
     private Set<String> readPublicTables() throws Exception {
@@ -86,6 +88,25 @@ class PostgresqlMigrationIT {
             try (ResultSet resultSet = statement.executeQuery()) {
                 assertThat(resultSet.next()).isTrue();
                 return resultSet.getInt("character_maximum_length");
+            }
+        }
+    }
+
+    private boolean hasColumn(String table, String column) throws Exception {
+        try (Connection connection = POSTGRES.createConnection("");
+                var statement = connection.prepareStatement(
+                        """
+                        SELECT count(*)
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = ?
+                          AND column_name = ?
+                        """)) {
+            statement.setString(1, table);
+            statement.setString(2, column);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                assertThat(resultSet.next()).isTrue();
+                return resultSet.getInt(1) == 1;
             }
         }
     }

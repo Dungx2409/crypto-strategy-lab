@@ -1,6 +1,6 @@
 package com.cryptolab.api.marketdata;
 
-import com.cryptolab.marketdata.domain.Candle;
+import com.cryptolab.marketdata.domain.CandleUpdate;
 import java.time.Instant;
 
 record MarketCandleEvent(
@@ -12,11 +12,13 @@ record MarketCandleEvent(
         String high,
         String low,
         String close,
-        String volume) {
+        String volume,
+        boolean closed) {
 
-    static MarketCandleEvent closed(Candle candle) {
+    static MarketCandleEvent from(CandleUpdate update) {
+        var candle = update.candle();
         return new MarketCandleEvent(
-                "CANDLE_CLOSED",
+                "CANDLE_UPDATE",
                 candle.symbol(),
                 candle.timeframe().exchangeCode(),
                 candle.openTime(),
@@ -24,6 +26,7 @@ record MarketCandleEvent(
                 candle.high().toPlainString(),
                 candle.low().toPlainString(),
                 candle.close().toPlainString(),
-                candle.volume().toPlainString());
+                candle.volume().toPlainString(),
+                update.closed());
     }
 }

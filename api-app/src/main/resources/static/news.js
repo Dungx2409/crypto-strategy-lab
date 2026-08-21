@@ -12,6 +12,11 @@ function setNewsStatus(status, sentimentStatus) {
 
 function renderNews(items) {
     newsList.replaceChildren();
+    const totals = {POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0};
+    items.forEach(item => { if (totals[item.sentiment] !== undefined) totals[item.sentiment] += 1; });
+    document.querySelector("#sentiment-positive").textContent = totals.POSITIVE;
+    document.querySelector("#sentiment-neutral").textContent = totals.NEUTRAL;
+    document.querySelector("#sentiment-negative").textContent = totals.NEGATIVE;
     if (!items.length) {
         const empty = document.createElement("p");
         empty.className = "news-empty";

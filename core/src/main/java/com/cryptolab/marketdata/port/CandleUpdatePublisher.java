@@ -1,9 +1,9 @@
 package com.cryptolab.marketdata.port;
 
-import com.cryptolab.marketdata.domain.Candle;
+import com.cryptolab.marketdata.domain.CandleUpdate;
 
 @FunctionalInterface
 public interface CandleUpdatePublisher {
 
-    void publishClosed(Candle candle);
+    void publish(CandleUpdate update);
 }

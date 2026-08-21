@@ -106,7 +106,8 @@ public final class GeneticStrategyGenerator implements StrategyGenerator {
         for (int index = 0; index < current.size(); index++) {
             CandidateStrategy left = parents.get(index % parents.size());
             CandidateStrategy right = parents.get(random.nextInt(parents.size()));
-            List<StrategyDefinition> genome = crossover(left.strategies(), right.strategies(), random);
+            List<StrategyDefinition> genome = crossover(
+                    left.strategies(), right.strategies(), context.strategyTypes(), random);
             if (random.nextInt(100) < MUTATION_PERCENT) {
                 genome = mutate(genome, context, random);
             }
@@ -123,11 +124,21 @@ public final class GeneticStrategyGenerator implements StrategyGenerator {
     private static List<StrategyDefinition> crossover(
             List<StrategyDefinition> left,
             List<StrategyDefinition> right,
+            List<String> strategyTypes,
             SplittableRandom random) {
-        List<StrategyDefinition> child = new ArrayList<>(left.size());
-        for (int strategyIndex = 0; strategyIndex < left.size(); strategyIndex++) {
-            StrategyDefinition first = left.get(strategyIndex);
-            StrategyDefinition second = right.get(strategyIndex);
+        Map<String, StrategyDefinition> leftByType = definitionsByType(left);
+        Map<String, StrategyDefinition> rightByType = definitionsByType(right);
+        List<StrategyDefinition> child = new ArrayList<>(strategyTypes.size());
+        for (String strategyType : strategyTypes) {
+            StrategyDefinition first = leftByType.get(strategyType);
+            StrategyDefinition second = rightByType.get(strategyType);
+            if (first == null || second == null) {
+                StrategyDefinition available = first != null ? first : second;
+                if (available != null && random.nextBoolean()) {
+                    child.add(available);
+                }
+                continue;
+            }
             Map<String, Object> parameters = new LinkedHashMap<>();
             first.parameters().entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
@@ -138,13 +149,24 @@ public final class GeneticStrategyGenerator implements StrategyGenerator {
                                     : second.parameters().getOrDefault(entry.getKey(), entry.getValue())));
             child.add(new StrategyDefinition(first.type(), first.version(), parameters));
         }
-        return List.copyOf(child);
+        return child.isEmpty() ? left : List.copyOf(child);
+    }
+
+    private static Map<String, StrategyDefinition> definitionsByType(List<StrategyDefinition> definitions) {
+        Map<String, StrategyDefinition> byType = new LinkedHashMap<>();
+        definitions.forEach(definition -> byType.put(definition.type(), definition));
+        return byType;
     }
 
     private static List<StrategyDefinition> mutate(
             List<StrategyDefinition> genome,
             SearchContext context,
             SplittableRandom random) {
+        if (genome.size() > 1 && random.nextBoolean()) {
+            List<StrategyDefinition> mutated = new ArrayList<>(genome);
+            mutated.remove(random.nextInt(mutated.size()));
+            return List.copyOf(mutated);
+        }
         List<Integer> mutable = new ArrayList<>();
         for (int index = 0; index < genome.size(); index++) {
             StrategyDefinition definition = genome.get(index);

@@ -179,12 +179,23 @@ public final class SearchCoordinator {
             return publish(current);
         }
 
-        SearchRunStatus terminalStatus = reason == SearchStopReason.USER_CANCELLED
-                ? SearchRunStatus.CANCELLED
-                : SearchRunStatus.COMPLETED;
-        repository.transition(searchRunId, SearchRunStatus.RUNNING, terminalStatus, reason, clock.instant());
-        telemetry.runFinished(searchRunId, terminalStatus);
-        return publish(details(searchRunId));
+        if (reason == SearchStopReason.USER_CANCELLED) {
+            repository.transition(
+                    searchRunId,
+                    SearchRunStatus.RUNNING,
+                    SearchRunStatus.CANCELLED,
+                    reason,
+                    clock.instant());
+            telemetry.runFinished(searchRunId, SearchRunStatus.CANCELLED);
+            return publish(details(searchRunId));
+        }
+
+        repository.finishGeneration(searchRunId, reason, clock.instant());
+        SearchRunSummary finishedGeneration = details(searchRunId);
+        if (finishedGeneration.run().status() == SearchRunStatus.COMPLETED) {
+            telemetry.runFinished(searchRunId, SearchRunStatus.COMPLETED);
+        }
+        return publish(finishedGeneration);
     }
 
     public SearchRunSummary cancel(UUID searchRunId) {

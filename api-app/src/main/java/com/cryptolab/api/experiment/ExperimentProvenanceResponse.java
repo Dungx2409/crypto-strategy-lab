@@ -1,6 +1,5 @@
 package com.cryptolab.api.experiment;
 
-import com.cryptolab.experiment.domain.EvaluationMetrics;
 import com.cryptolab.experiment.domain.ExecutionConfig;
 import com.cryptolab.experiment.domain.ExperimentProvenance;
 import com.cryptolab.experiment.domain.ExperimentStatus;
@@ -28,7 +27,7 @@ public record ExperimentProvenanceResponse(
         String buildVersion,
         Instant startedAt,
         Instant completedAt,
-        EvaluationMetrics metrics) {
+        EvaluationMetricsResponse metrics) {
 
     static ExperimentProvenanceResponse from(ExperimentProvenance provenance) {
         return new ExperimentProvenanceResponse(
@@ -48,6 +47,6 @@ public record ExperimentProvenanceResponse(
                 provenance.buildVersion(),
                 provenance.startedAt(),
                 provenance.completedAt(),
-                provenance.metrics());
+                EvaluationMetricsResponse.from(provenance.metrics()));
     }
 }

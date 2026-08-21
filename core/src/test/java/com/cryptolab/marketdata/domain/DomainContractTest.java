@@ -15,7 +15,10 @@ class DomainContractTest {
     @Test
     void normalizesTradingPairAndMapsSupportedTimeframe() {
         assertThat(new TradingPair(" btcusdt ").symbol()).isEqualTo("BTCUSDT");
-        assertThat(Timeframe.fromExchangeCode("5m")).isEqualTo(Timeframe.M5);
+        assertThat(Timeframe.values())
+                .extracting(Timeframe::exchangeCode)
+                .containsExactly("1m", "5m", "15m", "1h", "4h");
+        assertThat(Timeframe.fromExchangeCode("1m")).isEqualTo(Timeframe.M1);
         assertThatThrownBy(() -> Timeframe.fromExchangeCode("2m"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unsupported timeframe: 2m");

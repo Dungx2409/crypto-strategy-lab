@@ -24,6 +24,8 @@ public interface SearchRunRepository {
             SearchStopReason stopReason,
             Instant at);
 
+    void finishGeneration(UUID searchRunId, SearchStopReason stopReason, Instant at);
+
     int appendCandidatesAndCreateJobs(
             SearchRun run,
             ExecutionConfig executionConfig,

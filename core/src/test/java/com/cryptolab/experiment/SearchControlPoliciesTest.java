@@ -36,7 +36,14 @@ class SearchControlPoliciesTest {
     @Test
     void stateMachineAllowsCancellationButProtectsTerminalRuns() {
         SearchRunStateMachine.requireTransition(SearchRunStatus.CREATED, SearchRunStatus.RUNNING);
-        SearchRunStateMachine.requireTransition(SearchRunStatus.RUNNING, SearchRunStatus.CANCELLED);
+        SearchRunStateMachine.requireTransition(SearchRunStatus.RUNNING, SearchRunStatus.EVALUATING);
+        SearchRunStateMachine.requireTransition(SearchRunStatus.EVALUATING, SearchRunStatus.CANCELLED);
+        SearchRunStateMachine.requireTransition(SearchRunStatus.EVALUATING, SearchRunStatus.COMPLETED);
+
+        assertThatThrownBy(() -> SearchRunStateMachine.requireTransition(
+                        SearchRunStatus.RUNNING, SearchRunStatus.COMPLETED))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("RUNNING -> COMPLETED");
 
         assertThatThrownBy(() -> SearchRunStateMachine.requireTransition(
                         SearchRunStatus.COMPLETED, SearchRunStatus.RUNNING))

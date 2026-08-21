@@ -15,12 +15,13 @@ class M7DashboardTest {
 
         assertThat(html).contains(
                 "System status",
-                "Candlestick chart",
+                "Realtime Chart",
                 "Strategy configuration",
                 "Search run",
                 "Leaderboard",
                 "Top #1 / Experiment details",
                 "News + Sentiment",
+                "/app.js",
                 "/lab.js");
         assertThat(lab).contains(
                 "/api/v1/strategies",

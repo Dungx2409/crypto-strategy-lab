@@ -37,7 +37,8 @@ class RandomStrategyGeneratorTest {
         var secondCandidates = second.generate(context).limit(6).toList();
         assertThat(firstCandidates).isEqualTo(secondCandidates);
         assertThat(firstCandidates).extracting(candidate -> candidate.candidateHash()).doesNotHaveDuplicates();
-        assertThat(firstRegistry.created).hasValue(12);
+        assertThat(firstRegistry.created).hasValue(
+                firstCandidates.stream().mapToInt(candidate -> candidate.strategies().size()).sum());
     }
 
     @Test
@@ -51,7 +52,14 @@ class RandomStrategyGeneratorTest {
                 .containsExactlyInAnyOrderElementsOf(second.stream().map(candidate -> candidate.candidateHash()).toList());
         assertThat(first).extracting(candidate -> candidate.candidateHash())
                 .isNotEqualTo(second.stream().map(candidate -> candidate.candidateHash()).toList());
-        assertThat(first).hasSize(8);
+        assertThat(first).hasSize(14);
+        var memberships = first.stream()
+                .map(candidate -> candidate.strategies().stream().map(StrategyDefinition::type).toList())
+                .toList();
+        assertThat(memberships).contains(List.of("MA"), List.of("RSI"), List.of("MA", "RSI"));
+        assertThat(memberships).filteredOn(List.of("MA")::equals).hasSize(4);
+        assertThat(memberships).filteredOn(List.of("RSI")::equals).hasSize(2);
+        assertThat(memberships).filteredOn(List.of("MA", "RSI")::equals).hasSize(8);
     }
 
     @Test
@@ -68,9 +76,14 @@ class RandomStrategyGeneratorTest {
         var secondSequence = second.generate(context(73L)).limit(24).toList();
         assertThat(firstSequence).isEqualTo(secondSequence);
         assertThat(firstSequence).allSatisfy(candidate -> {
-            assertThat(candidate.strategies()).hasSize(2);
+            assertThat(candidate.strategies()).isNotEmpty().hasSizeLessThanOrEqualTo(2);
             assertThat(candidate.candidateHash()).isNotBlank();
         });
+        assertThat(firstSequence.stream()
+                        .map(candidate -> candidate.strategies().stream()
+                                .map(StrategyDefinition::type)
+                                .toList()))
+                .contains(List.of("MA"), List.of("RSI"), List.of("MA", "RSI"));
         assertThat(first.type()).isEqualTo("genetic");
         assertThat(first.version()).isEqualTo("1.0");
     }

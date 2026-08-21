@@ -106,11 +106,22 @@ class ExperimentPipelineIT {
         assertThat(completed.signals()).hasSize(6);
         assertThat(completed.trades()).hasSize(1);
         assertThat(completed.metrics()).isNotNull();
+        assertThat(completed.metrics().winRatePct()).isEqualByComparingTo("100");
         assertThat(completed.rank()).isEqualTo(1);
         assertCount("experiment_signals", 6);
         assertCount("trades", 1);
         assertCount("evaluation_metrics", 1);
         assertCount("leaderboard_entries", 1);
+        assertThat(jdbc.queryForObject(
+                        "SELECT win_rate_pct FROM evaluation_metrics WHERE experiment_id = ?",
+                        BigDecimal.class,
+                        EXPERIMENT_ID))
+                .isEqualByComparingTo("100");
+        assertThat(jdbc.queryForObject(
+                        "SELECT win_rate_pct FROM leaderboard_entries WHERE experiment_id = ?",
+                        BigDecimal.class,
+                        EXPERIMENT_ID))
+                .isEqualByComparingTo("100");
 
         var top = pipeline.leaderboard(SEARCH_RUN_ID, 1).getFirst();
         var topProvenance = pipeline.provenance(top.ranking().experimentId());

@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Arrays;
 
 public enum Timeframe {
+    M1("1m", Duration.ofMinutes(1)),
     M5("5m", Duration.ofMinutes(5)),
     M15("15m", Duration.ofMinutes(15)),
     H1("1h", Duration.ofHours(1)),

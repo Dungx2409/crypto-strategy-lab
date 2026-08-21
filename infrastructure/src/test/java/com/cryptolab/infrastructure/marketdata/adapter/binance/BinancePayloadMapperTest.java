@@ -27,12 +27,13 @@ class BinancePayloadMapperTest {
     }
 
     @Test
-    void emitsOnlyClosedRealtimeKlines() {
+    void mapsOpenAndClosedRealtimeKlinesToExchangeNeutralUpdates() {
         String open = realtime(false);
         String closed = realtime(true);
 
-        assertThat(mapper.realtime(open)).isEmpty();
-        assertThat(mapper.realtime(closed)).get().extracting(candle -> candle.symbol()).isEqualTo("BTCUSDT");
+        assertThat(mapper.realtime(open).closed()).isFalse();
+        assertThat(mapper.realtime(closed).closed()).isTrue();
+        assertThat(mapper.realtime(open).candle().symbol()).isEqualTo("BTCUSDT");
     }
 
     private String realtime(boolean closed) {

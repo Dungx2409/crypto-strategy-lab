@@ -99,12 +99,21 @@ public final class RandomStrategyGenerator implements StrategyGenerator {
         long combinations = 1;
         try {
             for (StrategyTemplate template : templates) {
-                for (ParameterDimension dimension : template.dimensions()) {
-                    combinations = Math.multiplyExact(combinations, dimension.choices().size());
-                }
+                combinations = Math.multiplyExact(
+                        combinations,
+                        Math.addExact(parameterCombinationCount(template), 1));
             }
+            combinations = Math.subtractExact(combinations, 1);
         } catch (ArithmeticException exception) {
             throw new IllegalArgumentException("parameter space exceeds the supported deterministic range", exception);
+        }
+        return combinations;
+    }
+
+    private static long parameterCombinationCount(StrategyTemplate template) {
+        long combinations = 1;
+        for (ParameterDimension dimension : template.dimensions()) {
+            combinations = Math.multiplyExact(combinations, dimension.choices().size());
         }
         return combinations;
     }
@@ -155,13 +164,20 @@ public final class RandomStrategyGenerator implements StrategyGenerator {
     private static List<StrategyDefinition> definitions(
             long combinationIndex,
             List<StrategyTemplate> templates) {
-        long remaining = combinationIndex;
+        long remaining = combinationIndex + 1;
         List<StrategyDefinition> definitions = new ArrayList<>(templates.size());
         for (StrategyTemplate template : templates) {
+            long parameterCombinations = parameterCombinationCount(template);
+            long membershipChoice = remaining % (parameterCombinations + 1);
+            remaining /= parameterCombinations + 1;
+            if (membershipChoice == 0) {
+                continue;
+            }
+            long parameterCombination = membershipChoice - 1;
             Map<String, Object> parameters = new LinkedHashMap<>();
             for (ParameterDimension dimension : template.dimensions()) {
-                int choiceIndex = (int) (remaining % dimension.choices().size());
-                remaining /= dimension.choices().size();
+                int choiceIndex = (int) (parameterCombination % dimension.choices().size());
+                parameterCombination /= dimension.choices().size();
                 parameters.put(dimension.name(), dimension.choices().get(choiceIndex));
             }
             definitions.add(new StrategyDefinition(template.type(), template.version(), parameters));

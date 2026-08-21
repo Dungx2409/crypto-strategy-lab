@@ -53,6 +53,7 @@ class AsyncEvaluationRankingIT {
             new BigDecimal("12.500000000000000000"),
             new BigDecimal("-3.000000000000000000"),
             7,
+            new BigDecimal("42.857142860000000000"),
             new BigDecimal("9.500000000000000000"));
 
     @Container
@@ -110,6 +111,11 @@ class AsyncEvaluationRankingIT {
                         UUID.class,
                         SEARCH_RUN_ID))
                 .isEqualTo(EXPERIMENT_ID);
+        assertThat(jdbc.queryForObject(
+                        "SELECT win_rate_pct FROM leaderboard_entries WHERE search_run_id = ? AND rank = 1",
+                        BigDecimal.class,
+                        SEARCH_RUN_ID))
+                .isEqualByComparingTo(METRICS.winRatePct());
         assertThat(countOutbox("LeaderboardUpdated")).isOne();
         assertThat(jdbc.queryForObject(
                         "SELECT best_score FROM search_runs WHERE id = ?", BigDecimal.class, SEARCH_RUN_ID))
@@ -218,13 +224,14 @@ class AsyncEvaluationRankingIT {
                 """
                 INSERT INTO evaluation_metrics (
                     experiment_id, total_return_pct, max_drawdown_pct,
-                    total_trades, score, metrics_json
-                ) VALUES (?, ?, ?, ?, ?, '{}'::jsonb)
+                    total_trades, win_rate_pct, score, metrics_json
+                ) VALUES (?, ?, ?, ?, ?, ?, '{}'::jsonb)
                 """,
                 EXPERIMENT_ID,
                 METRICS.totalReturnPct(),
                 METRICS.maxDrawdownPct(),
                 METRICS.totalTrades(),
+                METRICS.winRatePct(),
                 METRICS.score());
     }
 

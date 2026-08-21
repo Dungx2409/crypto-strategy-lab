@@ -122,6 +122,25 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
 
     @Override
     @Transactional
+    public void finishGeneration(UUID searchRunId, SearchStopReason stopReason, Instant at) {
+        SearchRunStateMachine.requireTransition(SearchRunStatus.RUNNING, SearchRunStatus.EVALUATING);
+        int updated = jdbcTemplate.update(
+                """
+                UPDATE search_runs
+                SET status = 'EVALUATING', stop_reason = ?
+                WHERE id = ? AND status = 'RUNNING'
+                """,
+                stopReason == null ? null : stopReason.name(),
+                searchRunId);
+        if (updated != 1) {
+            throw new ConcurrentModificationException(
+                    "search-run generation handoff lost: " + searchRunId);
+        }
+        completeIfAllJobsTerminal(searchRunId, at);
+    }
+
+    @Override
+    @Transactional
     public int appendCandidatesAndCreateJobs(
             SearchRun run,
             ExecutionConfig executionConfig,
@@ -176,7 +195,7 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                 UPDATE search_runs
                 SET cancel_requested = true, status = 'CANCELLED', ended_at = ?,
                     stop_reason = 'USER_CANCELLED'
-                WHERE id = ? AND status IN ('CREATED', 'RUNNING', 'PAUSED')
+                WHERE id = ? AND status IN ('CREATED', 'RUNNING', 'PAUSED', 'EVALUATING')
                 """,
                 timestamp(cancelledAt),
                 searchRunId);
@@ -234,7 +253,7 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                         WHEN best_score IS NULL OR ? > best_score THEN ?
                         ELSE best_score
                     END
-                WHERE id = ? AND status = 'RUNNING'
+                WHERE id = ? AND status IN ('RUNNING', 'EVALUATING')
                 """,
                 score,
                 score,
@@ -253,7 +272,7 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                 UPDATE search_runs
                 SET status = 'FAILED', ended_at = ?, stop_reason = 'FAILED',
                     failure_code = ?, failure_message = ?
-                WHERE id = ? AND status IN ('CREATED', 'RUNNING', 'PAUSED')
+                WHERE id = ? AND status IN ('CREATED', 'RUNNING', 'PAUSED', 'EVALUATING')
                 """,
                 timestamp(failedAt),
                 failureCode,
@@ -320,6 +339,23 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                 reason == null ? null : SearchStopReason.valueOf(reason),
                 resultSet.getString("failure_code"),
                 resultSet.getString("failure_message"));
+    }
+
+    private void completeIfAllJobsTerminal(UUID searchRunId, Instant completedAt) {
+        SearchRunStateMachine.requireTransition(SearchRunStatus.EVALUATING, SearchRunStatus.COMPLETED);
+        jdbcTemplate.update(
+                """
+                UPDATE search_runs sr
+                SET status = 'COMPLETED', ended_at = ?
+                WHERE sr.id = ? AND sr.status = 'EVALUATING'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM backtest_jobs job
+                      WHERE job.search_run_id = sr.id
+                        AND job.status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED')
+                  )
+                """,
+                timestamp(completedAt),
+                searchRunId);
     }
 
     private void persistExperimentAndDispatchIntent(

@@ -11,15 +11,19 @@ in [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
 
 ## Current status
 
-M7 is implemented. The browser dashboard now uses only backend contracts to show
-market candles, discovered strategy plugins, search configuration/progress,
-leaderboard, experiment artifacts and immutable provenance, News + Sentiment,
-and independent system status. It materializes the current candle snapshot as an
-immutable checksummed dataset before starting a search; no synthetic dashboard
-data is used.
+M7 is implemented and the written MVP gaps found during the final audit are
+closed. The light browser application now has separate Realtime, Strategy,
+Discovery, Backtest, News, and Settings views. Four charts own independent
+timeframes and STOMP subscriptions. They render candles, volume, MA20, current
+signals, and open-candle updates. The Backtest view renders required metrics,
+trade rows, and entry or exit markers. The browser still uses only backend
+contracts and materializes the exact primary chart snapshot as an immutable
+checksummed dataset before search.
 
 Random and Genetic generators are both registered behind `StrategyGenerator` and
-can be selected per search request. The worker image remains replica-safe and
+can be selected per search request. Both vary strategy membership as well as
+parameters, so one run can compare `MA+RSI`, `BB+SR`, and larger composites. The
+worker image remains replica-safe and
 scales from one to three instances without a source-code or image change. News
 collection remains isolated behind its own ports, executor, health components,
 timeouts, and metrics. Transactional outbox/inbox boundaries keep queued state,
@@ -169,9 +173,11 @@ Failure counters and inference latency are exported as
 `crypto.sentiment.inference.duration`.
 
 The browser subscribes to `/topic/market/{symbol}/{timeframe}` through the STOMP
-endpoint `/ws`. Changing timeframe unsubscribes the old market topic, fetches
-only the selected candles, and subscribes to the replacement topic without a
-page/backend restart.
+endpoint `/ws`. Each of the four charts owns one subscription. Changing a
+timeframe unsubscribes only that chart, fetches its candles, and subscribes to
+the replacement topic without a page or backend restart. `CANDLE_UPDATE` events
+replace a candle with the same `openTime` and append a candle with a new
+`openTime`.
 
 `GET /api/v1/strategies` is generated from the discovered strategy factories;
 the controller has no baseline-strategy switch or concrete strategy dependency.

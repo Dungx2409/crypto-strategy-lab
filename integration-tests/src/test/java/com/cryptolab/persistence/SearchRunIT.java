@@ -108,7 +108,7 @@ class SearchRunIT {
 
         SearchRunSummary completed = coordinator.start(command(COMPLETE_ID, 7L, 3));
 
-        assertThat(completed.run().status()).isEqualTo(SearchRunStatus.COMPLETED);
+        assertThat(completed.run().status()).isEqualTo(SearchRunStatus.EVALUATING);
         assertThat(completed.stopReason()).isEqualTo(SearchStopReason.MAX_CANDIDATES);
         assertThat(completed.generatedCandidates()).isEqualTo(7);
         assertThat(completed.persistedCandidates()).isEqualTo(7);
@@ -267,6 +267,12 @@ class SearchRunIT {
                 SearchStopReason stopReason,
                 Instant at) {
             delegate.transition(searchRunId, expected, target, stopReason, at);
+        }
+
+        @Override
+        public void finishGeneration(
+                UUID searchRunId, SearchStopReason stopReason, Instant at) {
+            delegate.finishGeneration(searchRunId, stopReason, at);
         }
 
         @Override

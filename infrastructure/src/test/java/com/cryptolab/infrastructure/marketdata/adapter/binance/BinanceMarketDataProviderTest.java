@@ -3,6 +3,7 @@ package com.cryptolab.infrastructure.marketdata.adapter.binance;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cryptolab.marketdata.domain.Candle;
+import com.cryptolab.marketdata.domain.CandleUpdate;
 import com.cryptolab.marketdata.domain.Timeframe;
 import com.cryptolab.marketdata.domain.TradingPair;
 import com.cryptolab.marketdata.port.CandleListener;
@@ -52,7 +53,7 @@ class BinanceMarketDataProviderTest {
     void containsWebsocketProtocolAndDtoTranslationInsideAdapter() {
         FakeTransport transport = new FakeTransport();
         BinanceMarketDataProvider provider = provider(transport);
-        List<Candle> received = new ArrayList<>();
+        List<CandleUpdate> received = new ArrayList<>();
         CandleListener listener = received::add;
 
         provider.subscribe(new TradingPair("BTCUSDT"), Timeframe.H1, listener);
@@ -61,7 +62,8 @@ class BinanceMarketDataProviderTest {
                 """);
 
         assertThat(transport.lastUri.toString()).endsWith("/btcusdt@kline_1h");
-        assertThat(received).singleElement().extracting(Candle::timeframe).isEqualTo(Timeframe.H1);
+        assertThat(received).singleElement().extracting(update -> update.candle().timeframe()).isEqualTo(Timeframe.H1);
+        assertThat(received.getFirst().closed()).isTrue();
         assertThat(BinanceKlineDto.class.getModifiers() & java.lang.reflect.Modifier.PUBLIC).isZero();
     }
 
