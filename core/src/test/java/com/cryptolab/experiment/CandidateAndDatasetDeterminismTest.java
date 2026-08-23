@@ -10,6 +10,7 @@ import com.cryptolab.experiment.domain.MarketDatasetChecksum;
 import com.cryptolab.experiment.domain.MarketDatasetRef;
 import com.cryptolab.strategy.domain.CombinationPolicyDefinition;
 import com.cryptolab.strategy.domain.StrategyDefinition;
+import com.cryptolab.shared.domain.SentimentObservation;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -65,5 +66,21 @@ class CandidateAndDatasetDeterminismTest {
         assertThatThrownBy(() -> new MarketDataset(valid.id(), badReference, valid.candles()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("checksum");
+    }
+
+    @Test
+    void datasetChecksumIncludesVersionedSentimentObservations() {
+        MarketDataset valid = ExperimentTestFixtures.dataset();
+        SentimentObservation observation = new SentimentObservation(
+                "news-1",
+                valid.reference().from(),
+                new BigDecimal("0.75"),
+                "keyword",
+                "1.0",
+                "news-v1",
+                "normalize-v1");
+
+        assertThat(MarketDatasetChecksum.calculate(valid.candles(), List.of(observation)))
+                .isNotEqualTo(valid.reference().checksum());
     }
 }

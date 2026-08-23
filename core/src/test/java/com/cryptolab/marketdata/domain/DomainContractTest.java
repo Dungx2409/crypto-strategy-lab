@@ -17,8 +17,11 @@ class DomainContractTest {
         assertThat(new TradingPair(" btcusdt ").symbol()).isEqualTo("BTCUSDT");
         assertThat(Timeframe.values())
                 .extracting(Timeframe::exchangeCode)
-                .containsExactly("1m", "5m", "15m", "1h", "4h");
+                .containsExactly("1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d");
         assertThat(Timeframe.fromExchangeCode("1m")).isEqualTo(Timeframe.M1);
+        assertThat(Timeframe.fromExchangeCode("30m")).isEqualTo(Timeframe.M30);
+        assertThat(Timeframe.fromExchangeCode("2h")).isEqualTo(Timeframe.H2);
+        assertThat(Timeframe.fromExchangeCode("1d")).isEqualTo(Timeframe.D1);
         assertThatThrownBy(() -> Timeframe.fromExchangeCode("2m"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unsupported timeframe: 2m");

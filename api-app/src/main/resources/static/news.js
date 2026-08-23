@@ -2,6 +2,7 @@ const newsStatus = document.querySelector("#news-status");
 const newsMessage = document.querySelector("#news-message");
 const newsList = document.querySelector("#news-list");
 const refreshNewsButton = document.querySelector("#refresh-news");
+let latestNewsItems = [];
 
 function setNewsStatus(status, sentimentStatus) {
     newsStatus.textContent = `NEWS ${status} · SENTIMENT ${sentimentStatus}`;
@@ -11,6 +12,7 @@ function setNewsStatus(status, sentimentStatus) {
 }
 
 function renderNews(items) {
+    latestNewsItems = items.map(item => ({...item}));
     newsList.replaceChildren();
     const totals = {POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0};
     items.forEach(item => { if (totals[item.sentiment] !== undefined) totals[item.sentiment] += 1; });
@@ -48,6 +50,20 @@ function renderNews(items) {
         newsList.append(article);
     });
 }
+
+window.cryptoLabNews = {
+    snapshot: () => latestNewsItems
+            .filter(item => item.score !== null && item.score !== undefined && item.modelName && item.modelVersion)
+            .map(item => ({
+                sourceId: item.newsId,
+                observedAt: item.publishedAt,
+                score: item.score,
+                modelName: item.modelName,
+                modelVersion: item.modelVersion,
+                inputVersion: item.inputVersion,
+                preprocessingVersion: item.preprocessingVersion
+            }))
+};
 
 async function loadStoredNews() {
     const response = await fetch("/api/v1/news?limit=20");

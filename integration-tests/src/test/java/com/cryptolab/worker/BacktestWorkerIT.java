@@ -338,7 +338,7 @@ class BacktestWorkerIT {
         listenerContainers.get(2).stop();
         trackingBacktest.enableDelay(Duration.ofMillis(400));
         trackingBacktest.resetMaximumConcurrency();
-        List<UUID> singleReplicaJobs = createConfirmedJobs(6);
+        List<UUID> singleReplicaJobs = createConfirmedJobs(9);
 
         long singleStarted = System.nanoTime();
         publishJobs(singleReplicaJobs, false);

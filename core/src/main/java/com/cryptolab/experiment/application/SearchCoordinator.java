@@ -223,7 +223,10 @@ public final class SearchCoordinator {
         long generated = 0;
         long persisted = 0;
         StrategyGenerator generator = generator(details(searchRunId).run().generatorType());
-        try (Stream<CandidateStrategy> stream = generator.generate(command.context())) {
+        int generationSize = Math.max(1, generator.generationSize(command.context()));
+        int generatedInGeneration = 0;
+        try (Stream<CandidateStrategy> stream = generator.generate(
+                command.context(), repository::awaitCandidateFitness)) {
             Iterator<CandidateStrategy> candidates = stream.iterator();
             while (true) {
                 SearchRunSummary stored = details(searchRunId);
@@ -237,9 +240,12 @@ public final class SearchCoordinator {
                     return stop.orElseThrow();
                 }
 
-                List<CandidateStrategy> batch = new ArrayList<>(command.context().batchSize());
+                int generationRemaining = generationSize - generatedInGeneration;
+                int batchLimit = Math.max(1, Math.min(
+                        command.context().batchSize(), generationRemaining));
+                List<CandidateStrategy> batch = new ArrayList<>(batchLimit);
                 SearchStopReason afterBatch = null;
-                while (batch.size() < command.context().batchSize()) {
+                while (batch.size() < batchLimit) {
                     stop = stopConditions.evaluate(
                             command.context().stopConditions(),
                             progress(startedAt, generated, persisted, stored));
@@ -253,6 +259,7 @@ public final class SearchCoordinator {
                     }
                     batch.add(candidates.next());
                     generated++;
+                    generatedInGeneration++;
                     telemetry.candidatesGenerated(searchRunId, 1);
                 }
                 if (!batch.isEmpty()) {
@@ -263,6 +270,9 @@ public final class SearchCoordinator {
                             batch,
                             clock.instant());
                     publish(details(searchRunId));
+                }
+                if (generatedInGeneration == generationSize) {
+                    generatedInGeneration = 0;
                 }
                 if (details(searchRunId).run().cancelRequested()) {
                     return SearchStopReason.USER_CANCELLED;

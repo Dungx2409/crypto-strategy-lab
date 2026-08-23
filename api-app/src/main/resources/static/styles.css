@@ -123,7 +123,8 @@ th, td { padding: 10px; border-bottom: 1px solid #eaecf1; text-align: left; font
 th { color: #697285; background: #fafbfc; }
 tbody tr[data-experiment-id] { cursor: pointer; } tbody tr[data-experiment-id]:hover, tbody tr[data-selected-experiment] { background: #f1f5ff; }
 .empty { color: #8790a0; text-align: center; }
-.backtest-toolbar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+.backtest-toolbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.short-control { align-content: end; }.short-control input { width: 20px; min-width: 20px; height: 20px; }
 .backtest-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(390px, .75fr); gap: 14px; margin-top: 14px; }
 #backtest-chart { border: 1px solid #e5e8ee; border-radius: 9px; }
 .backtest-legend { display: flex; gap: 16px; margin-top: 7px; color: #6f788a; font-size: .67rem; }

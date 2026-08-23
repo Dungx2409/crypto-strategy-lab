@@ -167,8 +167,8 @@ function drawMarketChart(canvas, candles, options = {}) {
     (options.trades || []).forEach((trade, tradeIndex) => {
         const entry = nearestCandleIndex(candles, trade.entryTime);
         const exit = nearestCandleIndex(candles, trade.exitTime);
-        drawTradeMarker(context, x(entry), y(Number(trade.entryPrice)), true, tradeIndex === options.highlight);
-        drawTradeMarker(context, x(exit), y(Number(trade.exitPrice)), false, tradeIndex === options.highlight);
+        drawTradeMarker(context, x(entry), y(Number(trade.entryPrice)), true, trade.direction || "LONG", tradeIndex === options.highlight);
+        drawTradeMarker(context, x(exit), y(Number(trade.exitPrice)), false, trade.direction || "LONG", tradeIndex === options.highlight);
     });
 }
 
@@ -177,10 +177,11 @@ function nearestCandleIndex(candles, at) {
     return candles.reduce((best, candle, index) => Math.abs(new Date(candle.openTime).getTime() - time) < Math.abs(new Date(candles[best].openTime).getTime() - time) ? index : best, 0);
 }
 
-function drawTradeMarker(context, x, y, entry, selected) {
-    context.fillStyle = entry ? "#079450" : "#ce3445";
+function drawTradeMarker(context, x, y, entry, direction, selected) {
+    const pointsUp = entry ? direction === "LONG" : direction === "SHORT";
+    context.fillStyle = entry ? (direction === "LONG" ? "#079450" : "#ce3445") : "#2563eb";
     context.beginPath();
-    if (entry) { context.moveTo(x, y - 14); context.lineTo(x - 7, y - 2); context.lineTo(x + 7, y - 2); }
+    if (pointsUp) { context.moveTo(x, y - 14); context.lineTo(x - 7, y - 2); context.lineTo(x + 7, y - 2); }
     else { context.moveTo(x, y + 14); context.lineTo(x - 7, y + 2); context.lineTo(x + 7, y + 2); }
     context.closePath(); context.fill();
     if (selected) { context.strokeStyle = "#111827"; context.lineWidth = 2; context.stroke(); }
@@ -205,10 +206,10 @@ function renderBacktestResult(details, highlight = null) {
     const candles = chartStates[0].candles;
     drawMarketChart(document.querySelector("#backtest-chart"), candles, {trades: details.trades || [], highlight});
     const body = document.querySelector("#trade-table-body"); body.replaceChildren();
-    if (!details.trades?.length) { const row = body.insertRow(); const cell = row.insertCell(); cell.colSpan = 6; cell.className = "empty"; cell.textContent = "No trades."; return; }
+    if (!details.trades?.length) { const row = body.insertRow(); const cell = row.insertCell(); cell.colSpan = 8; cell.className = "empty"; cell.textContent = "No trades."; return; }
     details.trades.forEach((trade, index) => {
         const row = body.insertRow();
-        [index + 1, new Date(trade.entryTime).toLocaleString(), trade.entryPrice, new Date(trade.exitTime).toLocaleString(), trade.exitPrice, trade.pnl].forEach(value => { const cell = row.insertCell(); cell.textContent = value; });
+        [index + 1, trade.direction || "LONG", new Date(trade.entryTime).toLocaleString(), trade.entryPrice, new Date(trade.exitTime).toLocaleString(), trade.exitPrice, trade.exitReason || "SIGNAL", trade.pnl].forEach(value => { const cell = row.insertCell(); cell.textContent = value; });
         row.addEventListener("click", () => renderBacktestResult(details, index));
     });
 }
@@ -233,7 +234,10 @@ function updateStreamCount() {
 window.cryptoLabMarket = {snapshot: () => ({symbol: symbolSelect.value, timeframe: chartStates[0].timeframeSelect.value, candles: chartStates[0].candles.map(candle => ({...candle}))})};
 window.cryptoLabBacktest = {render: renderBacktestResult};
 
-symbolSelect.addEventListener("change", () => chartStates.forEach(state => reloadChart(state.index)));
+symbolSelect.addEventListener("change", () => chartStates.forEach(state => {
+    state.card.querySelector("strong").firstChild.textContent = `${symbolSelect.value} · `;
+    reloadChart(state.index);
+}));
 chartStates.forEach(state => state.timeframeSelect.addEventListener("change", () => reloadChart(state.index)));
 document.querySelectorAll("[data-primary-timeframe]").forEach(button => button.addEventListener("click", () => {
     document.querySelectorAll("[data-primary-timeframe]").forEach(item => item.classList.toggle("active", item === button));

@@ -11,4 +11,14 @@ public interface StrategyGenerator {
     String version();
 
     Stream<CandidateStrategy> generate(SearchContext context);
+
+    default Stream<CandidateStrategy> generate(
+            SearchContext context,
+            CandidateFitnessSource fitnessSource) {
+        return generate(context);
+    }
+
+    default int generationSize(SearchContext context) {
+        return Integer.MAX_VALUE;
+    }
 }

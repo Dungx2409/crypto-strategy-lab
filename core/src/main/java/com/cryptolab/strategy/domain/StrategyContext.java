@@ -3,6 +3,7 @@ package com.cryptolab.strategy.domain;
 import com.cryptolab.marketdata.domain.Candle;
 import com.cryptolab.marketdata.domain.Timeframe;
 import com.cryptolab.marketdata.domain.TradingPair;
+import com.cryptolab.shared.domain.SentimentObservation;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -11,13 +12,24 @@ public record StrategyContext(
         TradingPair pair,
         Timeframe timeframe,
         List<Candle> candles,
-        Instant evaluatedAt) {
+        Instant evaluatedAt,
+        List<SentimentObservation> sentimentObservations) {
+
+    public StrategyContext(
+            TradingPair pair,
+            Timeframe timeframe,
+            List<Candle> candles,
+            Instant evaluatedAt) {
+        this(pair, timeframe, candles, evaluatedAt, List.of());
+    }
 
     public StrategyContext {
         Objects.requireNonNull(pair, "pair must not be null");
         Objects.requireNonNull(timeframe, "timeframe must not be null");
         candles = List.copyOf(Objects.requireNonNull(candles, "candles must not be null"));
         Objects.requireNonNull(evaluatedAt, "evaluatedAt must not be null");
+        sentimentObservations = List.copyOf(Objects.requireNonNull(
+                sentimentObservations, "sentimentObservations must not be null"));
 
         Instant previousOpenTime = null;
         for (Candle candle : candles) {
@@ -31,6 +43,16 @@ public record StrategyContext(
                 throw new IllegalArgumentException("candles must be strictly ordered by open time");
             }
             previousOpenTime = candle.openTime();
+        }
+        Instant previousObservation = null;
+        for (SentimentObservation observation : sentimentObservations) {
+            if (observation.observedAt().isAfter(evaluatedAt)) {
+                throw new IllegalArgumentException("sentiment observation must not be after evaluatedAt");
+            }
+            if (previousObservation != null && observation.observedAt().isBefore(previousObservation)) {
+                throw new IllegalArgumentException("sentiment observations must be ordered");
+            }
+            previousObservation = observation.observedAt();
         }
     }
 }

@@ -3,10 +3,12 @@ package com.cryptolab.experiment.application;
 import com.cryptolab.experiment.domain.CandidateCanonicalizer;
 import com.cryptolab.experiment.domain.CandidateStrategy;
 import com.cryptolab.experiment.domain.SearchContext;
+import com.cryptolab.experiment.port.CandidateFitnessSource;
 import com.cryptolab.experiment.port.StrategyGenerator;
 import com.cryptolab.strategy.domain.StrategyDefinition;
 import com.cryptolab.strategy.port.StrategyRegistry;
 import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -22,14 +24,13 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 /**
- * A deliberately small deterministic genetic generator used to prove generator replaceability.
- * Genome-hash ordering is the deterministic parent-selection fitness policy; trading fitness is
- * still calculated only by the experiment evaluator and never by this generator.
+ * A deterministic genetic generator whose parent selection consumes evaluated candidate fitness
+ * through a framework-neutral port.
  */
 public final class GeneticStrategyGenerator implements StrategyGenerator {
 
     public static final String TYPE = "genetic";
-    public static final String VERSION = "1.0";
+    public static final String VERSION = "2.0";
     public static final int POPULATION_SIZE = 20;
     public static final int MUTATION_PERCENT = 20;
 
@@ -51,22 +52,37 @@ public final class GeneticStrategyGenerator implements StrategyGenerator {
 
     @Override
     public Stream<CandidateStrategy> generate(SearchContext context) {
+        return generate(context, (searchRunId, candidateIds) -> Map.of());
+    }
+
+    @Override
+    public Stream<CandidateStrategy> generate(
+            SearchContext context,
+            CandidateFitnessSource fitnessSource) {
         Objects.requireNonNull(context, "context must not be null");
-        return StreamSupport.stream(new GeneticSpliterator(context), false);
+        Objects.requireNonNull(fitnessSource, "fitnessSource must not be null");
+        return StreamSupport.stream(new GeneticSpliterator(context, fitnessSource), false);
+    }
+
+    @Override
+    public int generationSize(SearchContext context) {
+        return initialPopulation(context).size();
     }
 
     private final class GeneticSpliterator
             extends Spliterators.AbstractSpliterator<CandidateStrategy> {
 
         private final SearchContext context;
+        private final CandidateFitnessSource fitnessSource;
         private final SplittableRandom random;
         private List<CandidateStrategy> population;
         private int generation;
         private int slot;
 
-        private GeneticSpliterator(SearchContext context) {
+        private GeneticSpliterator(SearchContext context, CandidateFitnessSource fitnessSource) {
             super(Long.MAX_VALUE, Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.IMMUTABLE);
             this.context = context;
+            this.fitnessSource = fitnessSource;
             this.random = new SplittableRandom(context.randomSeed());
         }
 
@@ -78,10 +94,13 @@ public final class GeneticStrategyGenerator implements StrategyGenerator {
                     return false;
                 }
             } else if (slot == population.size()) {
-                population = evolve(population, ++generation, context, random);
+                Map<UUID, BigDecimal> fitness = fitnessSource.awaitFitness(
+                        context.searchRunId(),
+                        population.stream().map(CandidateStrategy::candidateId).toList());
+                population = evolve(population, fitness, ++generation, context, random);
                 slot = 0;
             }
-            action.accept(withGeneticIdentity(population.get(slot), generation, slot, context));
+            action.accept(population.get(slot));
             slot++;
             return true;
         }
@@ -89,17 +108,29 @@ public final class GeneticStrategyGenerator implements StrategyGenerator {
 
     private List<CandidateStrategy> initialPopulation(SearchContext context) {
         try (Stream<CandidateStrategy> seed = new RandomStrategyGenerator(registry).generate(context)) {
-            return seed.limit(POPULATION_SIZE).toList();
+            List<CandidateStrategy> seeds = seed
+                    .limit(POPULATION_SIZE)
+                    .toList();
+            List<CandidateStrategy> identified = new ArrayList<>(seeds.size());
+            for (int slot = 0; slot < seeds.size(); slot++) {
+                identified.add(withGeneticIdentity(seeds.get(slot), 0, slot, context));
+            }
+            return List.copyOf(identified);
         }
     }
 
     private List<CandidateStrategy> evolve(
             List<CandidateStrategy> current,
+            Map<UUID, BigDecimal> fitness,
             int generation,
             SearchContext context,
             SplittableRandom random) {
         List<CandidateStrategy> parents = current.stream()
-                .sorted(Comparator.comparing(CandidateStrategy::candidateHash).reversed())
+                .sorted(Comparator
+                        .comparing((CandidateStrategy candidate) ->
+                                fitness.getOrDefault(candidate.candidateId(), BigDecimal.valueOf(-1_000_000)))
+                        .reversed()
+                        .thenComparing(CandidateStrategy::candidateHash))
                 .limit(Math.max(1, current.size() / 2))
                 .toList();
         List<CandidateStrategy> next = new ArrayList<>(current.size());

@@ -24,9 +24,12 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ConcurrentModificationException;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -265,6 +268,66 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
     }
 
     @Override
+    public Map<UUID, BigDecimal> awaitCandidateFitness(
+            UUID searchRunId,
+            List<UUID> candidateIds) {
+        if (candidateIds.isEmpty()) {
+            return Map.of();
+        }
+        Set<UUID> expected = Set.copyOf(candidateIds);
+        long deadline = System.nanoTime() + 120_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            Map<UUID, BigDecimal> fitness = new HashMap<>();
+            Set<UUID> terminal = new HashSet<>();
+            List<FitnessRow> rows = jdbcTemplate.query(
+                    """
+                    SELECT candidate.id AS candidate_id, job.status, metrics.score
+                    FROM candidates candidate
+                    JOIN experiments experiment
+                      ON experiment.candidate_id = candidate.id
+                     AND experiment.search_run_id = candidate.search_run_id
+                    JOIN backtest_jobs job ON job.experiment_id = experiment.id
+                    LEFT JOIN evaluation_metrics metrics ON metrics.experiment_id = experiment.id
+                    WHERE candidate.search_run_id = ?
+                    """,
+                    (resultSet, rowNumber) -> new FitnessRow(
+                            resultSet.getObject("candidate_id", UUID.class),
+                            resultSet.getString("status"),
+                            resultSet.getBigDecimal("score")),
+                    searchRunId);
+            for (FitnessRow row : rows) {
+                if (!expected.contains(row.candidateId())) {
+                    continue;
+                }
+                if (row.score() != null) {
+                    fitness.put(row.candidateId(), row.score());
+                    terminal.add(row.candidateId());
+                } else if ("FAILED".equals(row.status()) || "CANCELLED".equals(row.status())) {
+                    fitness.put(row.candidateId(), BigDecimal.valueOf(-1_000_000));
+                    terminal.add(row.candidateId());
+                }
+            }
+            if (terminal.containsAll(expected)) {
+                return Map.copyOf(fitness);
+            }
+            Boolean cancelled = jdbcTemplate.queryForObject(
+                    "SELECT cancel_requested FROM search_runs WHERE id = ?",
+                    Boolean.class,
+                    searchRunId);
+            if (Boolean.TRUE.equals(cancelled)) {
+                return Map.copyOf(fitness);
+            }
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("interrupted while waiting for candidate fitness", interrupted);
+            }
+        }
+        throw new IllegalStateException("timed out waiting for candidate fitness: " + searchRunId);
+    }
+
+    @Override
     @Transactional
     public void fail(UUID searchRunId, String failureCode, String failureMessage, Instant failedAt) {
         jdbcTemplate.update(
@@ -463,4 +526,6 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
         OffsetDateTime value = resultSet.getObject(column, OffsetDateTime.class);
         return value == null ? null : value.toInstant();
     }
+
+    private record FitnessRow(UUID candidateId, String status, BigDecimal score) {}
 }

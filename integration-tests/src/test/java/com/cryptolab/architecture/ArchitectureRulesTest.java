@@ -170,9 +170,9 @@ class ArchitectureRulesTest {
             .haveSimpleName("BacktestJobClaimDecision");
 
     @ArchTest
-    static final ArchRule BINANCE_DTOS_DO_NOT_LEAK_OUTSIDE_THE_ADAPTER = noClasses()
+    static final ArchRule MARKET_PROVIDER_DTOS_DO_NOT_LEAK_OUTSIDE_THE_ADAPTERS = noClasses()
             .that()
-            .resideOutsideOfPackage("..marketdata.adapter.binance..")
+            .resideOutsideOfPackage("..marketdata.adapter..")
             .should()
             .dependOnClassesThat()
             .haveSimpleNameEndingWith("Dto");

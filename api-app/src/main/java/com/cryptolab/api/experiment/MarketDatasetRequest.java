@@ -9,7 +9,8 @@ public record MarketDatasetRequest(
         String symbol,
         String timeframe,
         String datasetVersion,
-        List<ExperimentCandleRequest> candles) {
+        List<ExperimentCandleRequest> candles,
+        List<SentimentObservationRequest> sentimentObservations) {
 
     MarketDataset materialize(MarketDatasetService service) {
         Timeframe parsed = Timeframe.fromExchangeCode(timeframe);
@@ -20,6 +21,11 @@ public record MarketDatasetRequest(
                 symbol,
                 parsed,
                 datasetVersion,
-                candles.stream().map(candle -> candle.toDomain(symbol, parsed)).toList());
+                candles.stream().map(candle -> candle.toDomain(symbol, parsed)).toList(),
+                sentimentObservations == null
+                        ? List.of()
+                        : sentimentObservations.stream()
+                                .map(SentimentObservationRequest::toDomain)
+                                .toList());
     }
 }

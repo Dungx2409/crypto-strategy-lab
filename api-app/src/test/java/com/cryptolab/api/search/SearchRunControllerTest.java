@@ -132,7 +132,9 @@ class SearchRunControllerTest {
         mockMvc.perform(get("/api/v1/search-runs/capabilities"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.defaultGenerator").value("random"))
-                .andExpect(jsonPath("$.availableGenerators[0]").value("random"));
+                .andExpect(jsonPath("$.availableGenerators[0]").value("random"))
+                .andExpect(jsonPath("$.engineVersion").value("deterministic-next-open-v5"))
+                .andExpect(jsonPath("$.fillPolicy").value("NEXT_CANDLE_OPEN"));
     }
 
     @Test

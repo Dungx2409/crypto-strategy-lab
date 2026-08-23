@@ -374,8 +374,8 @@ public class JdbcBacktestWorkerRepository implements BacktestWorkerRepository {
                     """
                     INSERT INTO trades (
                         id, experiment_id, sequence_no, entry_time, entry_price,
-                        exit_time, exit_price, quantity, fee, pnl
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        exit_time, exit_price, quantity, fee, pnl, direction, exit_reason
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     artifactId(experimentId, "trade", index),
                     experimentId,
@@ -386,7 +386,9 @@ public class JdbcBacktestWorkerRepository implements BacktestWorkerRepository {
                     trade.exitPrice(),
                     trade.quantity(),
                     trade.fee(),
-                    trade.pnl());
+                    trade.pnl(),
+                    trade.direction().name(),
+                    trade.exitReason().name());
         }
     }
 

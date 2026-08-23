@@ -36,6 +36,41 @@ signal EMA periods. The backtester, evaluator, ranking, controllers, and schema
 remain strategy-agnostic; the registry endpoint and dashboard discover MACD
 through the same factory contract as every other strategy.
 
+The post-MVP extension pass adds 30m, 2h, and 1d market intervals. Engine
+version 2 adds Long and Short positions through the same next-candle-open fill
+rule. Engine version 3 adds percentage Position Sizing. Engine version 4 adds
+Stop Loss and Take Profit with a conservative Stop-first OHLC rule. Every
+stored trade records its direction and exit reason. Engine version 5 adds a
+Trailing Stop based only on completed-candle water marks. Versions 1 through 4
+remain runnable for old experiment provenance.
+
+The default market allow-list includes BTCUSDT, ETHUSDT, SOLUSDT, and BNBUSDT.
+Override it with `CRYPTO_MARKET_SUPPORTED_SYMBOLS` without changing market
+services or the Binance adapter.
+
+`NEWS_SENTIMENT@1.0` can join the same search space as technical strategies.
+Dataset materialization copies versioned sentiment observations into the
+experiment dataset and checksum. Backtests expose only observations published
+by each candle close, so the strategy cannot read live or future news.
+
+Genetic Search version 2 selects parents from durable evaluator scores. It
+persists and evaluates one population before evolving the next. The generator
+depends only on a candidate-fitness port; JDBC, RabbitMQ, and worker details
+remain outside `core`.
+
+Signed-in users can ask Gemini for a strategy idea, confirm it, and save the
+result as restricted JSON. Gemini cannot generate or run Java code. The JSON
+can only name registered strategy plugins, versions, parameters, and a
+combination policy. The application validates and smoke-tests the result before
+storing an account-owned version. Set `GEMINI_API_KEY` in the git-ignored
+`.env` file to enable these calls. The checked-in default is blank.
+
+Account-owned discovery schedules repeatedly launch bounded Genetic Search.
+Each schedule stores its pair, timeframe, lookback, capital, candidate limit,
+next run time, active search ID, and status. The default interval is 24 hours.
+Database claiming prevents overlapping runs, and startup recovery makes an
+interrupted schedule eligible to run again.
+
 The final architecture proof matrix and repeatable commands are documented in
 [`docs/architecture/PROOF_MATRIX.md`](docs/architecture/PROOF_MATRIX.md).
 
@@ -115,6 +150,40 @@ curl "http://localhost:8080/actuator/health/newsProvider"
 curl "http://localhost:8080/actuator/health/sentimentAnalyzer"
 ```
 
+Account-owned endpoints use the session cookie returned by registration or
+login:
+
+```text
+POST   /api/v1/auth/register
+POST   /api/v1/auth/login
+POST   /api/v1/auth/logout
+GET    /api/v1/auth/me
+POST   /api/v1/user-strategies/drafts
+POST   /api/v1/user-strategies/drafts/{draftId}/confirm
+GET    /api/v1/user-strategies
+GET    /api/v1/user-strategies/{strategyId}
+DELETE /api/v1/user-strategies/{strategyId}
+POST   /api/v1/discovery-schedules
+GET    /api/v1/discovery-schedules
+GET    /api/v1/discovery-schedules/{scheduleId}
+POST   /api/v1/discovery-schedules/{scheduleId}/stop
+POST   /api/v1/discovery-schedules/{scheduleId}/start
+```
+
+Create a schedule with ISO-8601 durations. Omitted values default to a one-year
+lookback, 10,000 capital, 125 candidates, and a 24-hour interval:
+
+```json
+{
+  "symbol": "BTCUSDT",
+  "timeframe": "1h",
+  "lookback": "P365D",
+  "initialCapital": 10000,
+  "candidateLimit": 125,
+  "interval": "PT24H"
+}
+```
+
 M4 adds these synchronous single-candidate endpoints:
 
 ```text
@@ -190,11 +259,17 @@ from candle N for execution at candle N+1 open. A final open position is valued
 deterministically by liquidating it at the last candle close. This terminal
 valuation rule is versioned by the engine and covered by tests.
 
-Binance public endpoints are configurable with `BINANCE_REST_URL` and
-`BINANCE_WEBSOCKET_URL`. Compose publishes PostgreSQL on host port `55432` by
-default while containers keep using port `5432` on the internal network. Set
-both `POSTGRES_PORT` and the matching `DATABASE_URL` when running a Java process
-directly against a different host port.
+`CRYPTO_MARKET_PROVIDER=binance|okx` selects one market adapter when the API
+starts. Binance is the default. Configure provider endpoints with
+`BINANCE_REST_URL`, `BINANCE_WEBSOCKET_URL`, `OKX_REST_URL`, and
+`OKX_WEBSOCKET_URL`. Both adapters return the same REST and STOMP contracts, so
+the dashboard does not change when the provider changes. The current OKX
+symbol mapper supports the configured USDT pairs.
+
+Compose publishes PostgreSQL on host port `55432` by default while containers
+keep using port `5432` on the internal network. Set both `POSTGRES_PORT` and the
+matching `DATABASE_URL` when running a Java process directly against a
+different host port.
 
 ## Architecture proof commands
 

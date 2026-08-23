@@ -39,9 +39,9 @@ The detailed normative requirements remain in `FEATURE_SPEC.md`.
 
 | Requirement | Evidence |
 |---|---|
-| Historical Binance candles | `BinanceMarketDataProvider`, payload/provider tests, and `/api/v1/market/candles` |
+| Historical market candles | Selectable `BinanceMarketDataProvider` or `OkxMarketDataProvider`, payload/provider tests, and the unchanged `/api/v1/market/candles` contract |
 | Realtime open and closed candle updates | Normalized `CandleUpdate`, Java HTTP WebSocket transport, and STOMP `/topic/market/{symbol}/{timeframe}`; open updates replace the current browser candle while only closed candles persist |
-| Provider DTO isolation | Package-private `BinanceKlineDto` plus ArchUnit no-leak rule |
+| Provider DTO isolation | Package-private Binance and OKX candle DTOs plus a market-adapter ArchUnit no-leak rule |
 | Reconnect and gap recovery | `MarketDataStreamServiceTest` fake disconnect/reconnect/repeated-candle scenario |
 | Duplicate protection | PostgreSQL primary key, `ON CONFLICT DO NOTHING`, and `CandleStoreIT` |
 | Four independent timeframes | Four browser chart states, independent STOMP subscription IDs, reference-counted backend streams, 1m/5m/15m/1h/4h support, `ReferenceDashboardTest`, and `MarketDashboardIsolationTest` |
@@ -168,3 +168,30 @@ The detailed normative requirements remain in `FEATURE_SPEC.md`.
 | Binance recovery proof | `MarketDataStreamServiceTest` and `CandleStoreIT` prove reconnect, boundary-inclusive gap recovery, stale-listener rejection, and duplicate safety |
 | Top #1 provenance proof | `ExperimentPipelineIT` follows the top leaderboard `experimentId` to candidate/strategy/policy, dataset/checksum, execution/generator/evaluator, code/build, signals, trades, and metrics |
 | Repeatable final evidence | `scripts/verify-architecture-proofs.sh`, `mvn clean verify`, and `docker compose up --build`; mapping is summarized in `docs/architecture/PROOF_MATRIX.md` |
+
+## Post-MVP extension evidence
+
+| Extension | Evidence |
+|---|---|
+| 30m, 2h, and 1d timeframes | Shared `Timeframe` enum, domain contract test, dashboard controls, and the unchanged provider-neutral REST/STOMP flow |
+| Long and Short trading | Versioned deterministic engine, explicit `TradeDirection`, Flyway V10 persistence, REST and dashboard direction output, short P/L unit test, and full verification |
+| Position sizing | Engine version 3, immutable `positionSizePct`, partial-capital portfolio accounting, backend capability discovery, dashboard control, deterministic unit test, and full verification |
+| Stop Loss and Take Profit | Engine version 4, conservative OHLC ordering, gap policy, persisted exit reason through Flyway V11, dashboard controls, deterministic tests, and full verification |
+| Trailing Stop | Engine version 5, completed-candle water marks, conservative gap fills, `TRAILING_STOP` persistence through Flyway V12, dashboard control, deterministic test, and full verification |
+| Multiple coins | Configurable application allow-list, BTC/ETH/SOL/BNB dashboard choices, shared provider-neutral market flow, and live Binance API evidence for each added pair |
+| Multiple exchanges | Startup-selectable Binance or OKX adapters behind `MarketDataProvider`, provider selection and mapping tests, DTO isolation rule, and live normalized OKX candles through the unchanged REST contract |
+| News Sentiment strategy | Versioned sentiment observations in dataset checksum and Flyway V13 persistence, time-filtered `StrategyContext`, `NEWS_SENTIMENT@1.0` plugin factory, no-look-ahead tests, and full verification |
+| Evaluator-driven Genetic Search | Genetic version 2, candidate fitness port, durable population barriers, score-based parent selection, deterministic tie breaks, unit and architecture tests, full verification, and two-generation runtime evidence |
+
+## Newly added requirement status
+
+| Requirement | Status |
+|---|---|
+| Registration, login, and account identity | Complete: server-side sessions, BCrypt, account identity, and ownership guard |
+| TradingView-like history and changing last candle | Realtime open-candle behavior complete; visual comparison pending |
+| 1,000 users with four realtime charts | Architecture supports shared, reference-counted streams; load test and measurements pending |
+| Natural-language or article-link strategy authoring | Prompt path complete: Gemini idea confirmation, restricted JSON, three validation attempts, deterministic smoke test, account-owned versions, list, detail, and deletion. Article-link input remains pending |
+| Manual backtest controls and result report | Core execution and metrics exist; account-facing manual workflow and filters are incomplete |
+| Continuous non-exhaustive discovery and 24-hour leaderboard | Complete: persisted account schedules repeatedly launch bounded Genetic Search, recover after restart, prevent overlap, and support stop/start controls |
+| LLM-assisted crawler selector repair | Not started |
+| Current non-OpenAI analysis model bonus | Gemini 2.5 Flash is wired for strategy authoring; API key is intentionally blank by default |

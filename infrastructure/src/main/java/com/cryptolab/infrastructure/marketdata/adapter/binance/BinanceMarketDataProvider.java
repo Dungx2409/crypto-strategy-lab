@@ -20,9 +20,11 @@ import java.util.Locale;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "crypto.market.provider", havingValue = "binance", matchIfMissing = true)
 public final class BinanceMarketDataProvider implements MarketDataProvider {
 
     private static final int PAGE_SIZE = 1000;

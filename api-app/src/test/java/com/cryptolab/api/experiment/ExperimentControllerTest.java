@@ -114,6 +114,8 @@ class ExperimentControllerTest {
                 .andExpect(jsonPath("$.generator.type").value("manual"))
                 .andExpect(jsonPath("$.signals.length()").value(6))
                 .andExpect(jsonPath("$.trades.length()").value(1))
+                .andExpect(jsonPath("$.trades[0].direction").value("LONG"))
+                .andExpect(jsonPath("$.trades[0].exitReason").value("SIGNAL"))
                 .andExpect(jsonPath("$.metrics.totalTrades").value(1))
                 .andExpect(jsonPath("$.metrics.winRatePct").value(100));
 

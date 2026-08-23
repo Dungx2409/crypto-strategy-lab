@@ -21,6 +21,7 @@ import com.cryptolab.experiment.port.ExperimentRepository;
 import com.cryptolab.experiment.port.MarketDatasetProvider;
 import com.cryptolab.marketdata.domain.Candle;
 import com.cryptolab.marketdata.domain.Timeframe;
+import com.cryptolab.shared.domain.SentimentObservation;
 import com.cryptolab.strategy.domain.Signal;
 import com.cryptolab.strategy.domain.SignalType;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -347,7 +348,24 @@ public class JdbcExperimentRepository
                         resultSet.getBigDecimal("close"),
                         resultSet.getBigDecimal("volume")),
                 dataset.id());
-        return new MarketDataset(dataset.id(), dataset.reference(), candles);
+        List<SentimentObservation> sentimentObservations = jdbcTemplate.query(
+                """
+                SELECT source_id, observed_at, score, model_name, model_version,
+                       input_version, preprocessing_version
+                FROM market_dataset_sentiment_observations
+                WHERE dataset_id = ?
+                ORDER BY sequence_no
+                """,
+                (resultSet, rowNumber) -> new SentimentObservation(
+                        resultSet.getString("source_id"),
+                        instant(resultSet, "observed_at"),
+                        resultSet.getBigDecimal("score"),
+                        resultSet.getString("model_name"),
+                        resultSet.getString("model_version"),
+                        resultSet.getString("input_version"),
+                        resultSet.getString("preprocessing_version")),
+                dataset.id());
+        return new MarketDataset(dataset.id(), dataset.reference(), candles, sentimentObservations);
     }
 
     private void persistDataset(MarketDataset dataset, Instant createdAt) {
@@ -385,6 +403,25 @@ public class JdbcExperimentRepository
                         candle.low(),
                         candle.close(),
                         candle.volume());
+            }
+            for (int index = 0; index < dataset.sentimentObservations().size(); index++) {
+                SentimentObservation observation = dataset.sentimentObservations().get(index);
+                jdbcTemplate.update(
+                        """
+                        INSERT INTO market_dataset_sentiment_observations (
+                            dataset_id, sequence_no, source_id, observed_at, score,
+                            model_name, model_version, input_version, preprocessing_version
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        dataset.id(),
+                        index,
+                        observation.sourceId(),
+                        timestamp(observation.observedAt()),
+                        observation.score(),
+                        observation.modelName(),
+                        observation.modelVersion(),
+                        observation.inputVersion(),
+                        observation.preprocessingVersion());
             }
         }
     }
@@ -455,8 +492,8 @@ public class JdbcExperimentRepository
                     """
                     INSERT INTO trades (
                         id, experiment_id, sequence_no, entry_time, entry_price,
-                        exit_time, exit_price, quantity, fee, pnl
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        exit_time, exit_price, quantity, fee, pnl, direction, exit_reason
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     UUID.randomUUID(),
                     experimentId,
@@ -467,7 +504,9 @@ public class JdbcExperimentRepository
                     trade.exitPrice(),
                     trade.quantity(),
                     trade.fee(),
-                    trade.pnl());
+                    trade.pnl(),
+                    trade.direction().name(),
+                    trade.exitReason().name());
         }
     }
 
@@ -553,7 +592,7 @@ public class JdbcExperimentRepository
     private List<Trade> findTrades(UUID experimentId) {
         return jdbcTemplate.query(
                 """
-                SELECT entry_time, entry_price, exit_time, exit_price, quantity, fee, pnl
+                SELECT entry_time, entry_price, exit_time, exit_price, quantity, fee, pnl, direction, exit_reason
                 FROM trades
                 WHERE experiment_id = ?
                 ORDER BY sequence_no
@@ -565,7 +604,11 @@ public class JdbcExperimentRepository
                         resultSet.getBigDecimal("exit_price"),
                         resultSet.getBigDecimal("quantity"),
                         resultSet.getBigDecimal("fee"),
-                        resultSet.getBigDecimal("pnl")),
+                        resultSet.getBigDecimal("pnl"),
+                        com.cryptolab.experiment.domain.TradeDirection.valueOf(
+                                resultSet.getString("direction")),
+                        com.cryptolab.experiment.domain.TradeExitReason.valueOf(
+                                resultSet.getString("exit_reason"))),
                 experimentId);
     }
 

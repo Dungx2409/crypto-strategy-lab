@@ -1,4 +1,4 @@
-const labState = { catalog: [], searchRunId: null, searchStartedAt: null, socket: null, connected: false, subscriptions: new Map(), poll: null };
+const labState = { catalog: [], capabilities: null, searchRunId: null, searchStartedAt: null, socket: null, connected: false, subscriptions: new Map(), poll: null };
 const byId = id => document.getElementById(id);
 
 async function api(url, options) {
@@ -67,7 +67,8 @@ function renderSelectedStrategyChips() {
 
 async function loadCapabilities() {
     const [catalog, capabilities] = await Promise.all([api("/api/v1/strategies"), api("/api/v1/search-runs/capabilities")]);
-    labState.catalog = catalog; renderStrategies();
+    labState.catalog = catalog; labState.capabilities = capabilities; renderStrategies();
+    byId("execution-version").value = `${capabilities.engineVersion} · ${capabilities.fillPolicy}`;
     const generator = byId("generator"); generator.replaceChildren(); capabilities.availableGenerators.forEach(type => { const option = document.createElement("option"); option.value = type; option.textContent = type.toUpperCase(); option.selected = type === capabilities.defaultGenerator; generator.append(option); });
 }
 
@@ -86,14 +87,17 @@ function selectedSearchConfiguration() {
 async function materializeDataset() {
     const snapshot = window.cryptoLabMarket.snapshot();
     if (snapshot.candles.length < 2) throw new Error("At least two backend candles are required before starting search.");
-    return api("/api/v1/datasets", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ symbol: snapshot.symbol, timeframe: snapshot.timeframe, datasetVersion: `dashboard-${snapshot.timeframe}-v1`, candles: snapshot.candles }) });
+    const sentimentObservations = window.cryptoLabNews?.snapshot?.() ?? [];
+    return api("/api/v1/datasets", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ symbol: snapshot.symbol, timeframe: snapshot.timeframe, datasetVersion: `dashboard-${snapshot.timeframe}-v2`, candles: snapshot.candles, sentimentObservations }) });
 }
 
 async function startSearch() {
     byId("start-search").disabled = true; byId("search-message").textContent = "Materializing immutable market dataset…";
     try {
         const dataset = await materializeDataset(); const config = selectedSearchConfiguration();
-        const request = { symbol: dataset.symbol, timeframe: dataset.timeframe, from: dataset.from, to: dataset.to, datasetVersion: dataset.datasetVersion, datasetChecksum: dataset.checksum, ...config, randomSeed: Number(byId("random-seed").value), stopConditions: { maxCandidates: Number(byId("max-candidates").value), maxDuration: null, noImprovementIterations: null }, batchSize: Number(byId("batch-size").value), executionConfig: null };
+        const optionalNumber = id => byId(id).value === "" ? null : Number(byId(id).value);
+        const executionConfig = { initialCapital: Number(byId("initial-capital").value), feeRate: Number(byId("fee-rate").value), allowShort: byId("allow-short").checked, fillPolicy: labState.capabilities.fillPolicy, engineVersion: labState.capabilities.engineVersion, positionSizePct: Number(byId("position-size-pct").value), stopLossPct: optionalNumber("stop-loss-pct"), takeProfitPct: optionalNumber("take-profit-pct"), trailingStopPct: optionalNumber("trailing-stop-pct") };
+        const request = { symbol: dataset.symbol, timeframe: dataset.timeframe, from: dataset.from, to: dataset.to, datasetVersion: dataset.datasetVersion, datasetChecksum: dataset.checksum, ...config, randomSeed: Number(byId("random-seed").value), stopConditions: { maxCandidates: Number(byId("max-candidates").value), maxDuration: null, noImprovementIterations: null }, batchSize: Number(byId("batch-size").value), executionConfig };
         const run = await api(`/api/v1/search-runs?generator=${encodeURIComponent(byId("generator").value)}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(request) });
         labState.searchRunId = run.searchRunId; labState.searchStartedAt = Date.now(); byId("cancel-search").disabled = false; byId("search-message").textContent = `Search ${run.searchRunId}`;
         subscribeProofTopics(run.searchRunId); renderSearch(run); beginPolling();
@@ -125,13 +129,14 @@ async function loadExperiment(experimentId) {
     try {
         const [details, provenance] = await Promise.all([api(`/api/v1/experiments/${experimentId}`), api(`/api/v1/experiments/${experimentId}/provenance`)]); byId("experiment-rank").textContent = details.rank ? `TOP #${details.rank}` : details.status; byId("experiment-rank").className = "status status-online"; byId("experiment-message").textContent = `${details.strategies.map(s => `${s.type}@${s.version}`).join(" + ")} · ${details.dataset.symbol} ${details.dataset.timeframe}`;
         byId("backtest-timeframe").value = details.dataset.timeframe;
+        document.querySelector(".backtest-toolbar input").value = details.dataset.symbol;
         byId("backtest-strategy").value = details.strategies.map(strategy => strategy.type).join(" + ");
         byId("metric-win-rate").textContent = details.metrics ? `${details.metrics.winRatePct ?? "-"}%` : "-";
         byId("metric-return").textContent = details.metrics ? `${details.metrics.totalReturnPct}%` : "-";
         byId("metric-drawdown").textContent = details.metrics ? `${details.metrics.maxDrawdownPct}%` : "-";
         byId("metric-trades").textContent = details.metrics?.totalTrades ?? "-";
         const grid = byId("provenance-grid"); grid.replaceChildren(provenanceItem("Experiment",details.experimentId),provenanceItem("Candidate hash",details.candidateHash),provenanceItem("Dataset checksum",details.dataset.checksum),provenanceItem("Dataset range",`${details.dataset.from} to ${details.dataset.to}`),provenanceItem("Generator",`${details.generator.type}@${details.generator.version}`),provenanceItem("Evaluator",details.evaluatorVersion),provenanceItem("Engine",`${details.executionConfig.engineVersion} · ${details.executionConfig.fillPolicy}`),provenanceItem("Code / build",`${details.codeCommit} / ${details.buildVersion}`),provenanceItem("Return",details.metrics ? `${details.metrics.totalReturnPct}%` : "-"),provenanceItem("Win rate",details.metrics ? `${details.metrics.winRatePct ?? "-"}%` : "-"),provenanceItem("MDD",details.metrics ? `${details.metrics.maxDrawdownPct}%` : "-"),provenanceItem("Trades",details.metrics?.totalTrades),provenanceItem("Score",details.metrics?.score));
-        renderArtifacts("signals", details.signals, signal => `${signal.at} · ${signal.strategyType}@${signal.strategyVersion} · ${signal.type} (${signal.strength}) · ${signal.reason}`); renderArtifacts("trades", details.trades, trade => `${trade.entryTime} @ ${trade.entryPrice} to ${trade.exitTime} @ ${trade.exitPrice} · PnL ${trade.pnl}`); byId("provenance-json").textContent = JSON.stringify(provenance,null,2);
+        renderArtifacts("signals", details.signals, signal => `${signal.at} · ${signal.strategyType}@${signal.strategyVersion} · ${signal.type} (${signal.strength}) · ${signal.reason}`); renderArtifacts("trades", details.trades, trade => `${trade.direction || "LONG"} · ${trade.entryTime} @ ${trade.entryPrice} to ${trade.exitTime} @ ${trade.exitPrice} · ${trade.exitReason || "SIGNAL"} · PnL ${trade.pnl}`); byId("provenance-json").textContent = JSON.stringify(provenance,null,2);
         window.cryptoLabBacktest.render(details);
     } catch (error) { byId("experiment-message").textContent = error.message; }
 }

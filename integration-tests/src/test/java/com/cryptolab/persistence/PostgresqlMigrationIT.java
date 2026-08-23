@@ -35,13 +35,14 @@ class PostgresqlMigrationIT {
         MigrateResult result = flyway.migrate();
 
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(9);
+        assertThat(result.migrationsExecuted).isEqualTo(16);
 
         Set<String> tables = readPublicTables();
         assertThat(tables)
                 .contains(
                         "candles",
                         "market_datasets",
+                        "market_dataset_sentiment_observations",
                         "search_runs",
                         "candidates",
                         "experiments",
@@ -50,6 +51,10 @@ class PostgresqlMigrationIT {
                         "trades",
                         "evaluation_metrics",
                         "leaderboard_entries",
+                        "accounts",
+                        "strategy_drafts",
+                        "user_strategies",
+                        "discovery_schedules",
                         "news_items",
                         "sentiment_predictions",
                         "outbox_events",
@@ -58,6 +63,8 @@ class PostgresqlMigrationIT {
         assertThat(readColumnLength("sentiment_predictions", "input_version")).isEqualTo(128);
         assertThat(hasColumn("evaluation_metrics", "win_rate_pct")).isTrue();
         assertThat(hasColumn("leaderboard_entries", "win_rate_pct")).isTrue();
+        assertThat(hasColumn("trades", "direction")).isTrue();
+        assertThat(hasColumn("trades", "exit_reason")).isTrue();
     }
 
     private Set<String> readPublicTables() throws Exception {

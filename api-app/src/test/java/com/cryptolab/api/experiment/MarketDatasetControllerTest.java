@@ -1,5 +1,6 @@
 package com.cryptolab.api.experiment;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -22,7 +23,10 @@ class MarketDatasetControllerTest {
     void materializesBackendCandlesIntoAnExactDatasetReference() throws Exception {
         Clock clock = Clock.fixed(Instant.parse("2026-08-18T12:00:00Z"), ZoneOffset.UTC);
         MarketDatasetService service = new MarketDatasetService(
-                (dataset, createdAt) -> dataset,
+                (dataset, createdAt) -> {
+                    assertThat(dataset.sentimentObservations()).hasSize(1);
+                    return dataset;
+                },
                 clock,
                 () -> UUID.fromString("90000000-0000-0000-0000-000000000002"));
         ObjectMapper mapper = new ObjectMapper()
@@ -41,6 +45,11 @@ class MarketDatasetControllerTest {
                                   "candles":[
                                     {"openTime":"2026-08-18T00:00:00Z","open":100,"high":110,"low":90,"close":105,"volume":10},
                                     {"openTime":"2026-08-18T00:05:00Z","open":105,"high":115,"low":95,"close":110,"volume":12}
+                                  ],
+                                  "sentimentObservations":[
+                                    {"sourceId":"news-1","observedAt":"2026-08-18T00:04:00Z","score":0.8,
+                                     "modelName":"keyword","modelVersion":"1.0","inputVersion":"news-v1",
+                                     "preprocessingVersion":"normalize-v1"}
                                   ]
                                 }
                                 """))

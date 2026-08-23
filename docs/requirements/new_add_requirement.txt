@@ -1,0 +1,26 @@
+Cần Đăng ký đăng nhập định danh tài khoản
+Biểu đồ cần giống trading view, cần load được lịch sử nến, và nến cuối cùng phải load liên tục nhảy lên xuống realtime. Phải quyết định khi hiển thị cây nến cuối cùng, nó là tĩnh như các cây trước hay là cây realtime luôn
+Phải giải thích được thiết kế 1000 connect, mỗi người 4 biểu đồ realtime, phải có test, chạy test và có độ đo
+Dùng Unicorn realtime websocket hoặc binance python thuần
+
+Yêu cầu 4: phải cho người dùng thêm mới strategy bằng ngôn ngữ tự nhiên, hoặc lấy link bài báo paste vào, chọn 1 cách thích hợp, không cần build lại hệ thống mà người dùng vẫn tạo mới được.
+Phải có bước hiện ý tưởng ra để người dùng xác nhận. Phải có vòng lặp để AI test file strategy để chạy được, rồi mới hiện ra cho người dùng, dĩ nhiên lưu riêng và cho xóa
+
+Strategy người dùng thêm mới có thể là đơn, phải chạy code tạo ra nó và lưu nó lại cho người dùng
+Khi chọn strategy cần chọn 
+•	Pair/coin
+•	Khoảng thời gian như 1 năm
+•	Vốn
+•	Vân vân, phải nghiên cứu
+
+
+Yêu cầu 8: phải nghiên cứu chiến lược, cách tự động loop discovery để tự kết hợp các chiến lược và trả kết quả. Không được vét cạn vì quá lâu, phải tìm cách hay hơn
+Nó sẽ chạy 24/24 để tìm leaderboard
+
+Chạy backtest thủ công, chọn như trên, chọn stratey, output là bảng kết quả
+Cần các bộ lọc, kết quả báo cáo như winrate, total profits, max drawn down,…
+
+Yêu cầu 7: quá trình backtest, loop discovery phải lưu lại nhiều phiên bản, người dùng có thể chọn nhiều khung thời gian khác nhau và cho phép chủ động dừng.
+(Điểm cộng) Yêu cầu 11: phải dùng LLM có tác dụng, mới nhất và hiệu quả để phân tích thì mới được điểm cộng, OpenAI thì không được
+
+Yêu cầu 10: khi crawler, mỗi trang có cấu trúc html khác nhau, cần luu lại trong db, mỗi khi nó sửa thì dùng LLM track lại các tag

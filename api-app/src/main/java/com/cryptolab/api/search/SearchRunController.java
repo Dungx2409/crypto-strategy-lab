@@ -1,6 +1,7 @@
 package com.cryptolab.api.search;
 
 import com.cryptolab.experiment.application.SearchCoordinator;
+import com.cryptolab.experiment.application.DeterministicBacktestEngine;
 import java.net.URI;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -70,7 +71,10 @@ public final class SearchRunController {
     @GetMapping("/capabilities")
     public SearchCapabilitiesResponse capabilities() {
         return new SearchCapabilitiesResponse(
-                coordinator.defaultGeneratorType(), coordinator.availableGeneratorTypes());
+                coordinator.defaultGeneratorType(),
+                coordinator.availableGeneratorTypes(),
+                DeterministicBacktestEngine.VERSION,
+                DeterministicBacktestEngine.FILL_POLICY);
     }
 
     @GetMapping("/{searchRunId}")

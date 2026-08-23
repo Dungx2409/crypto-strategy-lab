@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -85,7 +86,34 @@ class RandomStrategyGeneratorTest {
                                 .toList()))
                 .contains(List.of("MA"), List.of("RSI"), List.of("MA", "RSI"));
         assertThat(first.type()).isEqualTo("genetic");
-        assertThat(first.version()).isEqualTo("1.0");
+        assertThat(first.version()).isEqualTo("2.0");
+    }
+
+    @Test
+    void geneticParentSelectionChangesWithEvaluatedFitness() {
+        SearchContext context = context(73L);
+        GeneticStrategyGenerator generator = new GeneticStrategyGenerator(new CountingRegistry());
+        var firstFavored = generator.generate(context, (runId, candidateIds) -> {
+                    Map<UUID, BigDecimal> scores = new java.util.HashMap<>();
+                    for (int index = 0; index < candidateIds.size(); index++) {
+                        scores.put(candidateIds.get(index), BigDecimal.valueOf(candidateIds.size() - index));
+                    }
+                    return scores;
+                })
+                .limit(28)
+                .toList();
+        var lastFavored = generator.generate(context, (runId, candidateIds) -> {
+                    Map<UUID, BigDecimal> scores = new java.util.HashMap<>();
+                    for (int index = 0; index < candidateIds.size(); index++) {
+                        scores.put(candidateIds.get(index), BigDecimal.valueOf(index));
+                    }
+                    return scores;
+                })
+                .limit(28)
+                .toList();
+
+        assertThat(firstFavored.subList(0, 14)).isEqualTo(lastFavored.subList(0, 14));
+        assertThat(firstFavored.subList(14, 28)).isNotEqualTo(lastFavored.subList(14, 28));
     }
 
     private static SearchContext context(long seed) {
@@ -105,7 +133,7 @@ class RandomStrategyGeneratorTest {
                 new CombinationPolicyDefinition("MAJORITY", "1.0", Map.of(), BigDecimal.ZERO),
                 seed,
                 new StopConditions(100L, null, null),
-                3);
+                20);
     }
 
     private static final class CountingRegistry implements StrategyRegistry {

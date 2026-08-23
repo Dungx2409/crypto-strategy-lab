@@ -3,6 +3,7 @@ package com.cryptolab.infrastructure.experiment.adapter;
 import com.cryptolab.experiment.domain.MarketDataset;
 import com.cryptolab.experiment.port.MarketDatasetRepository;
 import com.cryptolab.marketdata.domain.Candle;
+import com.cryptolab.shared.domain.SentimentObservation;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -83,7 +84,34 @@ public class JdbcMarketDatasetRepository implements MarketDatasetRepository {
         if (persisted == null || persisted != dataset.candles().size()) {
             throw new IllegalStateException("materialized dataset candle count does not match input");
         }
-        return new MarketDataset(datasetId, reference, dataset.candles());
+        for (int sequence = 0; sequence < dataset.sentimentObservations().size(); sequence++) {
+            SentimentObservation observation = dataset.sentimentObservations().get(sequence);
+            jdbcTemplate.update(
+                    """
+                    INSERT INTO market_dataset_sentiment_observations (
+                        dataset_id, sequence_no, source_id, observed_at, score,
+                        model_name, model_version, input_version, preprocessing_version
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT DO NOTHING
+                    """,
+                    datasetId,
+                    sequence,
+                    observation.sourceId(),
+                    timestamp(observation.observedAt()),
+                    observation.score(),
+                    observation.modelName(),
+                    observation.modelVersion(),
+                    observation.inputVersion(),
+                    observation.preprocessingVersion());
+        }
+        Integer persistedSentiment = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM market_dataset_sentiment_observations WHERE dataset_id = ?",
+                Integer.class,
+                datasetId);
+        if (persistedSentiment == null || persistedSentiment != dataset.sentimentObservations().size()) {
+            throw new IllegalStateException("materialized dataset sentiment count does not match input");
+        }
+        return new MarketDataset(datasetId, reference, dataset.candles(), dataset.sentimentObservations());
     }
 
     private static OffsetDateTime timestamp(Instant instant) {

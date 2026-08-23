@@ -6,6 +6,7 @@ import com.cryptolab.experiment.domain.MarketDatasetRef;
 import com.cryptolab.experiment.port.MarketDatasetRepository;
 import com.cryptolab.marketdata.domain.Candle;
 import com.cryptolab.marketdata.domain.Timeframe;
+import com.cryptolab.shared.domain.SentimentObservation;
 import java.time.Clock;
 import java.util.Comparator;
 import java.util.List;
@@ -33,6 +34,15 @@ public final class MarketDatasetService {
             Timeframe timeframe,
             String datasetVersion,
             List<Candle> candles) {
+        return materialize(symbol, timeframe, datasetVersion, candles, List.of());
+    }
+
+    public MarketDataset materialize(
+            String symbol,
+            Timeframe timeframe,
+            String datasetVersion,
+            List<Candle> candles,
+            List<SentimentObservation> sentimentObservations) {
         List<Candle> ordered = List.copyOf(Objects.requireNonNull(candles, "candles must not be null"))
                 .stream()
                 .sorted(Comparator.comparing(Candle::openTime))
@@ -40,7 +50,13 @@ public final class MarketDatasetService {
         if (ordered.isEmpty()) {
             throw new IllegalArgumentException("dataset candles must not be empty");
         }
-        String checksum = MarketDatasetChecksum.calculate(ordered);
+        List<SentimentObservation> orderedSentiment = List.copyOf(Objects.requireNonNull(
+                        sentimentObservations, "sentimentObservations must not be null"))
+                .stream()
+                .sorted(Comparator.comparing(SentimentObservation::observedAt)
+                        .thenComparing(SentimentObservation::sourceId))
+                .toList();
+        String checksum = MarketDatasetChecksum.calculate(ordered, orderedSentiment);
         MarketDatasetRef reference = new MarketDatasetRef(
                 symbol,
                 timeframe,
@@ -48,6 +64,8 @@ public final class MarketDatasetService {
                 ordered.getLast().openTime().plus(timeframe.duration()),
                 datasetVersion,
                 checksum);
-        return repository.save(new MarketDataset(idGenerator.get(), reference, ordered), clock.instant());
+        return repository.save(
+                new MarketDataset(idGenerator.get(), reference, ordered, orderedSentiment),
+                clock.instant());
     }
 }

@@ -11,7 +11,32 @@ public record Trade(
         BigDecimal exitPrice,
         BigDecimal quantity,
         BigDecimal fee,
-        BigDecimal pnl) {
+        BigDecimal pnl,
+        TradeDirection direction,
+        TradeExitReason exitReason) {
+
+    public Trade(
+            Instant entryTime,
+            BigDecimal entryPrice,
+            Instant exitTime,
+            BigDecimal exitPrice,
+            BigDecimal quantity,
+            BigDecimal fee,
+            BigDecimal pnl) {
+        this(entryTime, entryPrice, exitTime, exitPrice, quantity, fee, pnl, TradeDirection.LONG, TradeExitReason.SIGNAL);
+    }
+
+    public Trade(
+            Instant entryTime,
+            BigDecimal entryPrice,
+            Instant exitTime,
+            BigDecimal exitPrice,
+            BigDecimal quantity,
+            BigDecimal fee,
+            BigDecimal pnl,
+            TradeDirection direction) {
+        this(entryTime, entryPrice, exitTime, exitPrice, quantity, fee, pnl, direction, TradeExitReason.SIGNAL);
+    }
 
     public Trade {
         Objects.requireNonNull(entryTime, "entryTime must not be null");
@@ -21,6 +46,8 @@ public record Trade(
         Objects.requireNonNull(quantity, "quantity must not be null");
         Objects.requireNonNull(fee, "fee must not be null");
         Objects.requireNonNull(pnl, "pnl must not be null");
+        direction = direction == null ? TradeDirection.LONG : direction;
+        exitReason = exitReason == null ? TradeExitReason.SIGNAL : exitReason;
         if (exitTime.isBefore(entryTime)) {
             throw new IllegalArgumentException("exitTime must not be before entryTime");
         }

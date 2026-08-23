@@ -6,6 +6,7 @@ import com.cryptolab.experiment.application.MarketDatasetService;
 import com.cryptolab.infrastructure.experiment.adapter.JdbcMarketDatasetRepository;
 import com.cryptolab.marketdata.domain.Candle;
 import com.cryptolab.marketdata.domain.Timeframe;
+import com.cryptolab.shared.domain.SentimentObservation;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -50,17 +51,34 @@ class MarketDatasetMaterializationIT {
 
     @Test
     void repeatMaterializationReusesTheImmutableDatasetWithoutDuplicateCandles() {
-        var first = service.materialize("BTCUSDT", Timeframe.M5, "dashboard-v1", candles());
-        var second = service.materialize("BTCUSDT", Timeframe.M5, "dashboard-v1", candles());
+        var first = service.materialize(
+                "BTCUSDT", Timeframe.M5, "dashboard-v1", candles(), observations());
+        var second = service.materialize(
+                "BTCUSDT", Timeframe.M5, "dashboard-v1", candles(), observations());
 
         assertThat(second.id()).isEqualTo(first.id());
         assertThat(second.reference()).isEqualTo(first.reference());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM market_datasets", Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM market_dataset_candles", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM market_dataset_sentiment_observations", Integer.class))
+                .isEqualTo(1);
+        assertThat(second.sentimentObservations()).isEqualTo(observations());
     }
 
     private static List<Candle> candles() {
         return List.of(candle(0), candle(1));
+    }
+
+    private static List<SentimentObservation> observations() {
+        return List.of(new SentimentObservation(
+                "news-1",
+                Instant.parse("2026-08-18T00:04:00Z"),
+                new BigDecimal("0.8"),
+                "keyword",
+                "1.0",
+                "news-v1",
+                "normalize-v1"));
     }
 
     private static Candle candle(int index) {

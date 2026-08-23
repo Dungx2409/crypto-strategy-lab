@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Map;
 
 public interface SearchRunRepository {
 
@@ -36,6 +37,12 @@ public interface SearchRunRepository {
     boolean cancel(UUID searchRunId, Instant cancelledAt);
 
     void recordEvaluation(UUID searchRunId, BigDecimal score);
+
+    default Map<UUID, BigDecimal> awaitCandidateFitness(
+            UUID searchRunId,
+            List<UUID> candidateIds) {
+        return Map.of();
+    }
 
     void fail(UUID searchRunId, String failureCode, String failureMessage, Instant failedAt);
 

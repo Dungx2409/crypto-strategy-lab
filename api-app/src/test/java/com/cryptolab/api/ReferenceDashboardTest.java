@@ -36,7 +36,13 @@ class ReferenceDashboardTest {
                 "market-chart-0",
                 "market-chart-1",
                 "market-chart-2",
-                "market-chart-3");
+                "market-chart-3",
+                "ETHUSDT",
+                "SOLUSDT",
+                "BNBUSDT",
+                "data-primary-timeframe=\"30m\"",
+                "data-primary-timeframe=\"2h\"",
+                "data-primary-timeframe=\"1d\"");
         assertThat(market).contains(
                 "chartStates",
                 "reloadChart",

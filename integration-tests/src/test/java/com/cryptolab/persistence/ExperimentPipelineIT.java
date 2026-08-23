@@ -105,6 +105,8 @@ class ExperimentPipelineIT {
         assertThat(completed.experiment().status()).isEqualTo(ExperimentStatus.COMPLETED);
         assertThat(completed.signals()).hasSize(6);
         assertThat(completed.trades()).hasSize(1);
+        assertThat(completed.trades().getFirst().direction())
+                .isEqualTo(com.cryptolab.experiment.domain.TradeDirection.LONG);
         assertThat(completed.metrics()).isNotNull();
         assertThat(completed.metrics().winRatePct()).isEqualByComparingTo("100");
         assertThat(completed.rank()).isEqualTo(1);

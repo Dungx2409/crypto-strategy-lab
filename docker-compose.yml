@@ -46,10 +46,18 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:-crypto_lab}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-crypto_lab_dev}
       CRYPTO_SEARCH_GENERATOR: ${CRYPTO_SEARCH_GENERATOR:-random}
+      CRYPTO_MARKET_PROVIDER: ${CRYPTO_MARKET_PROVIDER:-binance}
+      CRYPTO_MARKET_SUPPORTED_SYMBOLS: ${CRYPTO_MARKET_SUPPORTED_SYMBOLS:-BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT}
+      BINANCE_REST_URL: ${BINANCE_REST_URL:-https://api.binance.com/api/v3/klines}
+      BINANCE_WEBSOCKET_URL: ${BINANCE_WEBSOCKET_URL:-wss://stream.binance.com:9443/ws}
+      OKX_REST_URL: ${OKX_REST_URL:-https://www.okx.com/api/v5/market/history-candles}
+      OKX_WEBSOCKET_URL: ${OKX_WEBSOCKET_URL:-wss://ws.okx.com:8443/ws/v5/public}
       NEWS_PROVIDER: ${NEWS_PROVIDER:-cryptocompare}
       NEWS_API_URL: ${NEWS_API_URL:-https://min-api.cryptocompare.com/data/v2/news/}
       NEWS_API_KEY: ${NEWS_API_KEY:-}
       SENTIMENT_PROVIDER: ${SENTIMENT_PROVIDER:-keyword}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:
