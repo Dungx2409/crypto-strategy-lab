@@ -128,15 +128,15 @@ async function loadExperiment(experimentId) {
     byId("experiment-message").textContent = "Loading immutable result…";
     try {
         const [details, provenance] = await Promise.all([api(`/api/v1/experiments/${experimentId}`), api(`/api/v1/experiments/${experimentId}/provenance`)]); byId("experiment-rank").textContent = details.rank ? `TOP #${details.rank}` : details.status; byId("experiment-rank").className = "status status-online"; byId("experiment-message").textContent = `${details.strategies.map(s => `${s.type}@${s.version}`).join(" + ")} · ${details.dataset.symbol} ${details.dataset.timeframe}`;
-        byId("backtest-timeframe").value = details.dataset.timeframe;
-        document.querySelector(".backtest-toolbar input").value = details.dataset.symbol;
-        byId("backtest-strategy").value = details.strategies.map(strategy => strategy.type).join(" + ");
+        byId("manual-timeframe").value = details.dataset.timeframe;
+        byId("manual-symbol").value = details.dataset.symbol;
         byId("metric-win-rate").textContent = details.metrics ? `${details.metrics.winRatePct ?? "-"}%` : "-";
         byId("metric-return").textContent = details.metrics ? `${details.metrics.totalReturnPct}%` : "-";
         byId("metric-drawdown").textContent = details.metrics ? `${details.metrics.maxDrawdownPct}%` : "-";
         byId("metric-trades").textContent = details.metrics?.totalTrades ?? "-";
         const grid = byId("provenance-grid"); grid.replaceChildren(provenanceItem("Experiment",details.experimentId),provenanceItem("Candidate hash",details.candidateHash),provenanceItem("Dataset checksum",details.dataset.checksum),provenanceItem("Dataset range",`${details.dataset.from} to ${details.dataset.to}`),provenanceItem("Generator",`${details.generator.type}@${details.generator.version}`),provenanceItem("Evaluator",details.evaluatorVersion),provenanceItem("Engine",`${details.executionConfig.engineVersion} · ${details.executionConfig.fillPolicy}`),provenanceItem("Code / build",`${details.codeCommit} / ${details.buildVersion}`),provenanceItem("Return",details.metrics ? `${details.metrics.totalReturnPct}%` : "-"),provenanceItem("Win rate",details.metrics ? `${details.metrics.winRatePct ?? "-"}%` : "-"),provenanceItem("MDD",details.metrics ? `${details.metrics.maxDrawdownPct}%` : "-"),provenanceItem("Trades",details.metrics?.totalTrades),provenanceItem("Score",details.metrics?.score));
         renderArtifacts("signals", details.signals, signal => `${signal.at} · ${signal.strategyType}@${signal.strategyVersion} · ${signal.type} (${signal.strength}) · ${signal.reason}`); renderArtifacts("trades", details.trades, trade => `${trade.direction || "LONG"} · ${trade.entryTime} @ ${trade.entryPrice} to ${trade.exitTime} @ ${trade.exitPrice} · ${trade.exitReason || "SIGNAL"} · PnL ${trade.pnl}`); byId("provenance-json").textContent = JSON.stringify(provenance,null,2);
+        window.cryptoLabCurrentExperiment = details;
         window.cryptoLabBacktest.render(details);
     } catch (error) { byId("experiment-message").textContent = error.message; }
 }

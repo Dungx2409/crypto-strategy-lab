@@ -43,7 +43,7 @@ public final class GeminiStrategyAuthoringModel implements StrategyAuthoringMode
 
     @Override
     public String proposeIdea(String prompt, List<StrategyPluginDescriptor> availableStrategies) {
-        return generate("""
+        return generateText("""
                 You design cryptocurrency backtest strategies. Explain one concrete strategy idea in plain language.
                 Use only the registered plugins listed below. Do not output JSON yet.
 
@@ -69,7 +69,7 @@ public final class GeminiStrategyAuthoringModel implements StrategyAuthoringMode
                 Previous output: %s
                 Fix the error and return the complete JSON object again.
                 """.formatted(validationError, previousOutput);
-        return generate("""
+        return generateText("""
                 Convert the confirmed idea into one restricted JSON object. Output JSON only, without Markdown.
                 The exact shape is:
                 {"name":"...","description":"...","strategies":[{"type":"...","version":"...","parameters":{}}],"combinationPolicy":{"type":"MAJORITY","version":"1.0","weights":{},"threshold":0}}
@@ -82,7 +82,7 @@ public final class GeminiStrategyAuthoringModel implements StrategyAuthoringMode
                 """.formatted(prompt, confirmedIdea, json(availableStrategies), repair));
     }
 
-    private String generate(String prompt) {
+    String generateText(String prompt) {
         if (apiKey.isBlank()) {
             throw new IllegalStateException("GEMINI_API_KEY is blank; set it before using strategy authoring");
         }

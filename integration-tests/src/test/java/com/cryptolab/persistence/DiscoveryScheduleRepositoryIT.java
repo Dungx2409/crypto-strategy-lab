@@ -74,4 +74,25 @@ class DiscoveryScheduleRepositoryIT {
         assertThat(recovered.nextRunAt()).isEqualTo(now.plusSeconds(60));
         assertThat(recovered.lastError()).contains("restarted");
     }
+
+    @Test
+    void recordsEveryConfigurationVersion() {
+        Instant now = Instant.parse("2026-08-23T12:00:00Z");
+        UUID scheduleId = UUID.randomUUID();
+        repository.create(new DiscoverySchedule(
+                scheduleId, accountId, "BTCUSDT", Timeframe.H1, Duration.ofDays(30),
+                new BigDecimal("10000"), 100, Duration.ofHours(24),
+                DiscoveryScheduleStatus.ACTIVE, now, null, 0, null, now, now));
+
+        repository.updateConfiguration(
+                accountId, scheduleId, "ETHUSDT", Timeframe.H4, Duration.ofDays(90),
+                new BigDecimal("25000"), 250, Duration.ofHours(12), now.plusSeconds(60));
+
+        var versions = repository.findVersions(accountId, scheduleId);
+        assertThat(versions).hasSize(2);
+        assertThat(versions.getFirst().version()).isEqualTo(2);
+        assertThat(versions.getFirst().symbol()).isEqualTo("ETHUSDT");
+        assertThat(versions.getFirst().timeframe()).isEqualTo(Timeframe.H4);
+        assertThat(versions.getLast().version()).isEqualTo(1);
+    }
 }

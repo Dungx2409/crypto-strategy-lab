@@ -30,7 +30,10 @@ public final class StrategyAuthoringController {
     @PostMapping("/drafts")
     ResponseEntity<StrategyDraft> propose(
             @RequestBody StrategyPromptRequest request, HttpServletRequest servletRequest) {
-        StrategyDraft draft = service.propose(account(servletRequest).id(), request.prompt());
+        AuthenticatedAccount account = account(servletRequest);
+        StrategyDraft draft = request.usesArticle()
+                ? service.proposeFromArticle(account.id(), request.articleUrl())
+                : service.propose(account.id(), request.prompt());
         return ResponseEntity.status(HttpStatus.CREATED).body(draft);
     }
 

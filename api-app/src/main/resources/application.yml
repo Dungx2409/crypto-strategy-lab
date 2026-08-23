@@ -55,6 +55,7 @@ crypto:
     symbol-default: BTCUSDT
     supported-symbols: ${CRYPTO_MARKET_SUPPORTED_SYMBOLS:BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT}
     maximum-limit: 1000
+    maximum-range-candles: ${CRYPTO_MARKET_MAXIMUM_RANGE_CANDLES:20000}
     binance:
       rest-url: ${BINANCE_REST_URL:https://api.binance.com/api/v3/klines}
       websocket-url: ${BINANCE_WEBSOCKET_URL:wss://stream.binance.com:9443/ws}

@@ -10,6 +10,7 @@ import com.cryptolab.strategy.domain.StrategyDraftStatus;
 import com.cryptolab.strategy.domain.UserStrategy;
 import com.cryptolab.strategy.domain.UserStrategyDocument;
 import com.cryptolab.strategy.port.StrategyAuthoringModel;
+import com.cryptolab.strategy.port.ArticleSourceReader;
 import com.cryptolab.strategy.port.StrategyDocumentDecoder;
 import com.cryptolab.strategy.port.StrategyRegistry;
 import com.cryptolab.strategy.port.UserStrategyRepository;
@@ -32,6 +33,7 @@ public final class StrategyAuthoringService {
     private final CombinationPolicyResolver policyResolver;
     private final Clock clock;
     private final Supplier<UUID> ids;
+    private final ArticleSourceReader articles;
 
     public StrategyAuthoringService(
             StrategyAuthoringModel model,
@@ -41,6 +43,19 @@ public final class StrategyAuthoringService {
             CombinationPolicyResolver policyResolver,
             Clock clock,
             Supplier<UUID> ids) {
+        this(model, decoder, repository, registry, policyResolver, clock, ids,
+                url -> { throw new IllegalStateException("Article authoring is not configured"); });
+    }
+
+    public StrategyAuthoringService(
+            StrategyAuthoringModel model,
+            StrategyDocumentDecoder decoder,
+            UserStrategyRepository repository,
+            StrategyRegistry registry,
+            CombinationPolicyResolver policyResolver,
+            Clock clock,
+            Supplier<UUID> ids,
+            ArticleSourceReader articles) {
         this.model = Objects.requireNonNull(model);
         this.decoder = Objects.requireNonNull(decoder);
         this.repository = Objects.requireNonNull(repository);
@@ -48,6 +63,15 @@ public final class StrategyAuthoringService {
         this.policyResolver = Objects.requireNonNull(policyResolver);
         this.clock = Objects.requireNonNull(clock);
         this.ids = Objects.requireNonNull(ids);
+        this.articles = Objects.requireNonNull(articles);
+    }
+
+    public StrategyDraft proposeFromArticle(UUID accountId, String articleUrl) {
+        String article = articles.read(articleUrl);
+        String prefix = "Create a strategy from this article. Source URL: " + articleUrl + "\n\n";
+        int remaining = Math.max(0, 4000 - prefix.length());
+        String prompt = prefix + article.substring(0, Math.min(article.length(), remaining));
+        return propose(accountId, prompt);
     }
 
     public StrategyDraft propose(UUID accountId, String prompt) {

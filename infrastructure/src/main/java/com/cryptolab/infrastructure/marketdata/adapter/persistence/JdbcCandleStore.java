@@ -78,6 +78,25 @@ public class JdbcCandleStore implements CandleStore {
     }
 
     @Override
+    public List<Candle> findBetween(
+            TradingPair pair, Timeframe timeframe, Instant from, Instant to, int limit) {
+        return jdbcTemplate.query(
+                """
+                SELECT symbol, timeframe, open_time, open, high, low, close, volume
+                FROM candles
+                WHERE symbol = ? AND timeframe = ? AND open_time >= ? AND open_time < ?
+                ORDER BY open_time ASC
+                LIMIT ?
+                """,
+                this::mapCandle,
+                pair.symbol(),
+                timeframe.exchangeCode(),
+                OffsetDateTime.ofInstant(from, ZoneOffset.UTC),
+                OffsetDateTime.ofInstant(to, ZoneOffset.UTC),
+                limit);
+    }
+
+    @Override
     public Optional<Instant> findLastOpenTime(TradingPair pair, Timeframe timeframe) {
         List<Instant> values = jdbcTemplate.query(
                 """

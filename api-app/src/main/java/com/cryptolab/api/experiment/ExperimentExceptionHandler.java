@@ -1,6 +1,7 @@
 package com.cryptolab.api.experiment;
 
 import com.cryptolab.api.shared.ApiError;
+import com.cryptolab.api.account.UnauthenticatedException;
 import com.cryptolab.experiment.application.ExperimentNotFoundException;
 import java.time.Clock;
 import java.time.Instant;
@@ -28,6 +29,11 @@ final class ExperimentExceptionHandler {
     @ExceptionHandler(ExperimentNotFoundException.class)
     ResponseEntity<ApiError> notFound(ExperimentNotFoundException exception) {
         return response(HttpStatus.NOT_FOUND, "EXPERIMENT_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(UnauthenticatedException.class)
+    ResponseEntity<ApiError> unauthorized(UnauthenticatedException exception) {
+        return response(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED", exception.getMessage());
     }
 
     @ExceptionHandler({

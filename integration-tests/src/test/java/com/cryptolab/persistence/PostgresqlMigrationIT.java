@@ -35,7 +35,7 @@ class PostgresqlMigrationIT {
         MigrateResult result = flyway.migrate();
 
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(16);
+        assertThat(result.migrationsExecuted).isEqualTo(19);
 
         Set<String> tables = readPublicTables();
         assertThat(tables)
@@ -55,6 +55,10 @@ class PostgresqlMigrationIT {
                         "strategy_drafts",
                         "user_strategies",
                         "discovery_schedules",
+                        "discovery_schedule_versions",
+                        "experiment_owners",
+                        "crawler_templates",
+                        "crawler_template_versions",
                         "news_items",
                         "sentiment_predictions",
                         "outbox_events",

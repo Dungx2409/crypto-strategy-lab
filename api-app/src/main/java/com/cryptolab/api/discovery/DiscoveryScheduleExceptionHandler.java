@@ -31,6 +31,11 @@ final class DiscoveryScheduleExceptionHandler {
         return error(status, "INVALID_DISCOVERY_SCHEDULE", exception.getMessage());
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    ResponseEntity<ApiError> conflict(IllegalStateException exception) {
+        return error(HttpStatus.CONFLICT, "DISCOVERY_SCHEDULE_STATE_CONFLICT", exception.getMessage());
+    }
+
     private ResponseEntity<ApiError> error(HttpStatus status, String code, String message) {
         return ResponseEntity.status(status).body(new ApiError(
                 Instant.now(clock), status.value(), code, message, UUID.randomUUID().toString()));

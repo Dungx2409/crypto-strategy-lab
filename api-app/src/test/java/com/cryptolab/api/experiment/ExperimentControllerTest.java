@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cryptolab.experiment.application.DefaultExperimentEvaluator;
+import com.cryptolab.api.account.AuthenticatedAccount;
 import com.cryptolab.experiment.application.DefaultRankingService;
 import com.cryptolab.experiment.application.DeterministicBacktestEngine;
 import com.cryptolab.experiment.application.ExperimentPipelineService;
@@ -52,6 +53,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class ExperimentControllerTest {
@@ -101,7 +103,9 @@ class ExperimentControllerTest {
 
     @Test
     void runsCandidateAndExposesDetailsProvenanceLeaderboardAndRerun() throws Exception {
+        MockHttpSession session = authenticatedSession();
         mockMvc.perform(post("/api/v1/experiments")
+                        .session(session)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson()))
                 .andExpect(status().isCreated())
@@ -153,6 +157,7 @@ class ExperimentControllerTest {
     @Test
     void mapsMalformedAndMissingExperimentsToStableErrors() throws Exception {
         mockMvc.perform(post("/api/v1/experiments")
+                        .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"symbol\":\"BTCUSDT\",\"timeframe\":\"2m\"}"))
                 .andExpect(status().isBadRequest())
@@ -178,6 +183,14 @@ class ExperimentControllerTest {
                   "combinationPolicy": {"type":"MAJORITY","version":"1.0","weights":{},"threshold":0}
                 }
                 """;
+    }
+
+    private static MockHttpSession authenticatedSession() {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(
+                AuthenticatedAccount.class.getName(),
+                new AuthenticatedAccount(uuid(42), "student"));
+        return session;
     }
 
     private static UUID uuid(long suffix) {

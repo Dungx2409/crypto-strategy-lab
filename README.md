@@ -71,6 +71,21 @@ next run time, active search ID, and status. The default interval is 24 hours.
 Database claiming prevents overlapping runs, and startup recovery makes an
 interrupted schedule eligible to run again.
 
+The account dashboard also runs manual backtests from a saved strategy. Users
+choose pair, timeframe, date range, capital, fee, position size, Short support,
+and risk exits. An explicit range loads the requested historical candles instead
+of filtering only the latest chart data. The default cap is 20,000 range candles.
+Results remain owned by the account, appear in a reloadable run history, and can
+be filtered by P/L, direction, and exit reason. Schedule edits create immutable
+configuration versions.
+
+Strategy authoring accepts either a prompt or a public article URL. Article
+downloads reject private addresses, redirects, non-text content, and responses
+larger than 200 KB before sending extracted text to Gemini. Crawler selector
+templates use the same account boundary. A Gemini repair stays in
+`NEEDS_REVIEW` until the user confirms that exact version. Gemini calls remain
+disabled while `GEMINI_API_KEY` is blank.
+
 The final architecture proof matrix and repeatable commands are documented in
 [`docs/architecture/PROOF_MATRIX.md`](docs/architecture/PROOF_MATRIX.md).
 
@@ -168,6 +183,14 @@ GET    /api/v1/discovery-schedules
 GET    /api/v1/discovery-schedules/{scheduleId}
 POST   /api/v1/discovery-schedules/{scheduleId}/stop
 POST   /api/v1/discovery-schedules/{scheduleId}/start
+PUT    /api/v1/discovery-schedules/{scheduleId}
+GET    /api/v1/discovery-schedules/{scheduleId}/versions
+GET    /api/v1/experiments/mine
+POST   /api/v1/crawler-templates
+GET    /api/v1/crawler-templates
+GET    /api/v1/crawler-templates/{templateId}/versions
+POST   /api/v1/crawler-templates/{templateId}/repair
+POST   /api/v1/crawler-templates/{templateId}/versions/{version}/confirm
 ```
 
 Create a schedule with ISO-8601 durations. Omitted values default to a one-year
@@ -197,6 +220,9 @@ GET  /api/v1/leaderboard?searchRunId={searchRunId}&limit=50
 `POST /api/v1/experiments` accepts the symbol, timeframe, immutable candle
 dataset, strategy definitions, and combination policy. It is deliberately not
 the M5 search endpoint: it executes one candidate locally and synchronously.
+Creating a manual experiment now requires a session. Details, provenance, and
+rerun also require the owning session when an experiment has an ownership row.
+Legacy Search experiments remain public.
 
 M5 exposes bounded search-generation, dispatch, worker execution, cancellation,
 and live progress through:

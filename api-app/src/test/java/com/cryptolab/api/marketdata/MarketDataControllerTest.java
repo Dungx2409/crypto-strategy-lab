@@ -83,6 +83,24 @@ class MarketDataControllerTest {
                 .andExpect(jsonPath("$.code").value("MARKET_DATA_UNAVAILABLE"));
     }
 
+    @Test
+    void acceptsAnExplicitHistoricalRangeAndRejectsHalfARange() throws Exception {
+        mockMvc.perform(get("/api/v1/market/candles")
+                        .param("symbol", "BTCUSDT")
+                        .param("timeframe", "5m")
+                        .param("from", "2026-08-18T01:00:00Z")
+                        .param("to", "2026-08-18T02:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candles[0].openTime").value("2026-08-18T01:50:00Z"));
+
+        mockMvc.perform(get("/api/v1/market/candles")
+                        .param("symbol", "BTCUSDT")
+                        .param("timeframe", "5m")
+                        .param("from", "2026-08-18T01:00:00Z"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_RANGE"));
+    }
+
     private static Candle candle() {
         return new Candle(
                 "BTCUSDT",

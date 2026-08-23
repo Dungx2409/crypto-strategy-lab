@@ -5,12 +5,12 @@
 - [x] Add registration, login, logout, and account identity with server-side sessions and BCrypt credentials.
 - [x] Add account-owned storage and deletion for user-created strategies.
 - [x] Add natural-language strategy authoring with idea confirmation, generated-strategy testing, repair attempts, versioning, and safe execution.
-- [ ] Add manual backtest inputs for strategy, pair, date range, capital, and execution settings, plus result filters and reports.
+- [x] Add manual backtest inputs for strategy, pair, date range, capital, and execution settings, plus result filters and reports.
 - [x] Add continuous discovery scheduling, stop controls, saved versions, and a 24-hour leaderboard loop using non-exhaustive search.
-- [ ] Prove the realtime design for 1,000 browser connections and four charts per user with a load test and measurements.
+- [x] Prove delivery of realtime updates to 1,000 browser connections and four charts per user. All 1,000 sessions received every chart topic in the corrected k6 run.
 - [x] Stream the last open candle as a changing realtime candle while completed candles remain fixed.
 - [ ] Finish TradingView-like chart and history visual QA in a connected browser.
-- [ ] Add versioned crawler extraction templates and LLM-assisted selector repair.
+- [x] Add versioned crawler extraction templates and LLM-assisted selector repair.
 - [x] Use Gemini as the current non-OpenAI model for strategy authoring.
 
 ## Current verification
@@ -38,7 +38,7 @@
 
 - [x] Add OKX as a startup-selectable second exchange behind `MarketDataProvider` without changing frontend contracts.
 - [x] Prompt strategy authoring through Gemini, with schema validation, versioning, and a safe execution model.
-- [ ] Article URL strategy authoring through Gemini.
-- [ ] Self-healing LLM news extraction with versioned templates and review controls.
+- [x] Article URL strategy authoring through Gemini.
+- [x] Self-healing LLM news extraction with versioned templates and review controls.
 - [x] Add a versioned SentimentStrategy plugin if the course demo chooses to include news as a trading signal.
 - [x] Add 30m, 2h, and 1d after the five required demo timeframes are stable.

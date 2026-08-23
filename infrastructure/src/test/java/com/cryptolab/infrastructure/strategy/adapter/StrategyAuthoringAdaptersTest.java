@@ -36,4 +36,16 @@ class StrategyAuthoringAdaptersTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("without Markdown");
     }
+
+    @Test
+    void articleReaderRejectsPrivateAndNonHttpAddressesBeforeDownloading() {
+        var reader = new HttpArticleSourceReader();
+
+        assertThatThrownBy(() -> reader.read("http://127.0.0.1/article"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("private address");
+        assertThatThrownBy(() -> reader.read("file:///etc/passwd"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("public HTTP or HTTPS URL");
+    }
 }

@@ -2,6 +2,7 @@ package com.cryptolab.experiment.application;
 
 import com.cryptolab.experiment.domain.DiscoverySchedule;
 import com.cryptolab.experiment.domain.DiscoveryScheduleStatus;
+import com.cryptolab.experiment.domain.DiscoveryScheduleVersion;
 import com.cryptolab.experiment.domain.ExecutionConfig;
 import com.cryptolab.experiment.domain.SearchContext;
 import com.cryptolab.experiment.domain.SearchParameterSpace;
@@ -89,6 +90,33 @@ public final class ContinuousDiscoveryService {
         get(accountId, scheduleId);
         schedules.start(accountId, scheduleId, clock.instant(), clock.instant());
         return get(accountId, scheduleId);
+    }
+
+    public DiscoverySchedule update(
+            UUID accountId,
+            UUID scheduleId,
+            String symbol,
+            Timeframe timeframe,
+            Duration lookback,
+            BigDecimal initialCapital,
+            long candidateLimit,
+            Duration interval) {
+        DiscoverySchedule current = get(accountId, scheduleId);
+        if (current.activeSearchRunId() != null) {
+            throw new IllegalStateException("Stop the active discovery run before editing its configuration");
+        }
+        DiscoverySchedule proposed = new DiscoverySchedule(
+                current.id(), current.accountId(), symbol, timeframe, lookback, initialCapital,
+                candidateLimit, interval, current.status(), current.nextRunAt(), null,
+                current.completedRuns(), current.lastError(), current.createdAt(), clock.instant());
+        return schedules.updateConfiguration(
+                accountId, scheduleId, proposed.symbol(), proposed.timeframe(), proposed.lookback(),
+                proposed.initialCapital(), proposed.candidateLimit(), proposed.interval(), proposed.updatedAt());
+    }
+
+    public java.util.List<DiscoveryScheduleVersion> versions(UUID accountId, UUID scheduleId) {
+        get(accountId, scheduleId);
+        return schedules.findVersions(accountId, scheduleId);
     }
 
     public void recoverInterruptedRuns() {

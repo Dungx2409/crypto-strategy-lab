@@ -79,6 +79,44 @@ class MarketDataServiceTest {
                 .hasMessage("limit must be between 1 and 100");
     }
 
+    @Test
+    void loadsTheExactRequestedHistoricalRange() {
+        StubProvider provider = new StubProvider(List.of(candle("2025-08-18T01:00:00Z", Timeframe.H1)));
+        MarketDataService service = new MarketDataService(
+                provider,
+                new InMemoryStore(),
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                Set.of("BTCUSDT"),
+                100,
+                10_000);
+        Instant from = Instant.parse("2025-08-18T00:00:00Z");
+        Instant to = Instant.parse("2026-08-18T00:00:00Z");
+
+        var snapshot = service.candles("BTCUSDT", "1h", from, to);
+
+        assertThat(snapshot.candles()).hasSize(1);
+        assertThat(provider.requestedFrom).isEqualTo(from);
+        assertThat(provider.requestedTo).isEqualTo(to);
+    }
+
+    @Test
+    void rejectsAnOversizedHistoricalRange() {
+        MarketDataService service = new MarketDataService(
+                new StubProvider(List.of()),
+                new InMemoryStore(),
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                Set.of("BTCUSDT"),
+                100,
+                1_000);
+
+        assertThatThrownBy(() -> service.candles(
+                        "BTCUSDT", "1h",
+                        Instant.parse("2025-08-18T00:00:00Z"),
+                        Instant.parse("2026-08-18T00:00:00Z")))
+                .isInstanceOf(InvalidMarketDataRequestException.class)
+                .hasMessage("requested range exceeds 1000 candles");
+    }
+
     private MarketDataService service(MarketDataProvider provider, CandleStore store) {
         return new MarketDataService(
                 provider,
@@ -89,9 +127,13 @@ class MarketDataServiceTest {
     }
 
     private static Candle candle(String openTime) {
+        return candle(openTime, Timeframe.M5);
+    }
+
+    private static Candle candle(String openTime, Timeframe timeframe) {
         return new Candle(
                 "BTCUSDT",
-                Timeframe.M5,
+                timeframe,
                 Instant.parse(openTime),
                 new BigDecimal("100"),
                 new BigDecimal("110"),
@@ -103,6 +145,8 @@ class MarketDataServiceTest {
     private static final class StubProvider implements MarketDataProvider {
         private final List<Candle> historical;
         private RuntimeException failure;
+        private Instant requestedFrom;
+        private Instant requestedTo;
 
         private StubProvider(List<Candle> historical) {
             this.historical = historical;
@@ -114,6 +158,8 @@ class MarketDataServiceTest {
             if (failure != null) {
                 throw failure;
             }
+            requestedFrom = from;
+            requestedTo = to;
             return historical;
         }
 

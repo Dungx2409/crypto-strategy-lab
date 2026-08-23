@@ -1,6 +1,7 @@
 package com.cryptolab.api.marketdata;
 
 import com.cryptolab.marketdata.application.MarketDataService;
+import java.time.Instant;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,7 +21,12 @@ public final class MarketDataController {
     MarketCandlesResponse candles(
             @RequestParam String symbol,
             @RequestParam String timeframe,
-            @RequestParam(defaultValue = "500") int limit) {
+            @RequestParam(defaultValue = "500") int limit,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to) {
+        if (from != null || to != null) {
+            return MarketCandlesResponse.from(marketDataService.candles(symbol, timeframe, from, to));
+        }
         return MarketCandlesResponse.from(marketDataService.candles(symbol, timeframe, limit));
     }
 }

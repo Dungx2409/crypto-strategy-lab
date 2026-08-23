@@ -58,6 +58,11 @@ class CandleStoreIT {
                 .containsExactly(first.openTime(), second.openTime());
         assertThat(store.findLastOpenTime(new TradingPair("BTCUSDT"), Timeframe.M5))
                 .contains(second.openTime());
+        assertThat(store.findBetween(
+                        new TradingPair("BTCUSDT"), Timeframe.M5,
+                        first.openTime(), second.openTime(), 10))
+                .extracting(Candle::openTime)
+                .containsExactly(first.openTime());
     }
 
     private static Candle candle(String openTime, String close) {

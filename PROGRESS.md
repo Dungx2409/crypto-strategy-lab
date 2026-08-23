@@ -225,3 +225,30 @@
 - Added Flyway V16, scheduler service tests, and a PostgreSQL claim and recovery test.
 - The final `mvn clean verify` gate passed with all 16 migrations.
 - `scripts/verify-architecture-proofs.sh` passed with PostgreSQL and RabbitMQ Testcontainers.
+
+### Completed the remaining account workflows
+
+- Added account ownership for synchronous manual experiments and an owned-run history endpoint.
+- Added manual pair, timeframe, date range, saved strategy, capital, fee, position-size, Short, Stop Loss, Take Profit, and Trailing Stop controls.
+- Added P/L, direction, and exit-reason trade filters without changing stored results.
+- Added editable discovery schedules with immutable configuration history through Flyway V18.
+- Added article URL authoring with public-address, redirect, content-type, and size checks.
+- Added account-owned crawler templates. Gemini repairs create a review version and cannot become active until the account confirms it.
+- Added Flyway V17 through V19 and PostgreSQL tests for schedule history and crawler review promotion.
+- Kept `GEMINI_API_KEY` blank. No Gemini request ran during verification.
+
+### Measured realtime capacity
+
+- Registered 4,000 chart subscriptions for 1,000 users in 27 to 34 ms while sharing four provider streams.
+- Ran the k6 WebSocket test with 1,000 simultaneous users. All 1,000 HTTP upgrades passed. Connection p95 was 3.15 seconds.
+- The run received no candle messages before the 30-second close, so the update-count and 3-second p95 thresholds failed. This is recorded as incomplete proof, not a pass.
+- Added a 24-hour discovery soak script. A literal 24-hour run was not performed in this session.
+
+### Corrected realtime delivery and historical manual backtests
+
+- Fixed the k6 client so WebSocket callbacks can process `CONNECTED` and send four STOMP subscriptions.
+- Required each load-test session to receive candles for 5m, 15m, 1h, and 4h.
+- All 1,000 sessions passed. The run received 59,583 candle messages, connection p95 was 2.45 seconds, and first-update p95 was 4.40 seconds.
+- Manual backtests now request the exact selected historical range, capped at 20,000 candles by default.
+- Added reloadable account-owned manual-run history.
+- Added HTTP tests for strategy authoring, discovery schedules, crawler templates, and historical ranges.

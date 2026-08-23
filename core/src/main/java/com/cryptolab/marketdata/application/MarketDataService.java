@@ -7,6 +7,7 @@ import com.cryptolab.marketdata.domain.TradingPair;
 import com.cryptolab.marketdata.port.CandleStore;
 import com.cryptolab.marketdata.port.MarketDataProvider;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -20,6 +21,7 @@ public final class MarketDataService {
     private final Clock clock;
     private final Set<String> supportedSymbols;
     private final int maximumLimit;
+    private final int maximumRangeCandles;
 
     public MarketDataService(
             MarketDataProvider provider,
@@ -27,6 +29,16 @@ public final class MarketDataService {
             Clock clock,
             Set<String> supportedSymbols,
             int maximumLimit) {
+        this(provider, store, clock, supportedSymbols, maximumLimit, maximumLimit);
+    }
+
+    public MarketDataService(
+            MarketDataProvider provider,
+            CandleStore store,
+            Clock clock,
+            Set<String> supportedSymbols,
+            int maximumLimit,
+            int maximumRangeCandles) {
         this.provider = provider;
         this.store = store;
         this.clock = clock;
@@ -36,7 +48,11 @@ public final class MarketDataService {
         if (maximumLimit < 1) {
             throw new IllegalArgumentException("maximumLimit must be positive");
         }
+        if (maximumRangeCandles < 1) {
+            throw new IllegalArgumentException("maximumRangeCandles must be positive");
+        }
         this.maximumLimit = maximumLimit;
+        this.maximumRangeCandles = maximumRangeCandles;
     }
 
     public MarketDataSnapshot candles(String symbol, String timeframeCode, int limit) {
@@ -57,6 +73,26 @@ public final class MarketDataService {
             }
             throw new MarketDataUnavailableException(
                     "Market data provider is unavailable and no cached candles exist", providerFailure);
+        }
+    }
+
+    public MarketDataSnapshot candles(
+            String symbol, String timeframeCode, Instant from, Instant to) {
+        TradingPair pair = validatedPair(symbol);
+        Timeframe timeframe = validatedTimeframe(timeframeCode);
+        int expectedCandles = validateRange(from, to, timeframe);
+        try {
+            List<Candle> historical = provider.loadHistorical(pair, timeframe, from, to);
+            historical.forEach(store::saveIfAbsent);
+            return new MarketDataSnapshot(pair, timeframe, historical, false);
+        } catch (RuntimeException providerFailure) {
+            List<Candle> cached = store.findBetween(pair, timeframe, from, to, expectedCandles);
+            if (!cached.isEmpty()) {
+                return new MarketDataSnapshot(pair, timeframe, cached, true);
+            }
+            throw new MarketDataUnavailableException(
+                    "Market data provider is unavailable and no cached candles exist for the requested range",
+                    providerFailure);
         }
     }
 
@@ -87,5 +123,24 @@ public final class MarketDataService {
             throw new InvalidMarketDataRequestException(
                     "INVALID_LIMIT", "limit must be between 1 and " + maximumLimit);
         }
+    }
+
+    private int validateRange(Instant from, Instant to, Timeframe timeframe) {
+        if (from == null || to == null || !from.isBefore(to)) {
+            throw new InvalidMarketDataRequestException(
+                    "INVALID_RANGE", "from must be earlier than to");
+        }
+        long durationSeconds = Duration.between(from, to).getSeconds();
+        long candleSeconds = timeframe.duration().getSeconds();
+        long expectedCandles = durationSeconds / candleSeconds;
+        if (durationSeconds % candleSeconds != 0) {
+            expectedCandles++;
+        }
+        if (expectedCandles > maximumRangeCandles) {
+            throw new InvalidMarketDataRequestException(
+                    "INVALID_RANGE",
+                    "requested range exceeds " + maximumRangeCandles + " candles");
+        }
+        return Math.toIntExact(expectedCandles);
     }
 }

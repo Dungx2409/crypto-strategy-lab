@@ -3,6 +3,9 @@ package com.cryptolab.api.news;
 import com.cryptolab.infrastructure.news.adapter.DeterministicKeywordSentimentAnalyzer;
 import com.cryptolab.infrastructure.news.adapter.cryptocompare.CryptoCompareNewsProvider;
 import com.cryptolab.news.application.NewsCollector;
+import com.cryptolab.news.application.CrawlerTemplateService;
+import com.cryptolab.news.port.CrawlerTemplateRepository;
+import com.cryptolab.news.port.CrawlerSelectorRepairModel;
 import com.cryptolab.news.port.NewsProvider;
 import com.cryptolab.news.port.NewsStore;
 import com.cryptolab.news.port.NewsTelemetry;
@@ -13,6 +16,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -20,6 +24,14 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 class NewsRuntimeConfiguration {
+
+    @Bean
+    CrawlerTemplateService crawlerTemplateService(
+            CrawlerTemplateRepository repository,
+            CrawlerSelectorRepairModel repairModel,
+            Clock marketDataClock) {
+        return new CrawlerTemplateService(repository, repairModel, marketDataClock, UUID::randomUUID);
+    }
 
     @Bean(destroyMethod = "shutdownNow")
     ExecutorService newsCollectionExecutor() {

@@ -52,6 +52,35 @@ class ReferenceDashboardTest {
                 .doesNotContain("location.reload");
     }
 
+    @Test
+    void accountFeaturesExposeAuthoringSchedulesManualBacktestsAndCrawlerReview() throws IOException {
+        String html = resource("/static/index.html");
+        String features = resource("/static/account-features.js");
+
+        assertThat(html).contains(
+                "account-name",
+                "strategy-prompt",
+                "article-url",
+                "confirm-strategy",
+                "schedule-list",
+                "manual-strategy",
+                "manual-from",
+                "manual-to",
+                "manual-history-list",
+                "trade-filter-direction",
+                "crawler-template-list",
+                "account-features.js");
+        assertThat(features).contains(
+                "/api/v1/auth/",
+                "/api/v1/user-strategies",
+                "/api/v1/discovery-schedules",
+                "/api/v1/experiments",
+                "/api/v1/crawler-templates",
+                "query.set(\"from\"",
+                "query.set(\"to\"",
+                "Confirm");
+    }
+
     private static String resource(String path) throws IOException {
         try (var input = ReferenceDashboardTest.class.getResourceAsStream(path)) {
             if (input == null) {

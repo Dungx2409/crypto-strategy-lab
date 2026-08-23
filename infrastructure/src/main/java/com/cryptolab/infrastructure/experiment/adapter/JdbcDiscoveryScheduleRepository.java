@@ -2,6 +2,7 @@ package com.cryptolab.infrastructure.experiment.adapter;
 
 import com.cryptolab.experiment.domain.DiscoverySchedule;
 import com.cryptolab.experiment.domain.DiscoveryScheduleStatus;
+import com.cryptolab.experiment.domain.DiscoveryScheduleVersion;
 import com.cryptolab.experiment.port.DiscoveryScheduleRepository;
 import com.cryptolab.marketdata.domain.Timeframe;
 import java.sql.ResultSet;
@@ -15,9 +16,10 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
-public final class JdbcDiscoveryScheduleRepository implements DiscoveryScheduleRepository {
+public class JdbcDiscoveryScheduleRepository implements DiscoveryScheduleRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -26,6 +28,7 @@ public final class JdbcDiscoveryScheduleRepository implements DiscoveryScheduleR
     }
 
     @Override
+    @Transactional
     public DiscoverySchedule create(DiscoverySchedule schedule) {
         jdbcTemplate.update("""
                 INSERT INTO discovery_schedules (
@@ -38,6 +41,8 @@ public final class JdbcDiscoveryScheduleRepository implements DiscoveryScheduleR
                 schedule.interval().toSeconds(), schedule.status().name(), utc(schedule.nextRunAt()),
                 schedule.activeSearchRunId(), schedule.completedRuns(), schedule.lastError(),
                 utc(schedule.createdAt()), utc(schedule.updatedAt()));
+        insertVersion(schedule.id(), 1, schedule.symbol(), schedule.timeframe(), schedule.lookback(),
+                schedule.initialCapital(), schedule.candidateLimit(), schedule.interval(), schedule.createdAt());
         return schedule;
     }
 
@@ -115,6 +120,55 @@ public final class JdbcDiscoveryScheduleRepository implements DiscoveryScheduleR
     }
 
     @Override
+    @Transactional
+    public DiscoverySchedule updateConfiguration(
+            UUID accountId,
+            UUID scheduleId,
+            String symbol,
+            Timeframe timeframe,
+            Duration lookback,
+            java.math.BigDecimal initialCapital,
+            long candidateLimit,
+            Duration interval,
+            Instant updatedAt) {
+        int changed = jdbcTemplate.update("""
+                UPDATE discovery_schedules SET symbol = ?, timeframe = ?, lookback_seconds = ?,
+                    initial_capital = ?, candidate_limit = ?, interval_seconds = ?,
+                    next_run_at = ?, updated_at = ?
+                WHERE account_id = ? AND id = ? AND active_search_run_id IS NULL
+                """, symbol.trim().toUpperCase(), timeframe.exchangeCode(), lookback.toSeconds(),
+                initialCapital, candidateLimit, interval.toSeconds(), utc(updatedAt), utc(updatedAt),
+                accountId, scheduleId);
+        if (changed != 1) {
+            throw new IllegalArgumentException("Discovery schedule was not found or is running: " + scheduleId);
+        }
+        Integer version = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(version), 0) + 1 FROM discovery_schedule_versions WHERE schedule_id = ?",
+                Integer.class, scheduleId);
+        insertVersion(scheduleId, version, symbol, timeframe, lookback, initialCapital,
+                candidateLimit, interval, updatedAt);
+        return find(accountId, scheduleId).orElseThrow();
+    }
+
+    @Override
+    public List<DiscoveryScheduleVersion> findVersions(UUID accountId, UUID scheduleId) {
+        return jdbcTemplate.query("""
+                SELECT v.version, v.symbol, v.timeframe, v.lookback_seconds, v.initial_capital,
+                       v.candidate_limit, v.interval_seconds, v.created_at
+                FROM discovery_schedule_versions v
+                JOIN discovery_schedules s ON s.id = v.schedule_id
+                WHERE s.account_id = ? AND v.schedule_id = ? ORDER BY version DESC
+                """, (rs, row) -> new DiscoveryScheduleVersion(
+                        scheduleId, rs.getInt("version"), rs.getString("symbol"),
+                        Timeframe.fromExchangeCode(rs.getString("timeframe")),
+                        Duration.ofSeconds(rs.getLong("lookback_seconds")),
+                        rs.getBigDecimal("initial_capital"), rs.getLong("candidate_limit"),
+                        Duration.ofSeconds(rs.getLong("interval_seconds")),
+                        rs.getObject("created_at", OffsetDateTime.class).toInstant()),
+                accountId, scheduleId);
+    }
+
+    @Override
     public void recoverInterrupted(Instant now) {
         jdbcTemplate.update("""
                 UPDATE discovery_schedules
@@ -133,6 +187,25 @@ public final class JdbcDiscoveryScheduleRepository implements DiscoveryScheduleR
                 DiscoveryScheduleStatus.valueOf(rs.getString("status")), instant(rs, "next_run_at"),
                 rs.getObject("active_search_run_id", UUID.class), rs.getLong("completed_runs"),
                 rs.getString("last_error"), instant(rs, "created_at"), instant(rs, "updated_at"));
+    }
+
+    private void insertVersion(
+            UUID scheduleId,
+            int version,
+            String symbol,
+            Timeframe timeframe,
+            Duration lookback,
+            java.math.BigDecimal initialCapital,
+            long candidateLimit,
+            Duration interval,
+            Instant createdAt) {
+        jdbcTemplate.update("""
+                INSERT INTO discovery_schedule_versions (
+                    schedule_id, version, symbol, timeframe, lookback_seconds,
+                    initial_capital, candidate_limit, interval_seconds, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, scheduleId, version, symbol.trim().toUpperCase(), timeframe.exchangeCode(),
+                lookback.toSeconds(), initialCapital, candidateLimit, interval.toSeconds(), utc(createdAt));
     }
 
     private static OffsetDateTime utc(Instant instant) {

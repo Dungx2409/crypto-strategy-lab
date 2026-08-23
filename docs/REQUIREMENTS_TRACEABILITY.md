@@ -1,7 +1,9 @@
 # Requirements Traceability
 
 This file tracks delivery evidence without treating planned work as complete.
-The detailed normative requirements remain in `FEATURE_SPEC.md`.
+The normative requirements are
+[`Crypto Strategy Lab – Đồ án cuối kỳ.md`](requirements/Crypto%20Strategy%20Lab%20%E2%80%93%20%C4%90%E1%BB%93%20%C3%A1n%20cu%E1%BB%91i%20k%E1%BB%B3.md)
+and [`new_add_requirement.txt`](requirements/new_add_requirement.txt).
 
 | Scope | Specification sections | Delivery milestone | Current status | Required evidence |
 |---|---|---|---|---|
@@ -188,10 +190,10 @@ The detailed normative requirements remain in `FEATURE_SPEC.md`.
 | Requirement | Status |
 |---|---|
 | Registration, login, and account identity | Complete: server-side sessions, BCrypt, account identity, and ownership guard |
-| TradingView-like history and changing last candle | Realtime open-candle behavior complete; visual comparison pending |
-| 1,000 users with four realtime charts | Architecture supports shared, reference-counted streams; load test and measurements pending |
-| Natural-language or article-link strategy authoring | Prompt path complete: Gemini idea confirmation, restricted JSON, three validation attempts, deterministic smoke test, account-owned versions, list, detail, and deletion. Article-link input remains pending |
-| Manual backtest controls and result report | Core execution and metrics exist; account-facing manual workflow and filters are incomplete |
+| TradingView-like history and changing last candle | Realtime open-candle behavior complete; visual comparison remains blocked because no browser is connected |
+| 1,000 users with four realtime charts | `RealtimeFanoutCapacityTest` registered 4,000 charts over four shared provider streams. The corrected k6 run upgraded 1,000 simultaneous WebSockets, completed STOMP for every session, and delivered all four chart topics to all 1,000 sessions. It received 59,583 candle messages; connection p95 was 2.45 seconds and first-update p95 was 4.40 seconds |
+| Natural-language or article-link strategy authoring | Complete: prompt or public article URL, SSRF and response-size controls, Gemini idea confirmation, restricted JSON, three validation attempts, deterministic smoke test, account-owned versions, list, detail, and deletion |
+| Manual backtest controls and result report | Complete: saved strategy, pair, timeframe, exact historical date range up to 20,000 candles, capital, fees, sizing and risk exits, account-owned run history, reloadable results, metrics, trade table, and P/L, direction, and exit-reason filters |
 | Continuous non-exhaustive discovery and 24-hour leaderboard | Complete: persisted account schedules repeatedly launch bounded Genetic Search, recover after restart, prevent overlap, and support stop/start controls |
-| LLM-assisted crawler selector repair | Not started |
+| LLM-assisted crawler selector repair | Complete: account-owned database templates, immutable selector versions, Gemini repair in `NEEDS_REVIEW`, and explicit promotion to `ACTIVE` |
 | Current non-OpenAI analysis model bonus | Gemini 2.5 Flash is wired for strategy authoring; API key is intentionally blank by default |

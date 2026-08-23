@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -53,6 +54,23 @@ public final class DiscoveryScheduleController {
     @PostMapping("/{scheduleId}/start")
     DiscoverySchedule start(@PathVariable UUID scheduleId, HttpServletRequest request) {
         return service.start(account(request).id(), scheduleId);
+    }
+
+    @PutMapping("/{scheduleId}")
+    DiscoverySchedule update(
+            @PathVariable UUID scheduleId,
+            @RequestBody DiscoveryScheduleRequest body,
+            HttpServletRequest request) {
+        return service.update(
+                account(request).id(), scheduleId, body.symbol(), body.parsedTimeframe(),
+                body.resolvedLookback(), body.resolvedCapital(),
+                body.resolvedCandidateLimit(), body.resolvedInterval());
+    }
+
+    @GetMapping("/{scheduleId}/versions")
+    java.util.List<com.cryptolab.experiment.domain.DiscoveryScheduleVersion> versions(
+            @PathVariable UUID scheduleId, HttpServletRequest request) {
+        return service.versions(account(request).id(), scheduleId);
     }
 
     private static AuthenticatedAccount account(HttpServletRequest request) {

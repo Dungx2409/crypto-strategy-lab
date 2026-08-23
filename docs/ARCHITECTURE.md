@@ -2,7 +2,7 @@
 
 ## Scope
 
-The written requirements define the product scope. The five supplied images guide layout and visual style. Prompt-based strategy authoring uses Gemini and restricted JSON. Article-link authoring and self-healing LLM news extraction remain future work.
+The written requirements define the product scope. The five supplied images guide layout and visual style. Prompt and article-link strategy authoring use Gemini and restricted JSON. Crawler selector repairs also use Gemini and require user review before activation.
 
 The platform supports research and coursework. It never places real orders.
 
@@ -423,6 +423,46 @@ Consequences: The default interval is 24 hours, but the API accepts any interval
 
 Evidence: `ContinuousDiscoveryServiceTest`, `DiscoveryScheduleRepositoryIT`, Flyway V16, and the full Maven verification gate.
 
+### AD-28: Manual experiments belong to the session account
+
+Context: Manual backtests can contain a user's saved strategy and chosen execution settings. A public experiment ID must not expose that private work.
+
+Decision: Experiment creation requires a server session and inserts an owner row after the synchronous pipeline completes. Listing, details, provenance, and rerun check that owner. Search experiments and older experiments without an owner row keep their public read behavior.
+
+Consequences: A failed backtest creates no ownership row. Account history lists only owned experiment IDs. The browser sends the selected saved strategy document and exact filtered candle set to the existing deterministic experiment endpoint.
+
+Evidence: Flyway V17, `ExperimentControllerTest`, account session tests, and the full Maven gate.
+
+### AD-29: Article authoring fetches only bounded public text
+
+Context: Allowing an account to paste an article URL creates server-side request forgery and oversized-input risks before Gemini sees any text.
+
+Decision: The article reader accepts HTTP and HTTPS without user info, resolves the host, and rejects local, private, link-local, and multicast addresses. It follows no redirects, accepts only HTML or plain text, reads at most 200 KB, removes scripts and tags, and passes no more than 20,000 characters to authoring.
+
+Consequences: Sites that require login, redirects, JavaScript rendering, or larger documents are rejected. The same idea confirmation and restricted-JSON flow handles the extracted article text. A blank Gemini key still prevents model calls.
+
+Evidence: `StrategyAuthoringAdaptersTest`, `StrategyAuthoringServiceTest`, and the API module tests.
+
+### AD-30: Crawler selector repair requires human promotion
+
+Context: News sites change HTML selectors. Applying an unreviewed model response could silently collect the wrong text.
+
+Decision: Each account stores a crawler template and immutable selector versions. Gemini proposes a repaired selector set as `NEEDS_REVIEW`. Only the confirmation endpoint changes the selected version to `ACTIVE`; earlier versions become `HISTORICAL`.
+
+Consequences: The application stores configuration, not generated crawler code. A repair needs a changed HTML sample of at most 50,000 characters. Gemini is unavailable while its key is blank, but manual template creation and version history still work.
+
+Evidence: Flyway V19, `CrawlerTemplateRepositoryIT`, controller source tests, and the full Maven gate.
+
+### AD-31: Realtime capacity separates browser fanout from provider streams
+
+Context: One thousand users with four charts would create 4,000 exchange connections if every browser subscription opened its own provider socket.
+
+Decision: The subscription tracker reference-counts by pair and timeframe. Four thousand browser registrations for the same four topics share four provider streams. A k6 script opens 1,000 WebSockets and requests four STOMP topics per session.
+
+Consequences: The in-process capacity test registered 4,000 charts over four provider streams. The corrected k6 test upgraded 1,000 WebSockets and delivered every one of the four topics to all 1,000 sessions. It received 59,583 candle messages, with a 2.45 second connection p95 and a 4.40 second first-update p95.
+
+Evidence: `RealtimeFanoutCapacityTest` and `scripts/load-test-realtime.js`.
+
 ## Runtime flows
 
 ### Realtime flow
@@ -466,8 +506,8 @@ NewsProvider -> NewsCollector -> NewsStore
 
 ## Known limits
 
-- Browser visual inspection could not run in the current session because no browser connection was available. HTTP and source tests ran against the real container.
+- Browser visual inspection could not run in the current session because no browser connection was available. Source and API tests still ran.
 - Market provider selection happens at API startup. The system does not automatically fail over between Binance and OKX or combine their candles.
 - Natural-language authoring can only compose registered plugins. It does not generate new Java indicator implementations.
 - Gemini authoring cannot run until `GEMINI_API_KEY` is supplied.
-- LLM-assisted crawler repair is not implemented.
+- The realtime capacity proof ran on one development machine with Spring's in-process STOMP broker. Production deployment still needs environment-specific load tests and resource limits.

@@ -47,12 +47,14 @@ class MarketDataRuntimeConfiguration {
             CandleStore store,
             Clock marketDataClock,
             @Value("${crypto.market.supported-symbols:BTCUSDT}") String supportedSymbols,
-            @Value("${crypto.market.maximum-limit:1000}") int maximumLimit) {
+            @Value("${crypto.market.maximum-limit:1000}") int maximumLimit,
+            @Value("${crypto.market.maximum-range-candles:20000}") int maximumRangeCandles) {
         Set<String> symbols = Arrays.stream(supportedSymbols.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
                 .collect(Collectors.toUnmodifiableSet());
-        return new MarketDataService(provider, store, marketDataClock, symbols, maximumLimit);
+        return new MarketDataService(
+                provider, store, marketDataClock, symbols, maximumLimit, maximumRangeCandles);
     }
 
     @Bean(destroyMethod = "close")
