@@ -1,0 +1,192 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - link "Crypto Strategy Lab home" [ref=e4] [cursor=pointer]:
+      - /url: "#realtime"
+      - generic [ref=e5]: ⚗
+      - strong [ref=e6]: CryptoStrategy Lab
+    - navigation "Main navigation" [ref=e7]:
+      - button "⌁ Realtime" [ref=e8] [cursor=pointer]:
+        - generic [ref=e9]: ⌁
+        - text: Realtime
+      - button "⌘ Strategy Engine" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: ⌘
+        - text: Strategy Engine
+      - button "⌕ Discovery" [ref=e12] [cursor=pointer]:
+        - generic [ref=e13]: ⌕
+        - text: Discovery
+      - button "▥ Backtest" [ref=e14] [cursor=pointer]:
+        - generic [ref=e15]: ▥
+        - text: Backtest
+      - button "▤ News Crawler" [ref=e16] [cursor=pointer]:
+        - generic [ref=e17]: ▤
+        - text: News Crawler
+      - button "⚙ Settings" [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: ⚙
+        - text: Settings
+    - generic [ref=e20]:
+      - article [ref=e21]:
+        - generic [ref=e22]: ◇
+        - generic [ref=e23]:
+          - strong [ref=e24]: Architecture Lab
+          - generic [ref=e25]: Java 21 course project
+      - article [ref=e26]:
+        - generic [ref=e27]: CS
+        - generic [ref=e28]:
+          - strong [ref=e29]: Guest
+          - generic [ref=e30]: Sign in for saved work
+  - main [ref=e31]:
+    - generic [ref=e32]:
+      - generic [ref=e33]:
+        - heading "Realtime Chart" [level=1] [ref=e34]
+        - paragraph [ref=e35]: Four independent market timeframes from one normalized backend contract
+      - generic [ref=e36]:
+        - generic [ref=e37]: Binance API + WebSocket
+        - button "Help" [ref=e39] [cursor=pointer]: "?"
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - text: Pair / Coin
+          - combobox "Pair / Coin" [ref=e43]:
+            - option "₿ BTCUSDT" [selected]
+            - option "◆ ETHUSDT"
+            - option "● SOLUSDT"
+            - option "⬡ BNBUSDT"
+        - generic "Primary chart timeframe" [ref=e44]:
+          - generic [ref=e45]: Primary timeframe
+          - button "1m" [ref=e46] [cursor=pointer]
+          - button "5m" [ref=e47] [cursor=pointer]
+          - button "15m" [ref=e48] [cursor=pointer]
+          - button "30m" [ref=e49] [cursor=pointer]
+          - button "1h" [ref=e50] [cursor=pointer]
+          - button "2h" [ref=e51] [cursor=pointer]
+          - button "4h" [ref=e52] [cursor=pointer]
+          - button "1d" [ref=e53] [cursor=pointer]
+        - generic [ref=e54]:
+          - text: Realtime
+          - checkbox "Realtime" [checked]
+        - generic [ref=e56]: OFFLINE
+      - status [ref=e57]
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - article [ref=e60]:
+            - generic [ref=e61]:
+              - generic [ref=e62]:
+                - strong [ref=e63]:
+                  - text: BTCUSDT ·
+                  - combobox [ref=e64]:
+                    - option "1m"
+                    - option "5m" [selected]
+                    - option "15m"
+                    - option "30m"
+                    - option "1h"
+                    - option "2h"
+                    - option "4h"
+                    - option "1d"
+                - generic [ref=e65]: MA(20) —
+              - generic [ref=e66]:
+                - generic [ref=e67]: —
+                - generic [ref=e68]: —
+                - emphasis [ref=e69]: HOLD
+            - generic "Primary market chart" [ref=e70]
+            - generic [ref=e71]:
+              - generic [ref=e72]: Volume —
+              - generic [ref=e73]: Loading history
+          - article [ref=e74]:
+            - generic [ref=e75]:
+              - generic [ref=e76]:
+                - strong [ref=e77]:
+                  - text: BTCUSDT ·
+                  - combobox [ref=e78]:
+                    - option "1m"
+                    - option "5m"
+                    - option "15m" [selected]
+                    - option "30m"
+                    - option "1h"
+                    - option "2h"
+                    - option "4h"
+                    - option "1d"
+                - generic [ref=e79]: MA(20) —
+              - generic [ref=e80]:
+                - generic [ref=e81]: —
+                - generic [ref=e82]: —
+                - emphasis [ref=e83]: HOLD
+            - generic "Second market chart" [ref=e84]
+            - generic [ref=e85]:
+              - generic [ref=e86]: Volume —
+              - generic [ref=e87]: Loading history
+          - article [ref=e88]:
+            - generic [ref=e89]:
+              - generic [ref=e90]:
+                - strong [ref=e91]:
+                  - text: BTCUSDT ·
+                  - combobox [ref=e92]:
+                    - option "1m"
+                    - option "5m"
+                    - option "15m"
+                    - option "30m"
+                    - option "1h" [selected]
+                    - option "2h"
+                    - option "4h"
+                    - option "1d"
+                - generic [ref=e93]: MA(20) —
+              - generic [ref=e94]:
+                - generic [ref=e95]: —
+                - generic [ref=e96]: —
+                - emphasis [ref=e97]: HOLD
+            - generic "Third market chart" [ref=e98]
+            - generic [ref=e99]:
+              - generic [ref=e100]: Volume —
+              - generic [ref=e101]: Loading history
+          - article [ref=e102]:
+            - generic [ref=e103]:
+              - generic [ref=e104]:
+                - strong [ref=e105]:
+                  - text: BTCUSDT ·
+                  - combobox [ref=e106]:
+                    - option "1m"
+                    - option "5m"
+                    - option "15m"
+                    - option "30m"
+                    - option "1h"
+                    - option "2h"
+                    - option "4h" [selected]
+                    - option "1d"
+                - generic [ref=e107]: MA(20) —
+              - generic [ref=e108]:
+                - generic [ref=e109]: —
+                - generic [ref=e110]: —
+                - emphasis [ref=e111]: HOLD
+            - generic "Fourth market chart" [ref=e112]
+            - generic [ref=e113]:
+              - generic [ref=e114]: Volume —
+              - generic [ref=e115]: Loading history
+        - complementary [ref=e116]:
+          - article [ref=e117]:
+            - heading "Candle update rules" [level=2] [ref=e118]
+            - generic [ref=e119]:
+              - strong [ref=e120]: Same open time
+              - generic [ref=e121]: Replace the current candle
+            - generic [ref=e122]:
+              - strong [ref=e123]: New open time
+              - generic [ref=e124]: Append one candle
+          - article [ref=e125]:
+            - generic [ref=e126]:
+              - heading "Connection" [level=2] [ref=e127]
+              - generic [ref=e128]: DOWN
+            - generic [ref=e129]:
+              - generic [ref=e130]:
+                - term [ref=e131]: Provider
+                - definition [ref=e132]: Binance adapter
+              - generic [ref=e133]:
+                - term [ref=e134]: Last data
+                - definition [ref=e135]: —
+              - generic [ref=e136]:
+                - term [ref=e137]: Stream
+                - definition [ref=e138]: 0 charts
+          - article [ref=e139]:
+            - heading "Legend" [level=2] [ref=e140]
+            - list [ref=e141]:
+              - listitem [ref=e142]: Close at or above open
+              - listitem [ref=e144]: Close below open
+              - listitem [ref=e146]: MA(20)
+              - listitem [ref=e148]: Volume

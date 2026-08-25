@@ -1,0 +1,170 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - link "Crypto Strategy Lab home" [ref=e4] [cursor=pointer]:
+      - /url: "#realtime"
+      - generic [ref=e5]: ⚗
+      - strong [ref=e6]: CryptoStrategy Lab
+    - navigation "Main navigation" [ref=e7]:
+      - button "⌁ Realtime" [ref=e8] [cursor=pointer]:
+        - generic [ref=e9]: ⌁
+        - text: Realtime
+      - button "⌘ Strategy Engine" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: ⌘
+        - text: Strategy Engine
+      - button "⌕ Discovery" [active] [ref=e12] [cursor=pointer]:
+        - generic [ref=e13]: ⌕
+        - text: Discovery
+      - button "▥ Backtest" [ref=e14] [cursor=pointer]:
+        - generic [ref=e15]: ▥
+        - text: Backtest
+      - button "▤ News Crawler" [ref=e16] [cursor=pointer]:
+        - generic [ref=e17]: ▤
+        - text: News Crawler
+      - button "⚙ Settings" [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: ⚙
+        - text: Settings
+    - generic [ref=e20]:
+      - article [ref=e21]:
+        - generic [ref=e22]: ◇
+        - generic [ref=e23]:
+          - strong [ref=e24]: Architecture Lab
+          - generic [ref=e25]: Java 21 course project
+      - article [ref=e26]:
+        - generic [ref=e27]: CS
+        - generic [ref=e28]:
+          - strong [ref=e29]: Guest
+          - generic [ref=e30]: Sign in for saved work
+  - main [ref=e31]:
+    - generic [ref=e32]:
+      - generic [ref=e33]:
+        - heading "Strategy Engine & Loop Discovery" [level=1] [ref=e150]
+        - paragraph [ref=e35]: Generate, backtest, evaluate, rank, and keep the best reproducible combinations
+      - generic [ref=e36]:
+        - generic [ref=e37]: Binance API + WebSocket
+        - button "Help" [ref=e39] [cursor=pointer]: "?"
+    - generic [ref=e151]:
+      - generic [ref=e152]:
+        - generic [ref=e153]:
+          - generic [ref=e154]: ✣
+          - generic [ref=e155]: Generate
+        - generic [ref=e156]: →
+        - generic [ref=e157]:
+          - generic [ref=e158]: ▥
+          - generic [ref=e159]: Backtest
+        - generic [ref=e160]: →
+        - generic [ref=e161]:
+          - generic [ref=e162]: ⌁
+          - generic [ref=e163]: Evaluate
+        - generic [ref=e164]: →
+        - generic [ref=e165]:
+          - generic [ref=e166]: ▥
+          - generic [ref=e167]: Rank
+        - generic [ref=e168]: →
+        - generic [ref=e169]:
+          - generic [ref=e170]: ♜
+          - generic [ref=e171]: Leaderboard
+      - generic [ref=e172]:
+        - generic [ref=e173]:
+          - generic [ref=e174]:
+            - generic [ref=e175]:
+              - paragraph [ref=e176]: Continuous loop
+              - heading "Search run" [level=2] [ref=e177]
+            - generic [ref=e178]: IDLE
+          - generic [ref=e179]:
+            - generic [ref=e180]:
+              - text: Generator
+              - combobox "Generator" [ref=e181]:
+                - option "GENETIC"
+                - option "RANDOM" [selected]
+            - generic [ref=e182]:
+              - text: Max candidates
+              - spinbutton "Max candidates" [ref=e183]: "125"
+            - generic [ref=e184]:
+              - text: Random seed
+              - spinbutton "Random seed" [ref=e185]: "20260818"
+            - generic [ref=e186]:
+              - text: Batch size
+              - spinbutton "Batch size" [ref=e187]: "25"
+          - generic [ref=e188]:
+            - button "Start search" [ref=e189] [cursor=pointer]
+            - button "Cancel" [disabled] [ref=e190]
+          - status [ref=e191]: Waiting for a market dataset.
+          - generic [ref=e193]:
+            - article [ref=e194]:
+              - generic [ref=e195]: Generated
+              - strong [ref=e196]: "0"
+            - article [ref=e197]:
+              - generic [ref=e198]: Pending
+              - strong [ref=e199]: "0"
+            - article [ref=e200]:
+              - generic [ref=e201]: Queued
+              - strong [ref=e202]: "0"
+            - article [ref=e203]:
+              - generic [ref=e204]: Running
+              - strong [ref=e205]: "0"
+            - article [ref=e206]:
+              - generic [ref=e207]: Completed
+              - strong [ref=e208]: "0"
+            - article [ref=e209]:
+              - generic [ref=e210]: Failed
+              - strong [ref=e211]: "0"
+            - article [ref=e212]:
+              - generic [ref=e213]: Elapsed
+              - strong [ref=e214]: 0s
+            - article [ref=e215]:
+              - generic [ref=e216]: Best score
+              - strong [ref=e217]: —
+        - generic [ref=e218]:
+          - generic [ref=e219]:
+            - generic [ref=e220]:
+              - paragraph [ref=e221]: Top strategies
+              - heading "Leaderboard" [level=2] [ref=e222]
+            - generic [ref=e223]: Select a row to inspect the result
+          - table [ref=e225]:
+            - rowgroup [ref=e226]:
+              - row [ref=e227]:
+                - columnheader "Rank" [ref=e228]
+                - columnheader "Strategy" [ref=e229]
+                - columnheader "Return" [ref=e230]
+                - columnheader "Win rate" [ref=e231]
+                - columnheader "MDD" [ref=e232]
+                - columnheader "Trades" [ref=e233]
+                - columnheader "Score" [ref=e234]
+            - rowgroup [ref=e235]:
+              - row [ref=e236]:
+                - cell "No completed experiments yet." [ref=e237]
+      - generic [ref=e238]:
+        - generic [ref=e239]:
+          - generic [ref=e240]:
+            - paragraph [ref=e241]: 24-hour schedules
+            - heading "Continuous Genetic discovery" [level=2] [ref=e242]
+          - generic [ref=e243]: Saved per account
+        - generic [ref=e244]:
+          - generic [ref=e245]:
+            - text: Pair
+            - combobox "Pair" [ref=e246]:
+              - option "BTCUSDT" [selected]
+              - option "ETHUSDT"
+              - option "SOLUSDT"
+              - option "BNBUSDT"
+          - generic [ref=e247]:
+            - text: Timeframe
+            - combobox "Timeframe" [ref=e248]:
+              - option "15m"
+              - option "1h" [selected]
+              - option "4h"
+              - option "1d"
+          - generic [ref=e249]:
+            - text: Lookback days
+            - spinbutton "Lookback days" [ref=e250]: "365"
+          - generic [ref=e251]:
+            - text: Capital
+            - spinbutton "Capital" [ref=e252]: "10000"
+          - generic [ref=e253]:
+            - text: Candidates per run
+            - spinbutton "Candidates per run" [ref=e254]: "125"
+          - generic [ref=e255]:
+            - text: Interval hours
+            - spinbutton "Interval hours" [ref=e256]: "24"
+        - button "Create schedule" [ref=e257] [cursor=pointer]
+        - paragraph [ref=e258]

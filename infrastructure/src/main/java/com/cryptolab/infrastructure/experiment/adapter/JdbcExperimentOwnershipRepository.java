@@ -11,7 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public final class JdbcExperimentOwnershipRepository implements ExperimentOwnershipRepository {
+public class JdbcExperimentOwnershipRepository implements ExperimentOwnershipRepository {
 
     private final JdbcTemplate jdbcTemplate;
 

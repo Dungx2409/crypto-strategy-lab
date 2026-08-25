@@ -16,7 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public final class JdbcAccountRepository implements AccountRepository {
+public class JdbcAccountRepository implements AccountRepository {
 
     private final JdbcTemplate jdbcTemplate;
 

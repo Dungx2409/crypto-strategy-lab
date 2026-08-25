@@ -12,6 +12,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +25,7 @@ public final class GeminiStrategyAuthoringModel implements StrategyAuthoringMode
     private final String model;
     private final Duration timeout;
 
+    @Autowired
     public GeminiStrategyAuthoringModel(
             ObjectMapper objectMapper,
             @Value("${crypto.ai.gemini.api-key:}") String apiKey,

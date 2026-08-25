@@ -57,7 +57,3 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
-
-Reporting, writing style:
-- When write POC python script, write simple, use lowercase variables, use requests library, hardcode everything, don't handle try/catch
-- When explaining, explain like you are talking to a first-year university student, use simple words.
