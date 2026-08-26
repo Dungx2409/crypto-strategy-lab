@@ -11,6 +11,7 @@ import com.cryptolab.experiment.domain.ExperimentProvenance;
 import com.cryptolab.experiment.domain.ExperimentStateMachine;
 import com.cryptolab.experiment.domain.ExperimentStatus;
 import com.cryptolab.experiment.domain.LeaderboardEntry;
+import com.cryptolab.experiment.domain.MarketDataset;
 import com.cryptolab.experiment.domain.Ranking;
 import com.cryptolab.experiment.domain.RerunResult;
 import com.cryptolab.experiment.port.BacktestPort;
@@ -86,6 +87,12 @@ public final class ExperimentPipelineService {
 
     public ExperimentProvenance provenance(UUID experimentId) {
         return ExperimentProvenance.from(details(experimentId));
+    }
+
+    public MarketDataset dataset(UUID experimentId) {
+        return repository.findPlan(experimentId)
+                .map(ExperimentPlan::dataset)
+                .orElseThrow(() -> new ExperimentNotFoundException(experimentId));
     }
 
     public List<LeaderboardEntry> leaderboard(UUID searchRunId, int limit) {

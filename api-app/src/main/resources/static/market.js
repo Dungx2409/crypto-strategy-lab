@@ -12,7 +12,11 @@ const chartStates = [...document.querySelectorAll(".market-card")].map((card, in
     timeframeSelect: card.querySelector(".chart-timeframe"),
     candles: [],
     destination: null,
-    requestVersion: 0
+    requestVersion: 0,
+    visibleCount: 80,
+    offset: 0,
+    hoverIndex: null,
+    loadingEarlier: false
 }));
 
 function sendStomp(frame) {
@@ -73,9 +77,43 @@ async function loadChart(index) {
     if (!response.ok) throw new Error(body.message || "Market data request failed");
     if (requestVersion !== state.requestVersion) return;
     state.candles = body.candles;
+    state.offset = 0;
     state.card.querySelector(".chart-update").textContent = body.degraded ? "Cached history" : "History loaded";
     renderChart(index);
     if (index === 0) publishMarketSnapshot();
+}
+
+const timeframeMilliseconds = {"1m":60000,"5m":300000,"15m":900000,"30m":1800000,"1h":3600000,"2h":7200000,"4h":14400000,"1d":86400000};
+
+async function loadEarlier(index) {
+    const state = chartStates[index];
+    if (state.loadingEarlier || !state.candles.length) return;
+    const remaining = 20000 - state.candles.length;
+    if (remaining <= 0) {
+        state.card.querySelector(".chart-update").textContent = "20,000-candle history limit";
+        return;
+    }
+    const amount = Math.min(160, remaining);
+    state.loadingEarlier = true;
+    state.card.querySelector(".chart-update").textContent = "Loading earlier candles";
+    try {
+        const to = new Date(state.candles[0].openTime);
+        const from = new Date(to.getTime() - timeframeMilliseconds[state.timeframeSelect.value] * amount);
+        const params = new URLSearchParams({symbol:symbolSelect.value,timeframe:state.timeframeSelect.value,limit:String(amount),from:from.toISOString(),to:to.toISOString()});
+        const response = await fetch(`/api/v1/market/candles?${params}`);
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.message || "Earlier market data request failed");
+        const merged = new Map([...body.candles, ...state.candles].map(candle => [candle.openTime,candle]));
+        const added = merged.size - state.candles.length;
+        state.candles = [...merged.values()].sort((left,right)=>new Date(left.openTime)-new Date(right.openTime));
+        state.offset += Math.max(0, added);
+        state.card.querySelector(".chart-update").textContent = added ? `${added} earlier candles loaded` : "No earlier candles";
+        renderChart(index);
+    } catch (error) {
+        state.card.querySelector(".chart-update").textContent = error.message;
+    } finally {
+        state.loadingEarlier = false;
+    }
 }
 
 async function reloadChart(index) {
@@ -100,7 +138,7 @@ function acceptRealtimeCandle(event) {
         if (index >= 0) state.candles[index] = candle;
         else state.candles.push(candle);
         state.candles.sort((left, right) => new Date(left.openTime) - new Date(right.openTime));
-        state.candles = state.candles.slice(-160);
+        if (state.candles.length > 20000) state.candles = state.candles.slice(-20000);
         state.card.querySelector(".chart-update").textContent = event.closed ? "Closed candle" : "Updating current candle";
         renderChart(state.index);
         if (state.index === 0) publishMarketSnapshot();
@@ -112,11 +150,44 @@ function movingAverage(candles, period) {
     return candles.map((_, index) => index + 1 < period ? null : candles.slice(index + 1 - period, index + 1).reduce((sum, candle) => sum + Number(candle.close), 0) / period);
 }
 
+function visibleCandles(state) {
+    const end = Math.max(0,state.candles.length-state.offset);
+    return state.candles.slice(Math.max(0,end-state.visibleCount),end);
+}
+
+function rollingBands(candles, period=20, deviations=2) {
+    return candles.map((_,index)=>{
+        if(index+1<period)return null;
+        const values=candles.slice(index+1-period,index+1).map(candle=>Number(candle.close));
+        const mean=values.reduce((sum,value)=>sum+value,0)/period;
+        const deviation=Math.sqrt(values.reduce((sum,value)=>sum+(value-mean)**2,0)/period);
+        return {upper:mean+deviations*deviation,lower:mean-deviations*deviation};
+    });
+}
+
+function relativeStrengthIndex(candles, period=14) {
+    return candles.map((_,index)=>{
+        if(index<period)return null;
+        let gains=0,losses=0;
+        for(let cursor=index-period+1;cursor<=index;cursor++){
+            const change=Number(candles[cursor].close)-Number(candles[cursor-1].close);
+            if(change>0)gains+=change;else losses-=change;
+        }
+        if(!gains&&!losses)return 50;
+        if(!losses)return 100;
+        if(!gains)return 0;
+        return 100-(100/(1+gains/losses));
+    });
+}
+
 function drawMarketChart(canvas, candles, options = {}) {
     const context = canvas.getContext("2d");
     context.clearRect(0, 0, canvas.width, canvas.height);
     if (!candles.length) return;
+    const strategyTypes = new Set(options.strategyTypes || ["MOVING_AVERAGE"]);
+    const bands = strategyTypes.has("BOLLINGER_BANDS") ? rollingBands(candles) : [];
     const prices = candles.flatMap(candle => [Number(candle.high), Number(candle.low)]);
+    bands.filter(Boolean).forEach(band=>prices.push(band.upper,band.lower));
     const maximum = Math.max(...prices);
     const minimum = Math.min(...prices);
     const range = maximum - minimum || 1;
@@ -157,6 +228,22 @@ function drawMarketChart(canvas, candles, options = {}) {
     ma20.forEach((value, index) => { if (value === null) return; if (index === 19) context.moveTo(x(index), y(value)); else context.lineTo(x(index), y(value)); });
     context.stroke();
 
+    if (strategyTypes.has("BOLLINGER_BANDS")) {
+        ["upper","lower"].forEach(key=>{context.strokeStyle="#8b5cf6";context.lineWidth=1;context.beginPath();let started=false;bands.forEach((band,index)=>{if(!band)return;started?context.lineTo(x(index),y(band[key])):context.moveTo(x(index),y(band[key]));started=true;});context.stroke();});
+    }
+    if (strategyTypes.has("SUPPORT_RESISTANCE")) {
+        const recent=candles.slice(-Math.min(20,candles.length));
+        const support=Math.min(...recent.map(candle=>Number(candle.low)));
+        const resistance=Math.max(...recent.map(candle=>Number(candle.high)));
+        [[support,"#16a064"],[resistance,"#df4052"]].forEach(([value,color])=>{context.strokeStyle=color;context.setLineDash([5,4]);context.beginPath();context.moveTo(left,y(value));context.lineTo(canvas.width-right,y(value));context.stroke();context.setLineDash([]);});
+    }
+    if (strategyTypes.has("RSI")) {
+        const rsi=relativeStrengthIndex(candles),indicatorTop=priceBottom+8,indicatorBottom=canvas.height-bottom;
+        const rsiY=value=>indicatorBottom-(value/100)*(indicatorBottom-indicatorTop);
+        [30,70].forEach(value=>{context.strokeStyle="#cbd5e1";context.setLineDash([3,3]);context.beginPath();context.moveTo(left,rsiY(value));context.lineTo(canvas.width-right,rsiY(value));context.stroke();context.setLineDash([]);context.fillStyle="#64748b";context.fillText(String(value),canvas.width-right+8,rsiY(value)+3);});
+        context.strokeStyle="#d97706";context.lineWidth=1.5;context.beginPath();let started=false;rsi.forEach((value,index)=>{if(value===null)return;started?context.lineTo(x(index),rsiY(value)):context.moveTo(x(index),rsiY(value));started=true;});context.stroke();
+    }
+
     const step = Math.max(1, Math.floor(candles.length / 5));
     candles.forEach((candle, index) => {
         if (index % step !== 0) return;
@@ -164,13 +251,29 @@ function drawMarketChart(canvas, candles, options = {}) {
         context.fillText(new Date(candle.openTime).toLocaleString([], {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"}), Math.max(2, x(index) - 27), canvas.height - 5);
     });
 
+    const visibleFrom=new Date(candles[0].openTime).getTime();
+    const lastOpen=new Date(candles.at(-1).openTime).getTime();
+    const candleWidth=candles.length>1?lastOpen-new Date(candles.at(-2).openTime).getTime():1;
+    const visibleTo=lastOpen+candleWidth;
     (options.trades || []).forEach((trade, tradeIndex) => {
-        const entry = nearestCandleIndex(candles, trade.entryTime);
-        const exit = nearestCandleIndex(candles, trade.exitTime);
-        drawTradeMarker(context, x(entry), y(Number(trade.entryPrice)), true, trade.direction || "LONG", tradeIndex === options.highlight);
-        drawTradeMarker(context, x(exit), y(Number(trade.exitPrice)), false, trade.direction || "LONG", tradeIndex === options.highlight);
+        const entryTime=new Date(trade.entryTime).getTime(),exitTime=new Date(trade.exitTime).getTime();
+        if(entryTime>=visibleFrom&&entryTime<=visibleTo){const entry=nearestCandleIndex(candles,trade.entryTime);drawTradeMarker(context,x(entry),y(Number(trade.entryPrice)),true,trade.direction||"LONG",tradeIndex===options.highlight);}
+        if(exitTime>=visibleFrom&&exitTime<=visibleTo){const exit=nearestCandleIndex(candles,trade.exitTime);drawTradeMarker(context,x(exit),y(Number(trade.exitPrice)),false,trade.direction||"LONG",tradeIndex===options.highlight);}
     });
+    (options.signals || []).filter(signal=>signal.strategyType==="COMPOSITE"&&signal.type!=="HOLD"&&new Date(signal.at).getTime()>=visibleFrom&&new Date(signal.at).getTime()<=visibleTo).forEach(signal=>{
+        const candleIndex=nearestCandleIndex(candles,signal.at);
+        drawSignalMarker(context,x(candleIndex),y(Number(candles[candleIndex].close)),signal.type);
+    });
+    if (options.hoverIndex !== null && options.hoverIndex !== undefined && candles[options.hoverIndex]) {
+        const candle=candles[options.hoverIndex], hoverX=x(options.hoverIndex);
+        context.strokeStyle="#64748b";context.setLineDash([3,3]);context.beginPath();context.moveTo(hoverX,top);context.lineTo(hoverX,canvas.height-bottom);context.stroke();context.setLineDash([]);
+        context.fillStyle="rgba(15,23,42,.88)";context.fillRect(left+8,top+8,270,42);context.fillStyle="#fff";context.font="11px system-ui";
+        context.fillText(`${new Date(candle.openTime).toLocaleString()}  O ${candle.open}  H ${candle.high}`,left+16,top+25);
+        context.fillText(`L ${candle.low}  C ${candle.close}  V ${candle.volume}`,left+16,top+42);
+    }
 }
+
+function drawSignalMarker(context,x,y,type){context.fillStyle=type==="BUY"?"#16a064":"#df4052";context.font="bold 10px system-ui";context.fillText(type==="BUY"?"▲ BUY":"▼ SELL",x-18,y+(type==="BUY"?18:-10));}
 
 function nearestCandleIndex(candles, at) {
     const time = new Date(at).getTime();
@@ -189,7 +292,8 @@ function drawTradeMarker(context, x, y, entry, direction, selected) {
 
 function renderChart(index) {
     const state = chartStates[index];
-    drawMarketChart(state.canvas, state.candles);
+    const candles=visibleCandles(state);
+    drawMarketChart(state.canvas, candles, {hoverIndex:state.hoverIndex});
     const latest = state.candles.at(-1), first = state.candles.at(-2);
     if (!latest) return;
     const close = Number(latest.close), change = first ? (close - Number(first.close)) / Number(first.close) * 100 : 0;
@@ -203,8 +307,13 @@ function renderChart(index) {
 }
 
 function renderBacktestResult(details, highlight = null) {
-    const candles = chartStates[0].candles;
-    drawMarketChart(document.querySelector("#backtest-chart"), candles, {trades: details.trades || [], highlight});
+    let candles = details.candles || [];
+    if (highlight !== null && details.trades?.[highlight] && candles.length>240) {
+        const center=nearestCandleIndex(candles,details.trades[highlight].entryTime);
+        candles=candles.slice(Math.max(0,center-100),Math.min(candles.length,center+140));
+    } else if(candles.length>500) candles=candles.slice(-500);
+    const strategyTypes=(details.strategies||[]).flatMap(strategy=>strategy.type==="RULE"&&(strategy.parameters?.buyMetric==="RSI"||strategy.parameters?.sellMetric==="RSI")?["RULE","RSI"]:[strategy.type]);
+    drawMarketChart(document.querySelector("#backtest-chart"), candles, {trades: details.trades || [],signals:details.signals||[],strategyTypes,highlight});
     const body = document.querySelector("#trade-table-body"); body.replaceChildren();
     if (!details.trades?.length) { const row = body.insertRow(); const cell = row.insertCell(); cell.colSpan = 8; cell.className = "empty"; cell.textContent = "No trades."; return; }
     details.trades.forEach((trade, index) => {
@@ -239,6 +348,15 @@ symbolSelect.addEventListener("change", () => chartStates.forEach(state => {
     reloadChart(state.index);
 }));
 chartStates.forEach(state => state.timeframeSelect.addEventListener("change", () => reloadChart(state.index)));
+chartStates.forEach(state=>{
+    let dragStart=null;
+    state.canvas.addEventListener("wheel",event=>{event.preventDefault();if(event.shiftKey){state.offset=Math.max(0,Math.min(state.candles.length-state.visibleCount,state.offset+Math.sign(event.deltaY)*10));if(state.offset>=state.candles.length-state.visibleCount-5)loadEarlier(state.index);}else{state.visibleCount=Math.max(30,Math.min(state.candles.length,state.visibleCount+Math.sign(event.deltaY)*10));}renderChart(state.index);},{passive:false});
+    state.canvas.addEventListener("pointerdown",event=>{dragStart={x:event.clientX,offset:state.offset};state.canvas.setPointerCapture(event.pointerId);});
+    state.canvas.addEventListener("pointermove",event=>{const rect=state.canvas.getBoundingClientRect(),candles=visibleCandles(state),scale=state.canvas.width/rect.width,canvasX=(event.clientX-rect.left)*scale;state.hoverIndex=Math.max(0,Math.min(candles.length-1,Math.floor((canvasX-42)/(state.canvas.width-114)*candles.length)));if(dragStart){const moved=Math.round((event.clientX-dragStart.x)*scale/(state.canvas.width-114)*state.visibleCount);state.offset=Math.max(0,Math.min(Math.max(0,state.candles.length-state.visibleCount),dragStart.offset+moved));if(state.offset>=state.candles.length-state.visibleCount-5)loadEarlier(state.index);}renderChart(state.index);});
+    state.canvas.addEventListener("pointerup",()=>dragStart=null);
+    state.canvas.addEventListener("pointerleave",()=>{dragStart=null;state.hoverIndex=null;renderChart(state.index);});
+    state.canvas.addEventListener("dblclick",()=>{state.offset=0;state.visibleCount=Math.min(80,state.candles.length);renderChart(state.index);});
+});
 document.querySelectorAll("[data-primary-timeframe]").forEach(button => button.addEventListener("click", () => {
     document.querySelectorAll("[data-primary-timeframe]").forEach(item => item.classList.toggle("active", item === button));
     chartStates[0].timeframeSelect.value = button.dataset.primaryTimeframe;

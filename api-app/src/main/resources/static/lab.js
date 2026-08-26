@@ -77,7 +77,13 @@ function selectedSearchConfiguration() {
     document.querySelectorAll(".strategy-card").forEach(card => {
         if (!card.querySelector(".strategy-enabled").checked) return;
         const type = card.dataset.type; strategyTypes.push(type); strategyVersions[type] = card.dataset.version; weights[type] = Number(card.querySelector(".strategy-weight").value); parameterSpace[type] = {};
-        card.querySelectorAll("[data-parameter]").forEach(input => { parameterSpace[type][input.dataset.parameter] = input.value.split(",").map(raw => raw.trim()).filter(Boolean).map(raw => input.dataset.parameterType === "integer" ? Number.parseInt(raw,10) : Number(raw)); });
+        card.querySelectorAll("[data-parameter]").forEach(input => {
+            parameterSpace[type][input.dataset.parameter] = input.value.split(",")
+                .map(raw => raw.trim()).filter(Boolean)
+                .map(raw => input.dataset.parameterType === "integer"
+                    ? Number.parseInt(raw, 10)
+                    : input.dataset.parameterType === "number" ? Number(raw) : raw);
+        });
     });
     if (!strategyTypes.length) throw new Error("Select at least one strategy.");
     const policy = byId("combination-policy").value;
@@ -127,7 +133,7 @@ async function loadExperiment(experimentId) {
     document.querySelectorAll("#leaderboard-body tr").forEach(row => { if (row.dataset.experimentId === experimentId) row.dataset.selectedExperiment = "true"; else delete row.dataset.selectedExperiment; });
     byId("experiment-message").textContent = "Loading immutable result…";
     try {
-        const [details, provenance] = await Promise.all([api(`/api/v1/experiments/${experimentId}`), api(`/api/v1/experiments/${experimentId}/provenance`)]); byId("experiment-rank").textContent = details.rank ? `TOP #${details.rank}` : details.status; byId("experiment-rank").className = "status status-online"; byId("experiment-message").textContent = `${details.strategies.map(s => `${s.type}@${s.version}`).join(" + ")} · ${details.dataset.symbol} ${details.dataset.timeframe}`;
+        const [details, provenance, dataset] = await Promise.all([api(`/api/v1/experiments/${experimentId}`), api(`/api/v1/experiments/${experimentId}/provenance`),api(`/api/v1/experiments/${experimentId}/candles`)]); details.candles=dataset.candles; byId("experiment-rank").textContent = details.rank ? `TOP #${details.rank}` : details.status; byId("experiment-rank").className = "status status-online"; byId("experiment-message").textContent = `${details.strategies.map(s => `${s.type}@${s.version}`).join(" + ")} · ${details.dataset.symbol} ${details.dataset.timeframe}`;
         byId("manual-timeframe").value = details.dataset.timeframe;
         byId("manual-symbol").value = details.dataset.symbol;
         byId("metric-win-rate").textContent = details.metrics ? `${details.metrics.winRatePct ?? "-"}%` : "-";

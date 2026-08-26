@@ -29,7 +29,7 @@ public final class GeminiStrategyAuthoringModel implements StrategyAuthoringMode
     public GeminiStrategyAuthoringModel(
             ObjectMapper objectMapper,
             @Value("${crypto.ai.gemini.api-key:}") String apiKey,
-            @Value("${crypto.ai.gemini.model:gemini-2.5-flash}") String model,
+            @Value("${crypto.ai.gemini.model:gemini-3.7-flash}") String model,
             @Value("${crypto.ai.gemini.timeout:30s}") Duration timeout) {
         this(HttpClient.newBuilder().connectTimeout(timeout).build(), objectMapper, apiKey, model, timeout);
     }
@@ -76,6 +76,9 @@ public final class GeminiStrategyAuthoringModel implements StrategyAuthoringMode
                 The exact shape is:
                 {"name":"...","description":"...","strategies":[{"type":"...","version":"...","parameters":{}}],"combinationPolicy":{"type":"MAJORITY","version":"1.0","weights":{},"threshold":0}}
                 Use only registered type, version, and parameter names. Never output source code.
+                Prefer the RULE plugin when the request describes original conditions rather than
+                merely configuring a named built-in indicator. RULE is the safe runtime DSL for
+                AI-authored logic and its metric/operator values must come from its schema enums.
 
                 User request: %s
                 Confirmed idea: %s
@@ -84,14 +87,13 @@ public final class GeminiStrategyAuthoringModel implements StrategyAuthoringMode
                 """.formatted(prompt, confirmedIdea, json(availableStrategies), repair));
     }
 
-    String generateText(String prompt) {
+    public String generateText(String prompt) {
         if (apiKey.isBlank()) {
             throw new IllegalStateException("GEMINI_API_KEY is blank; set it before using strategy authoring");
         }
         try {
             String requestJson = objectMapper.writeValueAsString(Map.of(
-                    "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
-                    "generationConfig", Map.of("temperature", 0.2)));
+                    "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt))))));
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/"
                             + model + ":generateContent?key=" + apiKey))

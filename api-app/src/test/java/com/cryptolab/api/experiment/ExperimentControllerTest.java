@@ -138,6 +138,13 @@ class ExperimentControllerTest {
                 .andExpect(jsonPath("$.evaluatorVersion").value(DefaultExperimentEvaluator.VERSION))
                 .andExpect(jsonPath("$.metrics.winRatePct").value(100));
 
+        mockMvc.perform(get("/api/v1/experiments/{id}/candles", EXPERIMENT_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.datasetId").value(DATASET_ID.toString()))
+                .andExpect(jsonPath("$.candles.length()").value(3))
+                .andExpect(jsonPath("$.candles[0].openTime").value("2026-08-18T00:00:00Z"))
+                .andExpect(jsonPath("$.candles[2].close").value(125));
+
         mockMvc.perform(get("/api/v1/leaderboard")
                         .param("searchRunId", SEARCH_RUN_ID.toString()))
                 .andExpect(status().isOk())

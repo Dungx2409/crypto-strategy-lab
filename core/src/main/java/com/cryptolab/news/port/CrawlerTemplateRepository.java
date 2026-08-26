@@ -11,6 +11,7 @@ public interface CrawlerTemplateRepository {
     CrawlerTemplateVersion create(UUID id, UUID accountId, String siteUrl, CrawlerSelectors selectors, Instant at);
     Optional<CrawlerTemplateVersion> findCurrent(UUID accountId, UUID templateId);
     List<CrawlerTemplateVersion> findCurrentByAccount(UUID accountId);
+    List<CrawlerTemplateVersion> findAllCurrent();
     List<CrawlerTemplateVersion> findVersions(UUID accountId, UUID templateId);
     CrawlerTemplateVersion addRepair(
             UUID accountId, UUID templateId, CrawlerSelectors selectors, String reason, Instant at);

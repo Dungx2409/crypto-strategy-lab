@@ -75,7 +75,7 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .chart-signal.buy { color: #08723d; border: 1px solid #74c69b; background: #effaf4; }
 .chart-signal.sell { color: #aa2734; border: 1px solid #ef9aa2; background: #fff3f4; }
 .chart-signal.hold { color: #687386; border: 1px solid #d8dde6; background: #f8f9fb; }
-.market-card canvas, #backtest-chart { display: block; width: 100%; height: auto; background: #fff; }
+.market-card canvas, #backtest-chart { display: block; width: 100%; height: auto; background: #fff; cursor: crosshair; touch-action: none; }
 .market-card footer { padding-top: 9px; border-top: 1px solid #eef0f4; color: #697286; font-size: .66rem; }
 .realtime-rail { display: grid; align-content: start; gap: 12px; }
 .realtime-rail .panel { padding: 15px; }

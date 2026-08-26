@@ -1,6 +1,7 @@
 package com.cryptolab.infrastructure.strategy.adapter;
 
 import com.cryptolab.strategy.port.ArticleSourceReader;
+import com.cryptolab.news.port.CrawlerPageReader;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
@@ -13,7 +14,7 @@ import java.util.Locale;
 import org.springframework.stereotype.Component;
 
 @Component
-public final class HttpArticleSourceReader implements ArticleSourceReader {
+public final class HttpArticleSourceReader implements ArticleSourceReader, CrawlerPageReader {
 
     private static final int MAX_BYTES = 200_000;
     private final HttpClient client = HttpClient.newBuilder()
@@ -23,6 +24,11 @@ public final class HttpArticleSourceReader implements ArticleSourceReader {
 
     @Override
     public String read(String url) {
+        return plainText(readPage(url));
+    }
+
+    @Override
+    public String readPage(String url) {
         URI uri = validate(url);
         try {
             HttpRequest request = HttpRequest.newBuilder(uri)
@@ -47,7 +53,7 @@ public final class HttpArticleSourceReader implements ArticleSourceReader {
             if (bytes.length > MAX_BYTES) {
                 throw new IllegalArgumentException("Article is larger than 200 KB");
             }
-            return plainText(new String(bytes, StandardCharsets.UTF_8));
+            return new String(bytes, StandardCharsets.UTF_8);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Article download was interrupted", exception);

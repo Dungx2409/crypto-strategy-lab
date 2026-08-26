@@ -77,6 +77,12 @@ public class ExperimentController {
         return ExperimentProvenanceResponse.from(pipeline.provenance(experimentId));
     }
 
+    @GetMapping("/{experimentId}/candles")
+    public ExperimentCandlesResponse candles(@PathVariable UUID experimentId, HttpServletRequest request) {
+        requireOwnerWhenPresent(experimentId, request);
+        return ExperimentCandlesResponse.from(pipeline.dataset(experimentId));
+    }
+
     @PostMapping("/{experimentId}/rerun")
     public RerunResponse rerun(@PathVariable UUID experimentId, HttpServletRequest request) {
         requireOwnerWhenPresent(experimentId, request);

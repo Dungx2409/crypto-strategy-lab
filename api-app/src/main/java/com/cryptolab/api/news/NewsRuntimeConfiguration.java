@@ -1,11 +1,15 @@
 package com.cryptolab.api.news;
 
 import com.cryptolab.infrastructure.news.adapter.DeterministicKeywordSentimentAnalyzer;
+import com.cryptolab.infrastructure.news.adapter.GeminiSentimentAnalyzer;
+import com.cryptolab.infrastructure.strategy.adapter.GeminiStrategyAuthoringModel;
 import com.cryptolab.infrastructure.news.adapter.cryptocompare.CryptoCompareNewsProvider;
 import com.cryptolab.news.application.NewsCollector;
 import com.cryptolab.news.application.CrawlerTemplateService;
 import com.cryptolab.news.port.CrawlerTemplateRepository;
 import com.cryptolab.news.port.CrawlerSelectorRepairModel;
+import com.cryptolab.news.port.CrawlerPageReader;
+import com.cryptolab.news.port.CrawlerSelectorMatcher;
 import com.cryptolab.news.port.NewsProvider;
 import com.cryptolab.news.port.NewsStore;
 import com.cryptolab.news.port.NewsTelemetry;
@@ -29,8 +33,11 @@ class NewsRuntimeConfiguration {
     CrawlerTemplateService crawlerTemplateService(
             CrawlerTemplateRepository repository,
             CrawlerSelectorRepairModel repairModel,
+            CrawlerPageReader pageReader,
+            CrawlerSelectorMatcher matcher,
             Clock marketDataClock) {
-        return new CrawlerTemplateService(repository, repairModel, marketDataClock, UUID::randomUUID);
+        return new CrawlerTemplateService(
+                repository, repairModel, marketDataClock, UUID::randomUUID, pageReader, matcher);
     }
 
     @Bean(destroyMethod = "shutdownNow")
@@ -66,6 +73,16 @@ class NewsRuntimeConfiguration {
             matchIfMissing = true)
     SentimentAnalyzer deterministicKeywordSentimentAnalyzer(Clock marketDataClock) {
         return new DeterministicKeywordSentimentAnalyzer(marketDataClock);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "crypto.sentiment.provider", havingValue = "gemini")
+    SentimentAnalyzer geminiSentimentAnalyzer(
+            GeminiStrategyAuthoringModel gemini,
+            ObjectMapper objectMapper,
+            Clock marketDataClock,
+            @Value("${crypto.ai.gemini.model:gemini-3.7-flash}") String model) {
+        return new GeminiSentimentAnalyzer(gemini, objectMapper, marketDataClock, model);
     }
 
     @Bean

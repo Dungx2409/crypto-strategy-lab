@@ -54,6 +54,11 @@ public final class CrawlerTemplateController {
         return service.confirm(account(request).id(), templateId, version);
     }
 
+    @PostMapping("/{templateId}/check")
+    CrawlerTemplateVersion check(@PathVariable UUID templateId, HttpServletRequest request) {
+        return service.check(account(request).id(), templateId);
+    }
+
     private static AuthenticatedAccount account(HttpServletRequest request) {
         return AuthenticatedAccount.require(request.getSession(false));
     }

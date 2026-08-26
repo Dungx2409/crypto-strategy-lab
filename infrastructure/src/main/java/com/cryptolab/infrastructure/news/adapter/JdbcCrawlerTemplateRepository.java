@@ -52,6 +52,16 @@ public class JdbcCrawlerTemplateRepository implements CrawlerTemplateRepository 
     }
 
     @Override
+    public List<CrawlerTemplateVersion> findAllCurrent() {
+        return jdbc.query("""
+                SELECT t.id, t.account_id, t.site_url, v.* FROM crawler_templates t
+                JOIN crawler_template_versions v
+                  ON v.template_id = t.id AND v.version = t.active_version
+                ORDER BY t.created_at, t.id
+                """, this::row);
+    }
+
+    @Override
     public List<CrawlerTemplateVersion> findVersions(UUID accountId, UUID templateId) {
         return jdbc.query("""
                 SELECT t.id, t.account_id, t.site_url, v.* FROM crawler_templates t

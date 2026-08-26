@@ -48,7 +48,7 @@ crypto:
   ai:
     gemini:
       api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_MODEL:gemini-2.5-flash}
+      model: ${GEMINI_MODEL:gemini-3.7-flash}
       timeout: 30s
   market:
     provider: ${CRYPTO_MARKET_PROVIDER:binance}
@@ -102,6 +102,7 @@ crypto:
     collection:
       initial-delay: 30s
       interval: 5m
+    crawler-check-interval: ${CRAWLER_CHECK_INTERVAL:15m}
   sentiment:
     provider: ${SENTIMENT_PROVIDER:keyword}
     max-attempts: 2
