@@ -9,6 +9,7 @@ import com.cryptolab.experiment.domain.GeneratorSnapshot;
 import com.cryptolab.experiment.domain.JobDispatchMetadata;
 import com.cryptolab.experiment.domain.SearchContext;
 import com.cryptolab.experiment.domain.SearchRun;
+import com.cryptolab.experiment.domain.SearchRunKind;
 import com.cryptolab.experiment.domain.SearchRunStateMachine;
 import com.cryptolab.experiment.domain.SearchRunStatus;
 import com.cryptolab.experiment.domain.SearchRunSummary;
@@ -71,9 +72,9 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                 INSERT INTO search_runs (
                     id, status, symbol, timeframe, generator_type, generator_version, random_seed,
                     search_config_json, stop_conditions_json, execution_config_json,
-                    created_at, cancel_requested
+                    created_at, cancel_requested, owner_account_id, run_kind
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb),
-                          CAST(? AS jsonb), ?, false)
+                          CAST(? AS jsonb), ?, false, ?, ?)
                 """,
                 run.id(),
                 run.status().name(),
@@ -85,7 +86,9 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                 json(run.context()),
                 json(run.context().stopConditions()),
                 json(executionConfig),
-                timestamp(run.createdAt()));
+                timestamp(run.createdAt()),
+                run.ownerAccountId(),
+                run.runKind().name());
     }
 
     @Override
@@ -198,7 +201,7 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                 UPDATE search_runs
                 SET cancel_requested = true, status = 'CANCELLED', ended_at = ?,
                     stop_reason = 'USER_CANCELLED'
-                WHERE id = ? AND status IN ('CREATED', 'RUNNING', 'PAUSED', 'EVALUATING')
+                WHERE id = ? AND status IN ('CREATED', 'RUNNING', 'EVALUATING')
                 """,
                 timestamp(cancelledAt),
                 searchRunId);
@@ -335,7 +338,7 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                 UPDATE search_runs
                 SET status = 'FAILED', ended_at = ?, stop_reason = 'FAILED',
                     failure_code = ?, failure_message = ?
-                WHERE id = ? AND status IN ('CREATED', 'RUNNING', 'PAUSED', 'EVALUATING')
+                WHERE id = ? AND status IN ('CREATED', 'RUNNING', 'EVALUATING')
                 """,
                 timestamp(failedAt),
                 failureCode,
@@ -349,6 +352,7 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                         """
                         SELECT sr.id, sr.status, sr.generator_type, sr.generator_version, sr.search_config_json,
                                created_at, started_at, ended_at, cancel_requested,
+                               owner_account_id, run_kind,
                                generated_candidates, persisted_candidates, best_score,
                                no_improvement_iterations, stop_reason, failure_code, failure_message,
                                (SELECT count(*) FROM backtest_jobs j
@@ -374,6 +378,35 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                 .findFirst();
     }
 
+    @Override
+    public List<SearchRunSummary> findOwned(
+            UUID accountId, Instant beforeCreatedAt, UUID beforeId, int limit) {
+        List<UUID> ids = beforeCreatedAt == null
+                ? jdbcTemplate.query(
+                        """
+                        SELECT id FROM search_runs
+                        WHERE owner_account_id = ? AND run_kind <> 'MANUAL'
+                        ORDER BY created_at DESC, id DESC LIMIT ?
+                        """,
+                        (resultSet, rowNumber) -> resultSet.getObject("id", UUID.class),
+                        accountId,
+                        limit)
+                : jdbcTemplate.query(
+                        """
+                        SELECT id FROM search_runs
+                        WHERE owner_account_id = ? AND run_kind <> 'MANUAL'
+                          AND (created_at < ? OR (created_at = ? AND id < ?))
+                        ORDER BY created_at DESC, id DESC LIMIT ?
+                        """,
+                        (resultSet, rowNumber) -> resultSet.getObject("id", UUID.class),
+                        accountId,
+                        timestamp(beforeCreatedAt),
+                        timestamp(beforeCreatedAt),
+                        beforeId,
+                        limit);
+        return ids.stream().map(id -> findSummary(id).orElseThrow()).toList();
+    }
+
     private SearchRunSummary summary(ResultSet resultSet) throws SQLException {
         SearchContext context = read(resultSet.getString("search_config_json"), SearchContext.class);
         SearchRun run = new SearchRun(
@@ -385,7 +418,9 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                 instant(resultSet, "created_at"),
                 nullableInstant(resultSet, "started_at"),
                 nullableInstant(resultSet, "ended_at"),
-                resultSet.getBoolean("cancel_requested"));
+                resultSet.getBoolean("cancel_requested"),
+                resultSet.getObject("owner_account_id", UUID.class),
+                SearchRunKind.valueOf(resultSet.getString("run_kind")));
         String reason = resultSet.getString("stop_reason");
         return new SearchRunSummary(
                 run,

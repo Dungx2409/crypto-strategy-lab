@@ -54,7 +54,8 @@ public record ExperimentDetailsResponse(
                 experiment.reproductionOfExperimentId(),
                 experiment.startedAt(),
                 experiment.completedAt(),
-                EvaluationMetricsResponse.from(details.metrics()),
+                EvaluationMetricsResponse.from(
+                        details.metrics(), experiment.executionConfig().initialCapital()),
                 details.signals().stream().map(SignalResponse::from).toList(),
                 details.trades());
     }

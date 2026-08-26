@@ -7,6 +7,7 @@ import com.cryptolab.experiment.domain.ExperimentPlan;
 import com.cryptolab.experiment.domain.ExperimentStatus;
 import com.cryptolab.experiment.domain.LeaderboardEntry;
 import com.cryptolab.experiment.domain.Ranking;
+import com.cryptolab.marketdata.domain.Timeframe;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -31,4 +32,17 @@ public interface ExperimentRepository {
     Optional<ExperimentDetails> findDetails(UUID experimentId);
 
     Optional<ExperimentPlan> findPlan(UUID experimentId);
+
+    default boolean isExperimentOwnedBy(UUID experimentId, UUID accountId) {
+        return false;
+    }
+
+    default boolean isSearchRunOwnedBy(UUID searchRunId, UUID accountId) {
+        return false;
+    }
+
+    default List<LeaderboardEntry> findPublicDiscoveryLeaderboard(
+            String symbol, Timeframe timeframe, int limit) {
+        return List.of();
+    }
 }

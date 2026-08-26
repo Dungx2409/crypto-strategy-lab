@@ -11,11 +11,13 @@ import com.cryptolab.experiment.domain.ExperimentProvenance;
 import com.cryptolab.experiment.domain.ExperimentStateMachine;
 import com.cryptolab.experiment.domain.ExperimentStatus;
 import com.cryptolab.experiment.domain.LeaderboardEntry;
+import com.cryptolab.experiment.domain.MarketDataset;
 import com.cryptolab.experiment.domain.Ranking;
 import com.cryptolab.experiment.domain.RerunResult;
 import com.cryptolab.experiment.port.BacktestPort;
 import com.cryptolab.experiment.port.ExperimentEvaluator;
 import com.cryptolab.experiment.port.ExperimentRepository;
+import com.cryptolab.marketdata.domain.Timeframe;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -84,8 +86,24 @@ public final class ExperimentPipelineService {
                 .orElseThrow(() -> new ExperimentNotFoundException(experimentId));
     }
 
+    public ExperimentDetails details(UUID accountId, UUID experimentId) {
+        requireExperimentOwner(accountId, experimentId);
+        return details(experimentId);
+    }
+
     public ExperimentProvenance provenance(UUID experimentId) {
         return ExperimentProvenance.from(details(experimentId));
+    }
+
+    public ExperimentProvenance provenance(UUID accountId, UUID experimentId) {
+        return ExperimentProvenance.from(details(accountId, experimentId));
+    }
+
+    public MarketDataset dataset(UUID accountId, UUID experimentId) {
+        requireExperimentOwner(accountId, experimentId);
+        return repository.findPlan(experimentId)
+                .orElseThrow(() -> new ExperimentNotFoundException(experimentId))
+                .dataset();
     }
 
     public List<LeaderboardEntry> leaderboard(UUID searchRunId, int limit) {
@@ -93,6 +111,25 @@ public final class ExperimentPipelineService {
             throw new IllegalArgumentException("leaderboard limit must be between 1 and 500");
         }
         return repository.findLeaderboard(searchRunId, limit);
+    }
+
+    public List<LeaderboardEntry> leaderboard(UUID accountId, UUID searchRunId, int limit) {
+        if (!repository.isSearchRunOwnedBy(searchRunId, accountId)) {
+            throw new SearchRunNotFoundException(searchRunId);
+        }
+        return leaderboard(searchRunId, limit);
+    }
+
+    public List<LeaderboardEntry> publicDiscoveryLeaderboard(
+            String symbol, Timeframe timeframe, int limit) {
+        if (symbol == null || symbol.isBlank()) {
+            throw new IllegalArgumentException("symbol must not be blank");
+        }
+        if (limit < 1 || limit > 100) {
+            throw new IllegalArgumentException("leaderboard limit must be between 1 and 100");
+        }
+        return repository.findPublicDiscoveryLeaderboard(
+                symbol.trim().toUpperCase(java.util.Locale.ROOT), timeframe, limit);
     }
 
     public RerunResult rerun(UUID sourceExperimentId) {
@@ -104,6 +141,17 @@ public final class ExperimentPipelineService {
                 sourceExperimentId,
                 reproduced,
                 metricsMatch(sourceDetails.metrics(), reproduced.metrics()));
+    }
+
+    public RerunResult rerun(UUID accountId, UUID sourceExperimentId) {
+        requireExperimentOwner(accountId, sourceExperimentId);
+        return rerun(sourceExperimentId);
+    }
+
+    private void requireExperimentOwner(UUID accountId, UUID experimentId) {
+        if (!repository.isExperimentOwnedBy(experimentId, accountId)) {
+            throw new ExperimentNotFoundException(experimentId);
+        }
     }
 
     private static boolean metricsMatch(EvaluationMetrics left, EvaluationMetrics right) {

@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.cryptolab.account.domain.AccountRole;
+import com.cryptolab.api.account.AuthenticatedAccount;
 import com.cryptolab.experiment.application.SearchCoordinator;
 import com.cryptolab.experiment.domain.CandidateCanonicalizer;
 import com.cryptolab.experiment.domain.CandidateStrategy;
@@ -39,6 +41,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -48,6 +51,7 @@ class SearchRunControllerTest {
     private static final Instant NOW = Instant.parse("2026-08-18T12:00:00Z");
 
     private MockMvc mockMvc;
+    private MockHttpSession session;
 
     @BeforeEach
     void setUp() {
@@ -84,11 +88,15 @@ class SearchRunControllerTest {
                 .setControllerAdvice(new SearchRunExceptionHandler(clock))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(mapper))
                 .build();
+        session = new MockHttpSession();
+        session.setAttribute(
+                AuthenticatedAccount.class.getName(),
+                new AuthenticatedAccount(UUID.randomUUID(), "student", AccountRole.USER));
     }
 
     @Test
     void startsBoundedSearchAndExposesProgressAndCancellationEndpoint() throws Exception {
-        mockMvc.perform(post("/api/v1/search-runs")
+        mockMvc.perform(post("/api/v1/search-runs").session(session)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson()))
                 .andExpect(status().isAccepted())
@@ -99,7 +107,7 @@ class SearchRunControllerTest {
                 .andExpect(jsonPath("$.generatedCandidates").value(0))
                 .andExpect(jsonPath("$.persistedCandidates").value(0));
 
-        mockMvc.perform(get("/api/v1/search-runs/{id}", SEARCH_ID))
+        mockMvc.perform(get("/api/v1/search-runs/{id}", SEARCH_ID).session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.batchSize").value(2))
                 .andExpect(jsonPath("$.status").value("EVALUATING"))
@@ -109,20 +117,20 @@ class SearchRunControllerTest {
                 .andExpect(jsonPath("$.queuedJobs").value(0))
                 .andExpect(jsonPath("$.stopReason").value("MAX_CANDIDATES"));
 
-        mockMvc.perform(post("/api/v1/search-runs/{id}/cancel", SEARCH_ID))
+        mockMvc.perform(post("/api/v1/search-runs/{id}/cancel", SEARCH_ID).session(session))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.status").value("EVALUATING"));
     }
 
     @Test
     void rejectsMissingSeedAndMapsMissingRun() throws Exception {
-        mockMvc.perform(post("/api/v1/search-runs")
+        mockMvc.perform(post("/api/v1/search-runs").session(session)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson().replace("\"randomSeed\": 12345,", "")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_SEARCH_REQUEST"));
 
-        mockMvc.perform(get("/api/v1/search-runs/{id}", UUID.randomUUID()))
+        mockMvc.perform(get("/api/v1/search-runs/{id}", UUID.randomUUID()).session(session))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SEARCH_RUN_NOT_FOUND"));
     }
@@ -197,7 +205,9 @@ class SearchRunControllerTest {
                     run.id(), target, run.context(), run.generatorType(), run.generatorVersion(), run.createdAt(),
                     target == SearchRunStatus.RUNNING ? at : run.startedAt(),
                     target == SearchRunStatus.COMPLETED || target == SearchRunStatus.CANCELLED ? at : null,
-                    run.cancelRequested());
+                    run.cancelRequested(),
+                    run.ownerAccountId(),
+                    run.runKind());
         }
 
         @Override

@@ -12,13 +12,23 @@ in [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
 ## Current status
 
 M7 is implemented and the written MVP gaps found during the final audit are
-closed. The light browser application now has separate Realtime, Strategy,
-Discovery, Backtest, News, and Settings views. Four charts own independent
-timeframes and STOMP subscriptions. They render candles, volume, MA20, current
-signals, and open-candle updates. The Backtest view renders required metrics,
-trade rows, and entry or exit markers. The browser still uses only backend
-contracts and materializes the exact primary chart snapshot as an immutable
-checksummed dataset before search.
+closed. The light browser application has separate Realtime, Strategy,
+Discovery, Backtest, News, and Settings views. TradingView Lightweight Charts
+5.2 renders four independent timeframe subscriptions. Backtest charts load the
+experiment's stored candles and render only overlays declared by the selected
+Java strategy plugins. They no longer reuse the currently open chart or invent
+an MA signal in JavaScript.
+
+Account roles, Spring Security sessions, CSRF protection, account-owned search
+runs and experiments, and private search/leaderboard STOMP topics protect user
+work. Public market/news/health/catalog APIs remain readable. Only discovery
+results appear on the filtered public leaderboard.
+
+Users can save a plugin configuration without an LLM and run it over 1–4
+timeframes. The durable batch creates one child experiment per timeframe and
+supports cooperative cancellation. News defaults to an admin-configured,
+host-allowlisted HTML crawler and a hosted, pinned FinBERT classifier; the local
+keyword classifier is an explicit baseline only.
 
 Random and Genetic generators are both registered behind `StrategyGenerator` and
 can be selected per search request. Both vary strategy membership as well as
@@ -78,6 +88,7 @@ The final architecture proof matrix and repeatable commands are documented in
 
 - Java 21
 - Docker Engine and Docker Compose
+- Node.js with npm when rebuilding the vendored browser dependency
 
 The repository includes Maven Wrapper, so a system Maven installation is not
 required.
@@ -86,6 +97,14 @@ required.
 
 ```bash
 ./mvnw clean verify
+```
+
+Rebuild and test the browser dependency when Node.js is available:
+
+```bash
+npm install
+npm test
+npm run build
 ```
 
 The system Maven command is also supported when Maven 3.6.3 or newer is
@@ -158,11 +177,15 @@ POST   /api/v1/auth/register
 POST   /api/v1/auth/login
 POST   /api/v1/auth/logout
 GET    /api/v1/auth/me
+POST   /api/v1/user-strategies
 POST   /api/v1/user-strategies/drafts
 POST   /api/v1/user-strategies/drafts/{draftId}/confirm
 GET    /api/v1/user-strategies
 GET    /api/v1/user-strategies/{strategyId}
 DELETE /api/v1/user-strategies/{strategyId}
+POST   /api/v1/manual-runs
+GET    /api/v1/manual-runs/{batchId}
+POST   /api/v1/manual-runs/{batchId}/cancel
 POST   /api/v1/discovery-schedules
 GET    /api/v1/discovery-schedules
 GET    /api/v1/discovery-schedules/{scheduleId}
@@ -190,6 +213,7 @@ M4 adds these synchronous single-candidate endpoints:
 POST /api/v1/experiments
 GET  /api/v1/experiments/{experimentId}
 GET  /api/v1/experiments/{experimentId}/provenance
+GET  /api/v1/experiments/{experimentId}/dataset
 POST /api/v1/experiments/{experimentId}/rerun
 GET  /api/v1/leaderboard?searchRunId={searchRunId}&limit=50
 ```
@@ -205,6 +229,7 @@ and live progress through:
 POST /api/v1/datasets
 POST /api/v1/search-runs
 GET  /api/v1/search-runs/{searchRunId}
+GET  /api/v1/search-runs?cursor={cursor}&limit=50
 POST /api/v1/search-runs/{searchRunId}/cancel
 GET  /api/v1/search-runs/capabilities
 ```
@@ -231,12 +256,12 @@ reconnect/gap/UI latency, News/Sentiment failure and duration, and pending
 outbox rows. They are exposed through `/actuator/metrics`; health components are
 available under `/actuator/health`.
 
-News collection is enabled by default and configured through
-`NEWS_PROVIDER`, `NEWS_API_URL`, `NEWS_API_KEY`, and the timeout/schedule
-properties under `crypto.news`. The CryptoCompare key is sent in the
-`Authorization` header and must be stored in the git-ignored `.env` file, never
-in `docker-compose.yml`. `SENTIMENT_PROVIDER=keyword` selects the default local
-analyzer.
+News collection defaults to `NEWS_PROVIDER=html`. Admins manage versioned source
+templates through `/api/v1/admin/crawler-sources`; every configured list and
+article host must appear in `NEWS_ALLOWED_HOSTS`. `NEWS_PROVIDER=cryptocompare`
+keeps the original JSON adapter available. Sentiment defaults to hosted FinBERT
+through `HF_TOKEN`; `SENTIMENT_PROVIDER=keyword` deliberately selects the local
+baseline.
 Failure counters and inference latency are exported as
 `crypto.news.collection.failures`, `crypto.sentiment.inference.failures`, and
 `crypto.sentiment.inference.duration`.

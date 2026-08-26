@@ -1,7 +1,9 @@
 package com.cryptolab.api.experiment;
 
+import com.cryptolab.api.account.AuthenticatedAccount;
 import com.cryptolab.experiment.application.ExperimentPipelineService;
 import com.cryptolab.experiment.application.ExperimentPlanFactory;
+import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -26,25 +28,45 @@ public final class ExperimentController {
 
     @PostMapping
     public ResponseEntity<ExperimentDetailsResponse> runSingleCandidate(
-            @RequestBody SingleExperimentRequest request) {
+            @RequestBody SingleExperimentRequest request,
+            HttpServletRequest servletRequest) {
+        AuthenticatedAccount account =
+                AuthenticatedAccount.require(servletRequest.getSession(false));
         ExperimentDetailsResponse response = ExperimentDetailsResponse.from(
-                pipeline.execute(plans.create(request.toCommand())));
+                pipeline.execute(plans.create(request.toCommand(account.id()))));
         return ResponseEntity.created(URI.create("/api/v1/experiments/" + response.experimentId()))
                 .body(response);
     }
 
     @GetMapping("/{experimentId}")
-    public ExperimentDetailsResponse details(@PathVariable UUID experimentId) {
-        return ExperimentDetailsResponse.from(pipeline.details(experimentId));
+    public ExperimentDetailsResponse details(
+            @PathVariable UUID experimentId, HttpServletRequest servletRequest) {
+        AuthenticatedAccount account =
+                AuthenticatedAccount.require(servletRequest.getSession(false));
+        return ExperimentDetailsResponse.from(pipeline.details(account.id(), experimentId));
     }
 
     @GetMapping("/{experimentId}/provenance")
-    public ExperimentProvenanceResponse provenance(@PathVariable UUID experimentId) {
-        return ExperimentProvenanceResponse.from(pipeline.provenance(experimentId));
+    public ExperimentProvenanceResponse provenance(
+            @PathVariable UUID experimentId, HttpServletRequest servletRequest) {
+        AuthenticatedAccount account =
+                AuthenticatedAccount.require(servletRequest.getSession(false));
+        return ExperimentProvenanceResponse.from(pipeline.provenance(account.id(), experimentId));
+    }
+
+    @GetMapping("/{experimentId}/dataset")
+    public ExperimentDatasetResponse dataset(
+            @PathVariable UUID experimentId, HttpServletRequest servletRequest) {
+        AuthenticatedAccount account =
+                AuthenticatedAccount.require(servletRequest.getSession(false));
+        return ExperimentDatasetResponse.from(pipeline.dataset(account.id(), experimentId));
     }
 
     @PostMapping("/{experimentId}/rerun")
-    public RerunResponse rerun(@PathVariable UUID experimentId) {
-        return RerunResponse.from(pipeline.rerun(experimentId));
+    public RerunResponse rerun(
+            @PathVariable UUID experimentId, HttpServletRequest servletRequest) {
+        AuthenticatedAccount account =
+                AuthenticatedAccount.require(servletRequest.getSession(false));
+        return RerunResponse.from(pipeline.rerun(account.id(), experimentId));
     }
 }

@@ -6,6 +6,7 @@ import com.cryptolab.experiment.application.DeterministicBacktestEngine;
 import com.cryptolab.experiment.application.ExperimentPipelineService;
 import com.cryptolab.experiment.application.ExperimentPlanFactory;
 import com.cryptolab.experiment.application.MarketDatasetService;
+import com.cryptolab.experiment.application.ManualRunService;
 import com.cryptolab.experiment.port.BacktestPort;
 import com.cryptolab.experiment.port.CandidateProvider;
 import com.cryptolab.experiment.port.CombinationPolicyResolver;
@@ -13,7 +14,10 @@ import com.cryptolab.experiment.port.ExperimentEvaluator;
 import com.cryptolab.experiment.port.ExperimentRepository;
 import com.cryptolab.experiment.port.MarketDatasetProvider;
 import com.cryptolab.experiment.port.MarketDatasetRepository;
+import com.cryptolab.experiment.port.ManualRunRepository;
+import com.cryptolab.marketdata.port.MarketDataProvider;
 import com.cryptolab.strategy.port.StrategyRegistry;
+import com.cryptolab.strategy.port.UserStrategyRepository;
 import java.time.Clock;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -70,5 +74,23 @@ class ExperimentRuntimeConfiguration {
             Clock marketDataClock) {
         return new ExperimentPipelineService(
                 backtest, evaluator, ranking, repository, marketDataClock, UUID::randomUUID);
+    }
+
+    @Bean
+    ManualRunService manualRunService(
+            ManualRunRepository manualRuns,
+            UserStrategyRepository userStrategies,
+            MarketDataProvider marketData,
+            ExperimentPlanFactory plans,
+            ExperimentPipelineService pipeline,
+            Clock marketDataClock) {
+        return new ManualRunService(
+                manualRuns,
+                userStrategies,
+                marketData,
+                plans,
+                pipeline,
+                marketDataClock,
+                UUID::randomUUID);
     }
 }

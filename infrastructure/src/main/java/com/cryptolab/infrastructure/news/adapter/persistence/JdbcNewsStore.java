@@ -37,15 +37,19 @@ public class JdbcNewsStore implements NewsStore {
                     """
                     INSERT INTO news_items (
                         news_id, provider, title, url, published_at,
-                        normalized_text, input_version, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        normalized_text, input_version, content, crawled_at, related_coins,
+                        created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, string_to_array(?, ','), ?)
                     ON CONFLICT (news_id) DO UPDATE
                     SET provider = EXCLUDED.provider,
                         title = EXCLUDED.title,
                         url = EXCLUDED.url,
                         published_at = EXCLUDED.published_at,
                         normalized_text = EXCLUDED.normalized_text,
-                        input_version = EXCLUDED.input_version
+                        input_version = EXCLUDED.input_version,
+                        content = EXCLUDED.content,
+                        crawled_at = EXCLUDED.crawled_at,
+                        related_coins = EXCLUDED.related_coins
                     """,
                     item.newsId(),
                     item.provider(),
@@ -54,6 +58,9 @@ public class JdbcNewsStore implements NewsStore {
                     timestamp(item.publishedAt()),
                     item.normalizedText(),
                     item.inputVersion(),
+                    item.content(),
+                    timestamp(item.crawledAt()),
+                    String.join(",", item.relatedCoins()),
                     timestamp(storedAt));
         }
         return stored;
@@ -109,7 +116,8 @@ public class JdbcNewsStore implements NewsStore {
         return jdbcTemplate.query(
                 """
                 SELECT n.news_id, n.provider, n.title, n.url, n.published_at,
-                       n.normalized_text, n.input_version,
+                       n.normalized_text, n.input_version, n.content, n.crawled_at,
+                       n.related_coins,
                        p.sentiment, p.score, p.model_name, p.model_version,
                        p.prediction_input_version, p.preprocessing_version,
                        p.prediction_created_at
@@ -149,7 +157,10 @@ public class JdbcNewsStore implements NewsStore {
                 resultSet.getString("url"),
                 resultSet.getObject("published_at", OffsetDateTime.class).toInstant(),
                 resultSet.getString("normalized_text"),
-                resultSet.getString("input_version"));
+                resultSet.getString("input_version"),
+                resultSet.getString("content"),
+                resultSet.getObject("crawled_at", OffsetDateTime.class).toInstant(),
+                List.of((String[]) resultSet.getArray("related_coins").getArray()));
         String sentiment = resultSet.getString("sentiment");
         if (sentiment == null) {
             return new NewsInsight(item, Optional.empty());

@@ -15,6 +15,7 @@ import com.cryptolab.experiment.domain.MarketDataset;
 import com.cryptolab.experiment.domain.MarketDatasetRef;
 import com.cryptolab.experiment.domain.Ranking;
 import com.cryptolab.experiment.domain.RecordedSignal;
+import com.cryptolab.experiment.domain.SearchRunKind;
 import com.cryptolab.experiment.domain.Trade;
 import com.cryptolab.experiment.port.CandidateProvider;
 import com.cryptolab.experiment.port.ExperimentRepository;
@@ -275,6 +276,7 @@ public class JdbcExperimentRepository
     public Optional<ExperimentPlan> findPlan(UUID experimentId) {
         return findDetails(experimentId).map(details -> {
             Experiment experiment = details.experiment();
+            RunOwner owner = runOwner(experiment.searchRunId());
             MarketDataset dataset = getDataset(experiment.dataset());
             Instant reconstructedCreatedAt = experiment.startedAt() == null
                     ? Instant.EPOCH
@@ -290,8 +292,90 @@ public class JdbcExperimentRepository
                     experiment.codeCommit(),
                     experiment.buildVersion(),
                     experiment.reproductionOfExperimentId(),
-                    reconstructedCreatedAt);
+                    reconstructedCreatedAt,
+                    owner.accountId(),
+                    owner.kind());
         });
+    }
+
+    @Override
+    public boolean isExperimentOwnedBy(UUID experimentId, UUID accountId) {
+        Integer matches = jdbcTemplate.queryForObject(
+                """
+                SELECT count(*)
+                FROM experiments e
+                JOIN search_runs sr ON sr.id = e.search_run_id
+                WHERE e.id = ? AND sr.owner_account_id = ?
+                """,
+                Integer.class,
+                experimentId,
+                accountId);
+        return matches != null && matches == 1;
+    }
+
+    @Override
+    public boolean isSearchRunOwnedBy(UUID searchRunId, UUID accountId) {
+        Integer matches = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM search_runs WHERE id = ? AND owner_account_id = ?",
+                Integer.class,
+                searchRunId,
+                accountId);
+        return matches != null && matches == 1;
+    }
+
+    @Override
+    public List<LeaderboardEntry> findPublicDiscoveryLeaderboard(
+            String symbol, Timeframe timeframe, int limit) {
+        return jdbcTemplate.query(
+                """
+                SELECT l.search_run_id, l.experiment_id,
+                       row_number() OVER (ORDER BY l.score DESC, l.experiment_id) AS rank,
+                       l.score, l.return_pct, l.max_drawdown_pct, l.total_trades,
+                       l.win_rate_pct, c.candidate_spec_json
+                FROM leaderboard_entries l
+                JOIN search_runs sr ON sr.id = l.search_run_id
+                JOIN experiments e ON e.id = l.experiment_id
+                JOIN candidates c ON c.id = e.candidate_id
+                WHERE sr.run_kind = 'DISCOVERY' AND sr.symbol = ? AND sr.timeframe = ?
+                ORDER BY l.score DESC, l.experiment_id
+                LIMIT ?
+                """,
+                (resultSet, rowNumber) -> {
+                    CandidateStrategy candidate = read(
+                            resultSet.getString("candidate_spec_json"), CandidateStrategy.class);
+                    EvaluationMetrics values = new EvaluationMetrics(
+                            resultSet.getBigDecimal("return_pct"),
+                            resultSet.getBigDecimal("max_drawdown_pct"),
+                            resultSet.getInt("total_trades"),
+                            resultSet.getBigDecimal("win_rate_pct"),
+                            resultSet.getBigDecimal("score"));
+                    Ranking ranking = new Ranking(
+                            resultSet.getInt("rank"),
+                            resultSet.getObject("experiment_id", UUID.class),
+                            values);
+                    String summary = candidate.strategies().stream()
+                            .map(strategy -> strategy.type())
+                            .reduce((left, right) -> left + "+" + right)
+                            .orElseThrow();
+                    return new LeaderboardEntry(
+                            resultSet.getObject("search_run_id", UUID.class), ranking, summary);
+                },
+                symbol,
+                timeframe.exchangeCode(),
+                limit);
+    }
+
+    private RunOwner runOwner(UUID searchRunId) {
+        return jdbcTemplate.query(
+                        "SELECT owner_account_id, run_kind FROM search_runs WHERE id = ?",
+                        (resultSet, rowNumber) -> new RunOwner(
+                                resultSet.getObject("owner_account_id", UUID.class),
+                                SearchRunKind.valueOf(resultSet.getString("run_kind"))),
+                        searchRunId)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "search run not found: " + searchRunId));
     }
 
     @Override
@@ -432,9 +516,9 @@ public class JdbcExperimentRepository
                 INSERT INTO search_runs (
                     id, status, symbol, timeframe, generator_type, generator_version, random_seed,
                     search_config_json, stop_conditions_json, execution_config_json,
-                    created_at, started_at, cancel_requested
+                    created_at, started_at, cancel_requested, owner_account_id, run_kind
                 ) VALUES (?, 'RUNNING', ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb),
-                          CAST(? AS jsonb), ?, ?, false)
+                          CAST(? AS jsonb), ?, ?, false, ?, ?)
                 ON CONFLICT (id) DO NOTHING
                 """,
                 plan.searchRunId(),
@@ -447,7 +531,9 @@ public class JdbcExperimentRepository
                 "{\"maxCandidates\":1}",
                 json(plan.executionConfig()),
                 timestamp(plan.createdAt()),
-                timestamp(plan.createdAt()));
+                timestamp(plan.createdAt()),
+                plan.ownerAccountId(),
+                plan.runKind().name());
     }
 
     private void persistCandidate(ExperimentPlan plan) {
@@ -651,6 +737,8 @@ public class JdbcExperimentRepository
     }
 
     private record DatasetRow(UUID id, MarketDatasetRef reference) {}
+
+    private record RunOwner(UUID accountId, SearchRunKind kind) {}
 
     private record DetailsRow(
             Experiment experiment,

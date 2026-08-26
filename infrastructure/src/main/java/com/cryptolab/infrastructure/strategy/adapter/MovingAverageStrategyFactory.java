@@ -2,6 +2,8 @@ package com.cryptolab.infrastructure.strategy.adapter;
 
 import com.cryptolab.strategy.domain.Strategy;
 import com.cryptolab.strategy.domain.StrategyDefinition;
+import com.cryptolab.strategy.domain.StrategyOverlayDescriptor;
+import java.util.List;
 import com.cryptolab.strategy.domain.baseline.MovingAverageStrategy;
 import com.cryptolab.strategy.port.StrategyFactory;
 import java.util.Map;
@@ -28,6 +30,15 @@ public final class MovingAverageStrategyFactory implements StrategyFactory {
         return Map.of(
                 "fastPeriod", Map.of("type", "integer", "default", 10, "minimum", 1),
                 "slowPeriod", Map.of("type", "integer", "default", 20, "minimum", 2));
+    }
+
+    @Override
+    public List<StrategyOverlayDescriptor> overlays() {
+        return List.of(
+                new StrategyOverlayDescriptor(
+                        "fast-average", "SMA", Map.of("periodParameter", "fastPeriod", "color", "#2563eb")),
+                new StrategyOverlayDescriptor(
+                        "slow-average", "SMA", Map.of("periodParameter", "slowPeriod", "color", "#f59e0b")));
     }
 
     @Override

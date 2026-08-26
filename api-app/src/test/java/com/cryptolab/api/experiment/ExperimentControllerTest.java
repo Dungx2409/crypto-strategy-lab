@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.cryptolab.account.domain.AccountRole;
+import com.cryptolab.api.account.AuthenticatedAccount;
 import com.cryptolab.experiment.application.DefaultExperimentEvaluator;
 import com.cryptolab.experiment.application.DefaultRankingService;
 import com.cryptolab.experiment.application.DeterministicBacktestEngine;
@@ -51,6 +53,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -64,6 +67,8 @@ class ExperimentControllerTest {
     private static final UUID RERUN_ID = uuid(5);
 
     private MockMvc mockMvc;
+    private MockHttpSession session;
+    private UUID accountId;
 
     @BeforeEach
     void setUp() {
@@ -97,11 +102,16 @@ class ExperimentControllerTest {
                 .setControllerAdvice(new ExperimentExceptionHandler(clock))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(mapper))
                 .build();
+        accountId = uuid(100);
+        session = new MockHttpSession();
+        session.setAttribute(
+                AuthenticatedAccount.class.getName(),
+                new AuthenticatedAccount(accountId, "student", AccountRole.USER));
     }
 
     @Test
     void runsCandidateAndExposesDetailsProvenanceLeaderboardAndRerun() throws Exception {
-        mockMvc.perform(post("/api/v1/experiments")
+        mockMvc.perform(post("/api/v1/experiments").session(session)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson()))
                 .andExpect(status().isCreated())
@@ -119,12 +129,12 @@ class ExperimentControllerTest {
                 .andExpect(jsonPath("$.metrics.totalTrades").value(1))
                 .andExpect(jsonPath("$.metrics.winRatePct").value(100));
 
-        mockMvc.perform(get("/api/v1/experiments/{id}", EXPERIMENT_ID))
+        mockMvc.perform(get("/api/v1/experiments/{id}", EXPERIMENT_ID).session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.codeCommit").value("test-commit"))
                 .andExpect(jsonPath("$.dataset.checksum").isNotEmpty());
 
-        mockMvc.perform(get("/api/v1/experiments/{id}/provenance", EXPERIMENT_ID))
+        mockMvc.perform(get("/api/v1/experiments/{id}/provenance", EXPERIMENT_ID).session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.candidateId").value(CANDIDATE_ID.toString()))
                 .andExpect(jsonPath("$.strategies[0].type").value("TEST"))
@@ -134,7 +144,7 @@ class ExperimentControllerTest {
                 .andExpect(jsonPath("$.evaluatorVersion").value(DefaultExperimentEvaluator.VERSION))
                 .andExpect(jsonPath("$.metrics.winRatePct").value(100));
 
-        mockMvc.perform(get("/api/v1/leaderboard")
+        mockMvc.perform(get("/api/v1/leaderboard").session(session)
                         .param("searchRunId", SEARCH_RUN_ID.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].rank").value(1))
@@ -142,7 +152,7 @@ class ExperimentControllerTest {
                 .andExpect(jsonPath("$.items[0].strategySummary").value("TEST"))
                 .andExpect(jsonPath("$.items[0].winRatePct").value(100));
 
-        mockMvc.perform(post("/api/v1/experiments/{id}/rerun", EXPERIMENT_ID))
+        mockMvc.perform(post("/api/v1/experiments/{id}/rerun", EXPERIMENT_ID).session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metricsMatch").value(true))
                 .andExpect(jsonPath("$.experiment.experimentId").value(RERUN_ID.toString()))
@@ -152,13 +162,13 @@ class ExperimentControllerTest {
 
     @Test
     void mapsMalformedAndMissingExperimentsToStableErrors() throws Exception {
-        mockMvc.perform(post("/api/v1/experiments")
+        mockMvc.perform(post("/api/v1/experiments").session(session)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"symbol\":\"BTCUSDT\",\"timeframe\":\"2m\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_EXPERIMENT_REQUEST"));
 
-        mockMvc.perform(get("/api/v1/experiments/{id}", uuid(99)))
+        mockMvc.perform(get("/api/v1/experiments/{id}", uuid(99)).session(session))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("EXPERIMENT_NOT_FOUND"));
     }
@@ -300,6 +310,19 @@ class ExperimentControllerTest {
         public Optional<ExperimentPlan> findPlan(UUID experimentId) {
             State state = states.get(experimentId);
             return state == null ? Optional.empty() : Optional.of(state.plan);
+        }
+
+        @Override
+        public boolean isExperimentOwnedBy(UUID experimentId, UUID ownerAccountId) {
+            State state = states.get(experimentId);
+            return state != null && ownerAccountId.equals(state.plan.ownerAccountId());
+        }
+
+        @Override
+        public boolean isSearchRunOwnedBy(UUID searchRunId, UUID ownerAccountId) {
+            return states.values().stream().anyMatch(state ->
+                    state.plan.searchRunId().equals(searchRunId)
+                            && ownerAccountId.equals(state.plan.ownerAccountId()));
         }
 
         @Override

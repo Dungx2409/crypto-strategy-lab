@@ -11,12 +11,9 @@ public final class SearchRunStateMachine {
             EnumSet.of(SearchRunStatus.RUNNING, SearchRunStatus.CANCELLED, SearchRunStatus.FAILED),
             SearchRunStatus.RUNNING,
             EnumSet.of(
-                    SearchRunStatus.PAUSED,
                     SearchRunStatus.EVALUATING,
                     SearchRunStatus.CANCELLED,
                     SearchRunStatus.FAILED),
-            SearchRunStatus.PAUSED,
-            EnumSet.of(SearchRunStatus.RUNNING, SearchRunStatus.CANCELLED, SearchRunStatus.FAILED),
             SearchRunStatus.EVALUATING,
             EnumSet.of(SearchRunStatus.COMPLETED, SearchRunStatus.CANCELLED, SearchRunStatus.FAILED),
             SearchRunStatus.COMPLETED,

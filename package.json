@@ -1,0 +1,11 @@
+{
+  "name": "crypto-strategy-lab-frontend",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-frontend.mjs",
+    "test": "node --test frontend-tests/*.test.mjs"
+  },
+  "dependencies": {
+    "lightweight-charts": "5.2.0"
+  }
+}

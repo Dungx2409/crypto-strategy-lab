@@ -1,6 +1,7 @@
 package com.cryptolab.account.application;
 
 import com.cryptolab.account.domain.Account;
+import com.cryptolab.account.domain.AccountRole;
 import com.cryptolab.account.domain.StoredAccount;
 import com.cryptolab.account.port.AccountRepository;
 import com.cryptolab.account.port.PasswordHasher;
@@ -8,6 +9,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -18,11 +20,22 @@ public final class AccountService {
     private final AccountRepository accounts;
     private final PasswordHasher passwords;
     private final Clock clock;
+    private final Set<String> adminUsernames;
 
     public AccountService(AccountRepository accounts, PasswordHasher passwords, Clock clock) {
+        this(accounts, passwords, clock, Set.of());
+    }
+
+    public AccountService(
+            AccountRepository accounts,
+            PasswordHasher passwords,
+            Clock clock,
+            Set<String> adminUsernames) {
         this.accounts = Objects.requireNonNull(accounts, "accounts must not be null");
         this.passwords = Objects.requireNonNull(passwords, "passwords must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+        this.adminUsernames = Set.copyOf(
+                Objects.requireNonNull(adminUsernames, "adminUsernames must not be null"));
     }
 
     public Account register(String username, String password) {
@@ -34,7 +47,12 @@ public final class AccountService {
         }
         Instant now = clock.instant();
         return accounts.create(
-                UUID.randomUUID(), displayName, normalized, passwords.hash(password), now);
+                UUID.randomUUID(),
+                displayName,
+                normalized,
+                passwords.hash(password),
+                adminUsernames.contains(normalized) ? AccountRole.ADMIN : AccountRole.USER,
+                now);
     }
 
     public Account authenticate(String username, String password) {

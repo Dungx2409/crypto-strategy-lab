@@ -1,8 +1,14 @@
-const labState = { catalog: [], capabilities: null, searchRunId: null, searchStartedAt: null, socket: null, connected: false, subscriptions: new Map(), poll: null };
+const labState = { catalog: [], capabilities: null, searchRunId: null, searchStartedAt: null, socket: null, connected: false, subscriptions: new Map(), poll: null, manualRunId: null, manualPoll: null, manualResults: [] };
 const byId = id => document.getElementById(id);
 
-async function api(url, options) {
-    const response = await fetch(url, options);
+async function api(url, options = {}) {
+    const method = (options.method || "GET").toUpperCase();
+    const headers = new Headers(options.headers || {});
+    if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+        const csrfHeaders = await window.cryptoLabAuth.csrfHeaders();
+        Object.entries(csrfHeaders).forEach(([name, value]) => headers.set(name, value));
+    }
+    const response = await fetch(url, {...options, headers});
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.message || `${response.status} ${response.statusText}`);
     return body;
@@ -84,6 +90,144 @@ function selectedSearchConfiguration() {
     return { strategyTypes, strategyVersions, parameterSpace, combinationPolicy: { type: policy, version: "1.0", weights: policy === "WEIGHTED" ? weights : {}, threshold: policy === "WEIGHTED" ? Number(byId("policy-threshold").value) : 0 } };
 }
 
+function currentExecutionConfig() {
+    const optionalNumber = id => byId(id).value === "" ? null : Number(byId(id).value);
+    return {initialCapital: Number(byId("initial-capital").value), feeRate: Number(byId("fee-rate").value),
+        allowShort: byId("allow-short").checked, fillPolicy: labState.capabilities.fillPolicy,
+        engineVersion: labState.capabilities.engineVersion, positionSizePct: Number(byId("position-size-pct").value),
+        stopLossPct: optionalNumber("stop-loss-pct"), takeProfitPct: optionalNumber("take-profit-pct"),
+        trailingStopPct: optionalNumber("trailing-stop-pct")};
+}
+
+function savedStrategyDocument() {
+    const search = selectedSearchConfiguration();
+    const strategies = search.strategyTypes.map(type => {
+        const card = document.querySelector(`.strategy-card[data-type="${CSS.escape(type)}"]`);
+        const parameters = {};
+        card.querySelectorAll("[data-parameter]").forEach(input => {
+            const raw = input.value.split(",")[0].trim();
+            parameters[input.dataset.parameter] = input.dataset.parameterType === "integer"
+                ? Number.parseInt(raw, 10) : Number(raw);
+        });
+        return {type, version: search.strategyVersions[type], parameters};
+    });
+    return {name: byId("saved-strategy-name").value, description: "Saved from dashboard",
+        strategies, combinationPolicy: search.combinationPolicy};
+}
+
+async function loadSavedStrategies() {
+    const strategies = await api("/api/v1/user-strategies");
+    const select = byId("manual-strategy");
+    select.replaceChildren();
+    strategies.forEach(strategy => {
+        const option = document.createElement("option");
+        option.value = strategy.id;
+        option.textContent = `${strategy.document.name} v${strategy.version}`;
+        select.append(option);
+    });
+}
+
+async function saveStrategy() {
+    try {
+        const saved = await api("/api/v1/user-strategies", {method: "POST",
+            headers: {"Content-Type": "application/json"}, body: JSON.stringify(savedStrategyDocument())});
+        byId("saved-strategy-message").textContent = `Saved ${saved.document.name} v${saved.version}`;
+        await loadSavedStrategies();
+        byId("manual-strategy").value = saved.id;
+    } catch (error) {
+        byId("saved-strategy-message").textContent = error.message;
+    }
+}
+
+async function startManualRun() {
+    const selected = [...byId("manual-timeframes").selectedOptions].map(option => option.value);
+    try {
+        const batch = await api("/api/v1/manual-runs", {method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({strategyId: byId("manual-strategy").value,
+                symbol: byId("symbol").value, timeframes: selected,
+                from: new Date(byId("manual-from").value).toISOString(),
+                to: new Date(byId("manual-to").value).toISOString(), executionConfig: currentExecutionConfig()})});
+        byId("manual-run-message").textContent = `Batch ${batch.id} is preparing.`;
+        labState.manualRunId = batch.id;
+        byId("cancel-manual-run").disabled = false;
+        clearInterval(labState.manualPoll);
+        labState.manualPoll = setInterval(refreshManualRun, 2000);
+        await refreshManualRun();
+    } catch (error) {
+        byId("manual-run-message").textContent = error.message;
+    }
+}
+
+async function refreshManualRun() {
+    if (!labState.manualRunId) return;
+    try {
+        const current = await api(`/api/v1/manual-runs/${labState.manualRunId}`);
+        byId("manual-run-message").textContent = `${current.status}: ${current.children.map(child => `${child.timeframe} ${child.status}`).join(" · ")}`;
+        const completed = current.children.filter(child => child.experimentId);
+        labState.manualResults = await Promise.all(completed.map(async child => ({
+            child,
+            details: await api(`/api/v1/experiments/${child.experimentId}`)
+        })));
+        renderManualResults();
+        if (["COMPLETED", "PARTIAL_FAILURE", "FAILED", "CANCELLED"].includes(current.status)) {
+            clearInterval(labState.manualPoll);
+            byId("cancel-manual-run").disabled = true;
+        }
+    } catch (error) {
+        byId("manual-run-message").textContent = error.message;
+    }
+}
+
+async function cancelManualRun() {
+    if (!labState.manualRunId) return;
+    try {
+        await api(`/api/v1/manual-runs/${labState.manualRunId}/cancel`, {method: "POST"});
+        await refreshManualRun();
+    } catch (error) {
+        byId("manual-run-message").textContent = error.message;
+    }
+}
+
+function optionalNumber(id) {
+    const value = byId(id).value;
+    return value === "" ? null : Number(value);
+}
+
+function renderManualResults() {
+    const minimumReturn = optionalNumber("manual-min-return");
+    const minimumWinRate = optionalNumber("manual-min-win-rate");
+    const maximumDrawdown = optionalNumber("manual-max-drawdown");
+    const visible = labState.manualResults.filter(({details}) => {
+        const metrics = details.metrics;
+        return metrics
+            && (minimumReturn === null || Number(metrics.totalReturnPct) >= minimumReturn)
+            && (minimumWinRate === null || Number(metrics.winRatePct) >= minimumWinRate)
+            && (maximumDrawdown === null || Number(metrics.maxDrawdownPct) <= maximumDrawdown);
+    });
+    const body = byId("manual-results-body");
+    body.replaceChildren();
+    if (!visible.length) {
+        const row = body.insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = 8;
+        cell.className = "empty";
+        cell.textContent = labState.manualResults.length ? "No results match these filters." : "No manual result yet.";
+        return;
+    }
+    visible.forEach(({child, details}) => {
+        const metrics = details.metrics;
+        const row = body.insertRow();
+        row.dataset.experimentId = child.experimentId;
+        [child.timeframe, child.status, `${metrics.totalReturnPct}%`, metrics.netProfit,
+            metrics.endingCapital, `${metrics.winRatePct}%`, `${metrics.maxDrawdownPct}%`,
+            metrics.totalTrades].forEach(value => {
+            const cell = row.insertCell();
+            cell.textContent = value;
+        });
+        row.addEventListener("click", () => loadExperiment(child.experimentId));
+    });
+}
+
 async function materializeDataset() {
     const snapshot = window.cryptoLabMarket.snapshot();
     if (snapshot.candles.length < 2) throw new Error("At least two backend candles are required before starting search.");
@@ -95,8 +239,7 @@ async function startSearch() {
     byId("start-search").disabled = true; byId("search-message").textContent = "Materializing immutable market dataset…";
     try {
         const dataset = await materializeDataset(); const config = selectedSearchConfiguration();
-        const optionalNumber = id => byId(id).value === "" ? null : Number(byId(id).value);
-        const executionConfig = { initialCapital: Number(byId("initial-capital").value), feeRate: Number(byId("fee-rate").value), allowShort: byId("allow-short").checked, fillPolicy: labState.capabilities.fillPolicy, engineVersion: labState.capabilities.engineVersion, positionSizePct: Number(byId("position-size-pct").value), stopLossPct: optionalNumber("stop-loss-pct"), takeProfitPct: optionalNumber("take-profit-pct"), trailingStopPct: optionalNumber("trailing-stop-pct") };
+        const executionConfig = currentExecutionConfig();
         const request = { symbol: dataset.symbol, timeframe: dataset.timeframe, from: dataset.from, to: dataset.to, datasetVersion: dataset.datasetVersion, datasetChecksum: dataset.checksum, ...config, randomSeed: Number(byId("random-seed").value), stopConditions: { maxCandidates: Number(byId("max-candidates").value), maxDuration: null, noImprovementIterations: null }, batchSize: Number(byId("batch-size").value), executionConfig };
         const run = await api(`/api/v1/search-runs?generator=${encodeURIComponent(byId("generator").value)}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(request) });
         labState.searchRunId = run.searchRunId; labState.searchStartedAt = Date.now(); byId("cancel-search").disabled = false; byId("search-message").textContent = `Search ${run.searchRunId}`;
@@ -127,17 +270,19 @@ async function loadExperiment(experimentId) {
     document.querySelectorAll("#leaderboard-body tr").forEach(row => { if (row.dataset.experimentId === experimentId) row.dataset.selectedExperiment = "true"; else delete row.dataset.selectedExperiment; });
     byId("experiment-message").textContent = "Loading immutable result…";
     try {
-        const [details, provenance] = await Promise.all([api(`/api/v1/experiments/${experimentId}`), api(`/api/v1/experiments/${experimentId}/provenance`)]); byId("experiment-rank").textContent = details.rank ? `TOP #${details.rank}` : details.status; byId("experiment-rank").className = "status status-online"; byId("experiment-message").textContent = `${details.strategies.map(s => `${s.type}@${s.version}`).join(" + ")} · ${details.dataset.symbol} ${details.dataset.timeframe}`;
+        const [details, provenance, dataset] = await Promise.all([api(`/api/v1/experiments/${experimentId}`), api(`/api/v1/experiments/${experimentId}/provenance`), api(`/api/v1/experiments/${experimentId}/dataset`)]); byId("experiment-rank").textContent = details.rank ? `TOP #${details.rank}` : details.status; byId("experiment-rank").className = "status status-online"; byId("experiment-message").textContent = `${details.strategies.map(s => `${s.type}@${s.version}`).join(" + ")} · ${details.dataset.symbol} ${details.dataset.timeframe}`;
         byId("backtest-timeframe").value = details.dataset.timeframe;
         document.querySelector(".backtest-toolbar input").value = details.dataset.symbol;
         byId("backtest-strategy").value = details.strategies.map(strategy => strategy.type).join(" + ");
         byId("metric-win-rate").textContent = details.metrics ? `${details.metrics.winRatePct ?? "-"}%` : "-";
         byId("metric-return").textContent = details.metrics ? `${details.metrics.totalReturnPct}%` : "-";
+        byId("metric-net-profit").textContent = details.metrics?.netProfit ?? "-";
+        byId("metric-ending-capital").textContent = details.metrics?.endingCapital ?? "-";
         byId("metric-drawdown").textContent = details.metrics ? `${details.metrics.maxDrawdownPct}%` : "-";
         byId("metric-trades").textContent = details.metrics?.totalTrades ?? "-";
         const grid = byId("provenance-grid"); grid.replaceChildren(provenanceItem("Experiment",details.experimentId),provenanceItem("Candidate hash",details.candidateHash),provenanceItem("Dataset checksum",details.dataset.checksum),provenanceItem("Dataset range",`${details.dataset.from} to ${details.dataset.to}`),provenanceItem("Generator",`${details.generator.type}@${details.generator.version}`),provenanceItem("Evaluator",details.evaluatorVersion),provenanceItem("Engine",`${details.executionConfig.engineVersion} · ${details.executionConfig.fillPolicy}`),provenanceItem("Code / build",`${details.codeCommit} / ${details.buildVersion}`),provenanceItem("Return",details.metrics ? `${details.metrics.totalReturnPct}%` : "-"),provenanceItem("Win rate",details.metrics ? `${details.metrics.winRatePct ?? "-"}%` : "-"),provenanceItem("MDD",details.metrics ? `${details.metrics.maxDrawdownPct}%` : "-"),provenanceItem("Trades",details.metrics?.totalTrades),provenanceItem("Score",details.metrics?.score));
         renderArtifacts("signals", details.signals, signal => `${signal.at} · ${signal.strategyType}@${signal.strategyVersion} · ${signal.type} (${signal.strength}) · ${signal.reason}`); renderArtifacts("trades", details.trades, trade => `${trade.direction || "LONG"} · ${trade.entryTime} @ ${trade.entryPrice} to ${trade.exitTime} @ ${trade.exitPrice} · ${trade.exitReason || "SIGNAL"} · PnL ${trade.pnl}`); byId("provenance-json").textContent = JSON.stringify(provenance,null,2);
-        window.cryptoLabBacktest.render(details);
+        window.cryptoLabBacktest.render(details, dataset, labState.catalog);
     } catch (error) { byId("experiment-message").textContent = error.message; }
 }
 function renderArtifacts(id, items, describe) { const host = byId(id); host.replaceChildren(); if (!items?.length) { host.className = "artifact-list empty"; host.textContent = `No ${id}.`; return; } host.className = "artifact-list"; items.forEach(item => { const row = document.createElement("div"); row.className = "artifact-row"; row.textContent = describe(item); host.append(row); }); }
@@ -148,4 +293,15 @@ function sendProofSubscription(destination) { if (!labState.connected) return; c
 function subscribeProofTopics(searchRunId) { const search=`/topic/search/${searchRunId}`, leaderboard=`/topic/leaderboard/${searchRunId}`; labState.subscriptions.set(search, renderSearch); labState.subscriptions.set(leaderboard, loadLeaderboard); sendProofSubscription(search); sendProofSubscription(leaderboard); }
 
 byId("start-search").addEventListener("click", startSearch); byId("cancel-search").addEventListener("click", cancelSearch); byId("combination-policy").addEventListener("change", event => byId("policy-threshold").disabled = event.target.value !== "WEIGHTED"); byId("policy-threshold").disabled = true;
+byId("save-strategy").addEventListener("click", saveStrategy);
+byId("start-manual-run").addEventListener("click", startManualRun);
+byId("cancel-manual-run").addEventListener("click", cancelManualRun);
+["manual-min-return", "manual-min-win-rate", "manual-max-drawdown"].forEach(id => byId(id).addEventListener("input", renderManualResults));
+document.addEventListener("crypto-lab:account", event => {
+    if (event.detail) loadSavedStrategies().catch(() => {});
+    if (labState.socket) labState.socket.close();
+});
+const manualTo = new Date(), manualFrom = new Date(manualTo.getTime() - 7 * 24 * 60 * 60 * 1000);
+const localInput = date => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+byId("manual-from").value = localInput(manualFrom); byId("manual-to").value = localInput(manualTo);
 loadCapabilities().catch(error => byId("search-message").textContent = error.message); refreshSystemStatus(); setInterval(refreshSystemStatus,5000); connectProofSocket();

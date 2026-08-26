@@ -3,6 +3,7 @@ package com.cryptolab.api.news;
 import com.cryptolab.news.domain.NewsInsight;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 public record NewsItemResponse(
         String newsId,
@@ -15,7 +16,10 @@ public record NewsItemResponse(
         String modelName,
         String modelVersion,
         String inputVersion,
-        String preprocessingVersion) {
+        String preprocessingVersion,
+        String content,
+        Instant crawledAt,
+        List<String> relatedCoins) {
 
     static NewsItemResponse from(NewsInsight insight) {
         var item = insight.item();
@@ -31,6 +35,9 @@ public record NewsItemResponse(
                 prediction == null ? null : prediction.model().name(),
                 prediction == null ? null : prediction.model().version(),
                 item.inputVersion(),
-                prediction == null ? null : prediction.preprocessingVersion());
+                prediction == null ? null : prediction.preprocessingVersion(),
+                item.content(),
+                item.crawledAt(),
+                item.relatedCoins());
     }
 }

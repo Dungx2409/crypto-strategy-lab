@@ -5,12 +5,12 @@
 - [x] Add registration, login, logout, and account identity with server-side sessions and BCrypt credentials.
 - [x] Add account-owned storage and deletion for user-created strategies.
 - [x] Add natural-language strategy authoring with idea confirmation, generated-strategy testing, repair attempts, versioning, and safe execution.
-- [ ] Add manual backtest inputs for strategy, pair, date range, capital, and execution settings, plus result filters and reports.
+- [x] Add manual backtest inputs for saved strategy, pair, 1–4 timeframes, date range, capital, and execution settings, plus durable child results.
 - [x] Add continuous discovery scheduling, stop controls, saved versions, and a 24-hour leaderboard loop using non-exhaustive search.
-- [ ] Prove the realtime design for 1,000 browser connections and four charts per user with a load test and measurements.
+- [ ] Execute and archive the full 1,000-session Gatling measurement. The compiled load profile, acceptance assertions, four-subscription limit, and runtime meters are implemented; the measurement needs the running Docker topology.
 - [x] Stream the last open candle as a changing realtime candle while completed candles remain fixed.
-- [ ] Finish TradingView-like chart and history visual QA in a connected browser.
-- [ ] Add versioned crawler extraction templates and LLM-assisted selector repair.
+- [ ] Finish connected-browser visual QA for the new Lightweight Charts 5.2 screens.
+- [x] Add admin-managed, versioned crawler extraction templates. LLM-assisted repair is intentionally deferred.
 - [x] Use Gemini as the current non-OpenAI model for strategy authoring.
 
 ## Current verification

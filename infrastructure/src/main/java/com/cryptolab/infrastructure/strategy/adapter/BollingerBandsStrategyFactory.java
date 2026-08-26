@@ -2,6 +2,8 @@ package com.cryptolab.infrastructure.strategy.adapter;
 
 import com.cryptolab.strategy.domain.Strategy;
 import com.cryptolab.strategy.domain.StrategyDefinition;
+import com.cryptolab.strategy.domain.StrategyOverlayDescriptor;
+import java.util.List;
 import com.cryptolab.strategy.domain.baseline.BollingerBandsStrategy;
 import com.cryptolab.strategy.port.StrategyFactory;
 import java.util.Map;
@@ -28,6 +30,17 @@ public final class BollingerBandsStrategyFactory implements StrategyFactory {
         return Map.of(
                 "window", Map.of("type", "integer", "default", 20, "minimum", 2),
                 "deviationMultiplier", Map.of("type", "number", "default", 2, "exclusiveMinimum", 0));
+    }
+
+    @Override
+    public List<StrategyOverlayDescriptor> overlays() {
+        return List.of(new StrategyOverlayDescriptor(
+                "bollinger-bands",
+                "BOLLINGER",
+                Map.of(
+                        "periodParameter", "window",
+                        "deviationParameter", "deviationMultiplier",
+                        "color", "#7c3aed")));
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.cryptolab.account.port;
 
 import com.cryptolab.account.domain.Account;
+import com.cryptolab.account.domain.AccountRole;
 import com.cryptolab.account.domain.StoredAccount;
 import java.time.Instant;
 import java.util.Optional;
@@ -15,5 +16,6 @@ public interface AccountRepository {
             String username,
             String normalizedUsername,
             String passwordHash,
+            AccountRole role,
             Instant createdAt);
 }

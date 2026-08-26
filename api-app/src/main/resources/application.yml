@@ -45,6 +45,8 @@ management:
       show-details: when_authorized
 
 crypto:
+  security:
+    admin-usernames: ${CRYPTO_ADMIN_USERNAMES:}
   ai:
     gemini:
       api-key: ${GEMINI_API_KEY:}
@@ -90,7 +92,8 @@ crypto:
       concurrency: ${REALTIME_EVENT_CONCURRENCY:1}
       prefetch: ${REALTIME_EVENT_PREFETCH:10}
   news:
-    provider: ${NEWS_PROVIDER:cryptocompare}
+    provider: ${NEWS_PROVIDER:html}
+    allowed-hosts: ${NEWS_ALLOWED_HOSTS:}
     connect-timeout: 5s
     request-timeout: 10s
     maximum-items: 50
@@ -102,8 +105,15 @@ crypto:
       initial-delay: 30s
       interval: 5m
   sentiment:
-    provider: ${SENTIMENT_PROVIDER:keyword}
+    provider: ${SENTIMENT_PROVIDER:huggingface}
     max-attempts: 2
+    huggingface:
+      endpoint: ${HF_FINBERT_ENDPOINT:https://router.huggingface.co/hf-inference/models/ProsusAI/finbert}
+      token: ${HF_TOKEN:}
+      model: ${HF_FINBERT_MODEL:ProsusAI/finbert}
+      revision: ${HF_FINBERT_REVISION:4556d13015211d73dccd3fdd39d39232506f3e43}
+      connect-timeout: 5s
+      request-timeout: 20s
   provenance:
     git-commit: ${APP_GIT_COMMIT:dev}
     build-version: ${APP_BUILD_VERSION:dev}

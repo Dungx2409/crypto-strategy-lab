@@ -61,7 +61,7 @@ public final class SpringStrategyRegistry implements StrategyRegistry {
     public List<StrategyPluginDescriptor> availableStrategies() {
         return factories.values().stream()
                 .map(factory -> new StrategyPluginDescriptor(
-                        factory.type(), factory.version(), factory.parameterSchema()))
+                        factory.type(), factory.version(), factory.parameterSchema(), factory.overlays()))
                 .sorted(Comparator.comparing(StrategyPluginDescriptor::type)
                         .thenComparing(StrategyPluginDescriptor::version))
                 .toList();

@@ -1,10 +1,13 @@
 package com.cryptolab.api.account;
 
+import com.cryptolab.account.domain.AccountRole;
 import jakarta.servlet.http.HttpSession;
 import java.io.Serializable;
+import java.security.Principal;
 import java.util.UUID;
 
-public record AuthenticatedAccount(UUID id, String username) implements Serializable {
+public record AuthenticatedAccount(UUID id, String username, AccountRole role)
+        implements Principal, Serializable {
 
     static final String SESSION_ATTRIBUTE = AuthenticatedAccount.class.getName();
 
@@ -14,5 +17,10 @@ public record AuthenticatedAccount(UUID id, String username) implements Serializ
             return account;
         }
         throw new UnauthenticatedException();
+    }
+
+    @Override
+    public String getName() {
+        return username;
     }
 }

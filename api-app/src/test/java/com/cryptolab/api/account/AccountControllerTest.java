@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cryptolab.account.application.AccountService;
 import com.cryptolab.account.domain.Account;
+import com.cryptolab.account.domain.AccountRole;
 import com.cryptolab.account.domain.StoredAccount;
 import com.cryptolab.account.port.AccountRepository;
 import com.cryptolab.account.port.PasswordHasher;
@@ -107,8 +108,9 @@ class AccountControllerTest {
                 String username,
                 String normalizedUsername,
                 String passwordHash,
+                AccountRole role,
                 Instant createdAt) {
-            Account account = new Account(id, username, createdAt);
+            Account account = new Account(id, username, role, createdAt);
             values.put(normalizedUsername, new StoredAccount(account, passwordHash));
             return account;
         }

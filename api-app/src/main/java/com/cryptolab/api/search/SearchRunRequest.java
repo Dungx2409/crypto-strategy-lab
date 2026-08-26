@@ -5,6 +5,7 @@ import com.cryptolab.experiment.domain.ExecutionConfig;
 import com.cryptolab.experiment.domain.MarketDatasetRef;
 import com.cryptolab.experiment.domain.SearchContext;
 import com.cryptolab.experiment.domain.SearchParameterSpace;
+import com.cryptolab.experiment.domain.SearchRunKind;
 import com.cryptolab.experiment.domain.SearchStartCommand;
 import com.cryptolab.experiment.domain.StopConditions;
 import com.cryptolab.marketdata.domain.Timeframe;
@@ -31,7 +32,7 @@ public record SearchRunRequest(
         Integer batchSize,
         ExecutionConfig executionConfig) {
 
-    SearchStartCommand toCommand(UUID searchRunId) {
+    SearchStartCommand toCommand(UUID searchRunId, UUID ownerAccountId) {
         if (randomSeed == null) {
             throw new IllegalArgumentException("randomSeed must not be null");
         }
@@ -56,6 +57,7 @@ public record SearchRunRequest(
                         DeterministicBacktestEngine.FILL_POLICY,
                         DeterministicBacktestEngine.VERSION)
                 : executionConfig;
-        return new SearchStartCommand(context, resolvedExecution);
+        return new SearchStartCommand(
+                context, resolvedExecution, ownerAccountId, SearchRunKind.SEARCH);
     }
 }

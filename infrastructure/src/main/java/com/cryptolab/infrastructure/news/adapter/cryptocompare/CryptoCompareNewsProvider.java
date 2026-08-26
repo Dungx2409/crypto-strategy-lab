@@ -10,6 +10,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.Clock;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
@@ -22,6 +23,7 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
     private final ObjectMapper objectMapper;
     private final URI endpoint;
     private final int maximumItems;
+    private final Clock clock;
 
     public CryptoCompareNewsProvider(
             ObjectMapper objectMapper,
@@ -34,7 +36,8 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
                 new JdkCryptoCompareTransport(connectTimeout, requestTimeout, apiKey),
                 objectMapper,
                 endpoint,
-                maximumItems);
+                maximumItems,
+                Clock.systemUTC());
     }
 
     CryptoCompareNewsProvider(
@@ -42,6 +45,15 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
             ObjectMapper objectMapper,
             URI endpoint,
             int maximumItems) {
+        this(transport, objectMapper, endpoint, maximumItems, Clock.systemUTC());
+    }
+
+    CryptoCompareNewsProvider(
+            CryptoCompareTransport transport,
+            ObjectMapper objectMapper,
+            URI endpoint,
+            int maximumItems,
+            Clock clock) {
         this.transport = Objects.requireNonNull(transport, "transport must not be null");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.endpoint = Objects.requireNonNull(endpoint, "endpoint must not be null");
@@ -49,6 +61,7 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
             throw new IllegalArgumentException("maximumItems must be between 1 and 200");
         }
         this.maximumItems = maximumItems;
+        this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
 
     @Override
@@ -60,7 +73,7 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
                     "CryptoCompare response error: " + root.path("Message").asText("missing Data array"));
         }
         return StreamSupport.stream(root.path("Data").spliterator(), false)
-                .map(CryptoCompareNewsProvider::map)
+                .map(this::map)
                 .filter(item -> item.publishedAt().isAfter(since))
                 .sorted(Comparator.comparing(NewsItem::publishedAt).reversed()
                         .thenComparing(NewsItem::newsId))
@@ -81,7 +94,7 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
         }
     }
 
-    private static NewsItem map(JsonNode article) {
+    private NewsItem map(JsonNode article) {
         String id = required(article, "id");
         String title = required(article, "title");
         String url = required(article, "url");
@@ -95,6 +108,14 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
         }
         source = bounded(source, 64);
         String normalized = normalize(title + " " + article.path("body").asText(""));
+        String content = normalize(article.path("body").asText(title));
+        List<String> relatedCoins = java.util.Arrays.stream(
+                        article.path("categories").asText("").split("[|,]"))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .map(value -> value.toUpperCase(java.util.Locale.ROOT))
+                .distinct()
+                .toList();
         return new NewsItem(
                 bounded("cryptocompare:" + id, 256),
                 source,
@@ -102,7 +123,10 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
                 url,
                 Instant.ofEpochSecond(publishedEpoch),
                 normalized,
-                "sha256:" + sha256(normalized));
+                "sha256:" + sha256(normalized),
+                content,
+                clock.instant(),
+                relatedCoins);
     }
 
     private static String required(JsonNode node, String field) {

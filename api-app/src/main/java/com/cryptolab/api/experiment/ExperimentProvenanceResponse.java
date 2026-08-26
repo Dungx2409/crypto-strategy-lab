@@ -47,6 +47,7 @@ public record ExperimentProvenanceResponse(
                 provenance.buildVersion(),
                 provenance.startedAt(),
                 provenance.completedAt(),
-                EvaluationMetricsResponse.from(provenance.metrics()));
+                EvaluationMetricsResponse.from(
+                        provenance.metrics(), provenance.executionConfig().initialCapital()));
     }
 }

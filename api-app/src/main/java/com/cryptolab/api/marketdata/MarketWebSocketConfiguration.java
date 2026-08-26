@@ -1,5 +1,6 @@
 package com.cryptolab.api.marketdata;
 
+import com.cryptolab.api.search.SearchSubscriptionAuthorizer;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
@@ -12,9 +13,13 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 class MarketWebSocketConfiguration implements WebSocketMessageBrokerConfigurer {
 
     private final MarketSubscriptionTracker subscriptionTracker;
+    private final SearchSubscriptionAuthorizer searchSubscriptionAuthorizer;
 
-    MarketWebSocketConfiguration(MarketSubscriptionTracker subscriptionTracker) {
+    MarketWebSocketConfiguration(
+            MarketSubscriptionTracker subscriptionTracker,
+            SearchSubscriptionAuthorizer searchSubscriptionAuthorizer) {
         this.subscriptionTracker = subscriptionTracker;
+        this.searchSubscriptionAuthorizer = searchSubscriptionAuthorizer;
     }
 
     @Override
@@ -25,11 +30,11 @@ class MarketWebSocketConfiguration implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws").setAllowedOriginPatterns("*");
+        registry.addEndpoint("/ws");
     }
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(subscriptionTracker);
+        registration.interceptors(subscriptionTracker, searchSubscriptionAuthorizer);
     }
 }

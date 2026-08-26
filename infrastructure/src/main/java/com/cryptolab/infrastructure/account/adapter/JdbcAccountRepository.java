@@ -2,6 +2,7 @@ package com.cryptolab.infrastructure.account.adapter;
 
 import com.cryptolab.account.application.AccountConflictException;
 import com.cryptolab.account.domain.Account;
+import com.cryptolab.account.domain.AccountRole;
 import com.cryptolab.account.domain.StoredAccount;
 import com.cryptolab.account.port.AccountRepository;
 import java.sql.ResultSet;
@@ -28,7 +29,7 @@ public final class JdbcAccountRepository implements AccountRepository {
     public Optional<StoredAccount> findByNormalizedUsername(String normalizedUsername) {
         return jdbcTemplate.query(
                         """
-                        SELECT id, username, password_hash, created_at
+                        SELECT id, username, password_hash, role, created_at
                         FROM accounts
                         WHERE normalized_username = ?
                         """,
@@ -44,20 +45,22 @@ public final class JdbcAccountRepository implements AccountRepository {
             String username,
             String normalizedUsername,
             String passwordHash,
+            AccountRole role,
             Instant createdAt) {
         try {
             jdbcTemplate.update(
                     """
                     INSERT INTO accounts (
-                        id, username, normalized_username, password_hash, created_at
-                    ) VALUES (?, ?, ?, ?, ?)
+                        id, username, normalized_username, password_hash, role, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     id,
                     username,
                     normalizedUsername,
                     passwordHash,
+                    role.name(),
                     OffsetDateTime.ofInstant(createdAt, ZoneOffset.UTC));
-            return new Account(id, username, createdAt);
+            return new Account(id, username, role, createdAt);
         } catch (DuplicateKeyException exception) {
             throw new AccountConflictException("Username is already registered");
         }
@@ -67,6 +70,7 @@ public final class JdbcAccountRepository implements AccountRepository {
         Account account = new Account(
                 resultSet.getObject("id", UUID.class),
                 resultSet.getString("username"),
+                AccountRole.valueOf(resultSet.getString("role")),
                 resultSet.getObject("created_at", OffsetDateTime.class).toInstant());
         return new StoredAccount(account, resultSet.getString("password_hash"));
     }

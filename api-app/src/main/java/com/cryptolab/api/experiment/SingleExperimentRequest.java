@@ -10,6 +10,7 @@ import com.cryptolab.strategy.domain.StrategyDefinition;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public record SingleExperimentRequest(
         String symbol,
@@ -21,7 +22,7 @@ public record SingleExperimentRequest(
         ExecutionConfig executionConfig,
         GeneratorSnapshot generator) {
 
-    SingleExperimentCommand toCommand() {
+    SingleExperimentCommand toCommand(UUID ownerAccountId) {
         Timeframe parsedTimeframe = Timeframe.fromExchangeCode(timeframe);
         List<ExperimentCandleRequest> safeCandles = candles == null ? List.of() : List.copyOf(candles);
         ExecutionConfig resolvedExecution = executionConfig == null
@@ -44,6 +45,7 @@ public record SingleExperimentRequest(
                 strategies,
                 combinationPolicy,
                 resolvedExecution,
-                resolvedGenerator);
+                resolvedGenerator,
+                ownerAccountId);
     }
 }

@@ -47,4 +47,9 @@ public interface SearchRunRepository {
     void fail(UUID searchRunId, String failureCode, String failureMessage, Instant failedAt);
 
     Optional<SearchRunSummary> findSummary(UUID searchRunId);
+
+    default List<SearchRunSummary> findOwned(
+            UUID accountId, Instant beforeCreatedAt, UUID beforeId, int limit) {
+        return List.of();
+    }
 }

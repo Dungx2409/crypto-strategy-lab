@@ -10,7 +10,7 @@ The detailed normative requirements remain in `FEATURE_SPEC.md`.
 | Strategy and combination | 9–10, 18.1 | M3 | M3 complete | Strategy/policy unit tests, catalog API test, extension proof, and ArchUnit isolation |
 | Candidate and experiment pipeline | 11, 13, 17, 19 | M4 | M4 complete | Determinism, no-look-ahead, metrics, provenance, rerun, leaderboard, and PostgreSQL tests |
 | Search, messaging, and workers | 11–16, 18.2–18.3, 20 | M5 | M5.5 complete | Random/Genetic replaceability, complete cancellation, transactional outbox/inbox, live progress, worker metrics, and 1→3 scaling proof |
-| News and sentiment | 21, 18.4, 25.2, 25.5 | M6 | M6 complete | Adapter replacement, persistence/idempotency, and failure-isolation tests |
+| News and sentiment | 21, 18.4, 25.2, 25.5 | M6 | M6 + non-LLM extension complete | Configurable HTML extraction, FinBERT classification, persistence/idempotency, and failure-isolation tests |
 | Dashboard and final proof | 22, 24, 34–39 | M7 | M7 complete | Backend-driven dashboard, operational metrics/status, focused proof script, full verification, and Compose startup |
 
 ## P0 evidence
@@ -155,7 +155,7 @@ The detailed normative requirements remain in `FEATURE_SPEC.md`.
 
 | Requirement | Evidence |
 |---|---|
-| Complete backend-driven dashboard | Separate light-theme Realtime, Strategy, Discovery, Backtest, News, and Settings views; four independent charts with candles, volume, MA20, and signals; result metrics, trade rows, entry/exit markers, leaderboard, provenance, and sentiment counts; static scripts call only REST/STOMP contracts; `ReferenceDashboardTest` and `M7DashboardTest` reject missing screens and fabricated data |
+| Complete backend-driven dashboard | Separate light-theme Realtime, Strategy, Discovery, Backtest, News, and Settings views; TradingView Lightweight Charts 5.2 renders four independent candle/volume charts; backtest charts use the stored experiment dataset, trade markers, and plugin-declared overlays rather than browser-invented strategy signals |
 | Reproducible search input | `POST /api/v1/datasets` materializes the exact displayed candle snapshot with deterministic checksum and idempotent persistence before SearchRun creation; unit/controller/PostgreSQL tests cover the path |
 | Generator runtime replacement | Both Random and Genetic implementations are registered behind `StrategyGenerator`; `?generator=` selects per run and the selected type is persisted; replacement and architecture tests prove downstream independence |
 | Operational visibility | `GET /api/v1/system/status`, independent Actuator health components, and Micrometer meters cover active searches, candidates, queue depth, job outcomes/duration/duplicates, outbox backlog, Market recovery/UI latency, and News/Sentiment failure/duration |
@@ -187,11 +187,11 @@ The detailed normative requirements remain in `FEATURE_SPEC.md`.
 
 | Requirement | Status |
 |---|---|
-| Registration, login, and account identity | Complete: server-side sessions, BCrypt, account identity, and ownership guard |
-| TradingView-like history and changing last candle | Realtime open-candle behavior complete; visual comparison pending |
-| 1,000 users with four realtime charts | Architecture supports shared, reference-counted streams; load test and measurements pending |
+| Registration, login, and account identity | Complete: server-side sessions, BCrypt, USER/ADMIN roles, CSRF protection, centralized route security, private run ownership, and private STOMP topics |
+| TradingView-like history and changing last candle | Lightweight Charts 5.2, exact stored backtest datasets, plugin overlays, volume, markers, and realtime open-candle replacement complete; connected visual comparison remains an environment check |
+| 1,000 users with four realtime charts | Shared reference-counted streams, a hard four-subscription/session limit, Micrometer session/subscription/message meters, and the Gatling 3.15.1 acceptance simulation are complete; the full measurement requires a running Docker topology |
 | Natural-language or article-link strategy authoring | Prompt path complete: Gemini idea confirmation, restricted JSON, three validation attempts, deterministic smoke test, account-owned versions, list, detail, and deletion. Article-link input remains pending |
-| Manual backtest controls and result report | Core execution and metrics exist; account-facing manual workflow and filters are incomplete |
+| Manual backtest controls and result report | Complete: account-owned saved strategies, 1–4 timeframe restart-recoverable child runs, 366-day bound, cooperative cancellation, metric filters, per-timeframe results, immutable experiment linkage, exact dataset charting, net profit, and ending capital |
 | Continuous non-exhaustive discovery and 24-hour leaderboard | Complete: persisted account schedules repeatedly launch bounded Genetic Search, recover after restart, prevent overlap, and support stop/start controls |
-| LLM-assisted crawler selector repair | Not started |
+| Configurable crawler extraction | Complete: admin-only, host-allowlisted, immutable version history, CSS selectors, normalized content/coins/crawl time, and degraded status after three failures. LLM selector repair remains intentionally excluded. |
 | Current non-OpenAI analysis model bonus | Gemini 2.5 Flash is wired for strategy authoring; API key is intentionally blank by default |

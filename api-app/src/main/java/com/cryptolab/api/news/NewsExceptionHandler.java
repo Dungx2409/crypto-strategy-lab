@@ -9,7 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = NewsController.class)
+@RestControllerAdvice(assignableTypes = {NewsController.class, CrawlerSourceController.class})
 final class NewsExceptionHandler {
 
     private final Clock clock;

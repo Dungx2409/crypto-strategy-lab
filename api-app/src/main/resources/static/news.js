@@ -78,7 +78,10 @@ async function refreshNews() {
     refreshNewsButton.disabled = true;
     newsMessage.textContent = "Collecting the latest news…";
     try {
-        const response = await fetch("/api/v1/news/collect", {method: "POST"});
+        const response = await fetch("/api/v1/news/collect", {
+            method: "POST",
+            headers: await window.cryptoLabAuth.csrfHeaders()
+        });
         const body = await response.json();
         if (!response.ok) throw new Error(body.message || "News collection failed");
         await loadStoredNews();
@@ -91,7 +94,10 @@ async function refreshNews() {
 }
 
 refreshNewsButton.addEventListener("click", refreshNews);
-loadStoredNews().then(refreshNews).catch(error => {
+document.addEventListener("crypto-lab:account", event => {
+    refreshNewsButton.hidden = event.detail?.role !== "ADMIN";
+});
+loadStoredNews().catch(error => {
     newsMessage.textContent = error.message;
     setNewsStatus("DOWN", "DOWN");
     renderNews([]);

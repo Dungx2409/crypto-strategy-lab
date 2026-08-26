@@ -5,29 +5,44 @@ import com.cryptolab.marketdata.application.MarketDataStreamService;
 import com.cryptolab.marketdata.application.MarketStreamRegistration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 final class MarketSubscriptionTracker implements ChannelInterceptor {
 
     private static final String PREFIX = "/topic/market/";
+    private static final int MAX_MARKET_SUBSCRIPTIONS_PER_SESSION = 4;
 
     private final MarketDataService marketDataService;
     private final ObjectProvider<MarketDataStreamService> streamServiceProvider;
     private final Map<String, Map<String, MarketStreamRegistration>> sessions =
             new ConcurrentHashMap<>();
 
+    @Autowired
     MarketSubscriptionTracker(
             MarketDataService marketDataService,
-            ObjectProvider<MarketDataStreamService> streamServiceProvider) {
+            ObjectProvider<MarketDataStreamService> streamServiceProvider,
+            MeterRegistry meterRegistry) {
         this.marketDataService = marketDataService;
         this.streamServiceProvider = streamServiceProvider;
+        Gauge.builder("crypto.market.stomp.sessions.active", sessions, Map::size)
+                .description("Active STOMP sessions with market subscriptions")
+                .register(meterRegistry);
+        Gauge.builder(
+                        "crypto.market.stomp.subscriptions.active",
+                        sessions,
+                        values -> values.values().stream().mapToInt(Map::size).sum())
+                .description("Active market chart subscriptions")
+                .register(meterRegistry);
     }
 
     @Override
@@ -57,12 +72,19 @@ final class MarketSubscriptionTracker implements ChannelInterceptor {
         String subscriptionId = required(accessor.getSubscriptionId(), "subscription id");
         var pair = marketDataService.validatedPair(parts[0]);
         var timeframe = marketDataService.validatedTimeframe(parts[1]);
-        MarketStreamRegistration registration = streamServiceProvider.getObject().open(pair, timeframe);
-        MarketStreamRegistration previous = sessions
-                .computeIfAbsent(sessionId, ignored -> new ConcurrentHashMap<>())
-                .put(subscriptionId, registration);
-        if (previous != null) {
-            previous.close();
+        Map<String, MarketStreamRegistration> subscriptions =
+                sessions.computeIfAbsent(sessionId, ignored -> new ConcurrentHashMap<>());
+        synchronized (subscriptions) {
+            if (!subscriptions.containsKey(subscriptionId)
+                    && subscriptions.size() >= MAX_MARKET_SUBSCRIPTIONS_PER_SESSION) {
+                throw new IllegalArgumentException(
+                        "A session may subscribe to at most four market streams");
+            }
+            MarketStreamRegistration registration = streamServiceProvider.getObject().open(pair, timeframe);
+            MarketStreamRegistration previous = subscriptions.put(subscriptionId, registration);
+            if (previous != null) {
+                previous.close();
+            }
         }
     }
 

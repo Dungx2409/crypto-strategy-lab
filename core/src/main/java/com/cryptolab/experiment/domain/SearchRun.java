@@ -13,7 +13,33 @@ public record SearchRun(
         Instant createdAt,
         Instant startedAt,
         Instant endedAt,
-        boolean cancelRequested) {
+        boolean cancelRequested,
+        UUID ownerAccountId,
+        SearchRunKind runKind) {
+
+    public SearchRun(
+            UUID id,
+            SearchRunStatus status,
+            SearchContext context,
+            String generatorType,
+            String generatorVersion,
+            Instant createdAt,
+            Instant startedAt,
+            Instant endedAt,
+            boolean cancelRequested) {
+        this(
+                id,
+                status,
+                context,
+                generatorType,
+                generatorVersion,
+                createdAt,
+                startedAt,
+                endedAt,
+                cancelRequested,
+                null,
+                SearchRunKind.LEGACY);
+    }
 
     public SearchRun {
         Objects.requireNonNull(id, "id must not be null");
@@ -31,6 +57,10 @@ public record SearchRun(
         generatorType = generatorType.trim();
         generatorVersion = generatorVersion.trim();
         Objects.requireNonNull(createdAt, "createdAt must not be null");
+        Objects.requireNonNull(runKind, "runKind must not be null");
+        if (runKind != SearchRunKind.LEGACY && ownerAccountId == null) {
+            throw new IllegalArgumentException("owned search runs require an account id");
+        }
         if (startedAt != null && startedAt.isBefore(createdAt)) {
             throw new IllegalArgumentException("startedAt must not be before createdAt");
         }

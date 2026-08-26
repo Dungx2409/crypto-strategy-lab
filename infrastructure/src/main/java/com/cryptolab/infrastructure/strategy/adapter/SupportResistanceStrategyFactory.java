@@ -2,6 +2,8 @@ package com.cryptolab.infrastructure.strategy.adapter;
 
 import com.cryptolab.strategy.domain.Strategy;
 import com.cryptolab.strategy.domain.StrategyDefinition;
+import com.cryptolab.strategy.domain.StrategyOverlayDescriptor;
+import java.util.List;
 import com.cryptolab.strategy.domain.baseline.SupportResistanceStrategy;
 import com.cryptolab.strategy.port.StrategyFactory;
 import java.util.Map;
@@ -26,6 +28,14 @@ public final class SupportResistanceStrategyFactory implements StrategyFactory {
     @Override
     public Map<String, Object> parameterSchema() {
         return Map.of("window", Map.of("type", "integer", "default", 20, "minimum", 2));
+    }
+
+    @Override
+    public List<StrategyOverlayDescriptor> overlays() {
+        return List.of(new StrategyOverlayDescriptor(
+                "support-resistance",
+                "PRICE_CHANNEL",
+                Map.of("periodParameter", "window", "color", "#0891b2")));
     }
 
     @Override

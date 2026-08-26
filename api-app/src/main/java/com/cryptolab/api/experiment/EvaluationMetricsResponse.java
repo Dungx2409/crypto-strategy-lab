@@ -8,9 +8,14 @@ public record EvaluationMetricsResponse(
         BigDecimal maxDrawdownPct,
         int totalTrades,
         BigDecimal winRatePct,
-        BigDecimal score) {
+        BigDecimal score,
+        BigDecimal netProfit,
+        BigDecimal endingCapital) {
 
-    static EvaluationMetricsResponse from(EvaluationMetrics metrics) {
+    static EvaluationMetricsResponse from(EvaluationMetrics metrics, BigDecimal initialCapital) {
+        BigDecimal netProfit = metrics == null
+                ? null
+                : initialCapital.multiply(metrics.totalReturnPct()).movePointLeft(2);
         return metrics == null
                 ? null
                 : new EvaluationMetricsResponse(
@@ -18,6 +23,8 @@ public record EvaluationMetricsResponse(
                         metrics.maxDrawdownPct(),
                         metrics.totalTrades(),
                         metrics.winRatePct(),
-                        metrics.score());
+                        metrics.score(),
+                        netProfit,
+                        initialCapital.add(netProfit));
     }
 }

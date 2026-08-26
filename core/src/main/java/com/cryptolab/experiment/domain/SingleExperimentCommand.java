@@ -7,6 +7,7 @@ import com.cryptolab.strategy.domain.StrategyDefinition;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.UUID;
 
 public record SingleExperimentCommand(
         String symbol,
@@ -16,7 +17,29 @@ public record SingleExperimentCommand(
         List<StrategyDefinition> strategies,
         CombinationPolicyDefinition combinationPolicy,
         ExecutionConfig executionConfig,
-        GeneratorSnapshot generator) {
+        GeneratorSnapshot generator,
+        UUID ownerAccountId) {
+
+    public SingleExperimentCommand(
+            String symbol,
+            Timeframe timeframe,
+            String datasetVersion,
+            List<Candle> candles,
+            List<StrategyDefinition> strategies,
+            CombinationPolicyDefinition combinationPolicy,
+            ExecutionConfig executionConfig,
+            GeneratorSnapshot generator) {
+        this(
+                symbol,
+                timeframe,
+                datasetVersion,
+                candles,
+                strategies,
+                combinationPolicy,
+                executionConfig,
+                generator,
+                null);
+    }
 
     public SingleExperimentCommand {
         if (symbol == null || symbol.isBlank()) {

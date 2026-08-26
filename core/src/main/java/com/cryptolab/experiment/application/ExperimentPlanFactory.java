@@ -6,6 +6,7 @@ import com.cryptolab.experiment.domain.ExperimentPlan;
 import com.cryptolab.experiment.domain.MarketDataset;
 import com.cryptolab.experiment.domain.MarketDatasetChecksum;
 import com.cryptolab.experiment.domain.MarketDatasetRef;
+import com.cryptolab.experiment.domain.SearchRunKind;
 import com.cryptolab.experiment.domain.SingleExperimentCommand;
 import java.time.Clock;
 import java.util.UUID;
@@ -59,7 +60,9 @@ public final class ExperimentPlanFactory {
                 codeCommit,
                 buildVersion,
                 null,
-                clock.instant());
+                clock.instant(),
+                command.ownerAccountId(),
+                command.ownerAccountId() == null ? SearchRunKind.LEGACY : SearchRunKind.MANUAL);
     }
 
     private static String requireText(String value, String field) {

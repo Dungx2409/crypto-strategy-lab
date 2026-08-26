@@ -15,7 +15,37 @@ public record ExperimentPlan(
         String codeCommit,
         String buildVersion,
         UUID reproductionOfExperimentId,
-        Instant createdAt) {
+        Instant createdAt,
+        UUID ownerAccountId,
+        SearchRunKind runKind) {
+
+    public ExperimentPlan(
+            UUID experimentId,
+            UUID searchRunId,
+            CandidateStrategy candidate,
+            MarketDataset dataset,
+            ExecutionConfig executionConfig,
+            GeneratorSnapshot generator,
+            String evaluatorVersion,
+            String codeCommit,
+            String buildVersion,
+            UUID reproductionOfExperimentId,
+            Instant createdAt) {
+        this(
+                experimentId,
+                searchRunId,
+                candidate,
+                dataset,
+                executionConfig,
+                generator,
+                evaluatorVersion,
+                codeCommit,
+                buildVersion,
+                reproductionOfExperimentId,
+                createdAt,
+                null,
+                SearchRunKind.LEGACY);
+    }
 
     public ExperimentPlan {
         Objects.requireNonNull(experimentId, "experimentId must not be null");
@@ -34,6 +64,10 @@ public record ExperimentPlan(
             throw new IllegalArgumentException("buildVersion must not be blank");
         }
         Objects.requireNonNull(createdAt, "createdAt must not be null");
+        Objects.requireNonNull(runKind, "runKind must not be null");
+        if (runKind != SearchRunKind.LEGACY && ownerAccountId == null) {
+            throw new IllegalArgumentException("owned experiment plans require an account id");
+        }
     }
 
     public ExperimentPlan reproduceAs(UUID newExperimentId, Instant newCreatedAt) {
@@ -48,6 +82,8 @@ public record ExperimentPlan(
                 codeCommit,
                 buildVersion,
                 experimentId,
-                newCreatedAt);
+                newCreatedAt,
+                ownerAccountId,
+                runKind);
     }
 }

@@ -6,6 +6,7 @@ import com.cryptolab.experiment.domain.ExecutionConfig;
 import com.cryptolab.experiment.domain.SearchContext;
 import com.cryptolab.experiment.domain.SearchParameterSpace;
 import com.cryptolab.experiment.domain.SearchRunStatus;
+import com.cryptolab.experiment.domain.SearchRunKind;
 import com.cryptolab.experiment.domain.SearchStartCommand;
 import com.cryptolab.experiment.domain.StopConditions;
 import com.cryptolab.experiment.port.DiscoveryScheduleRepository;
@@ -147,7 +148,8 @@ public final class ContinuousDiscoveryService {
         ExecutionConfig execution = new ExecutionConfig(
                 schedule.initialCapital(), new BigDecimal("0.001"), false,
                 DeterministicBacktestEngine.FILL_POLICY, DeterministicBacktestEngine.VERSION);
-        return new SearchStartCommand(context, execution);
+        return new SearchStartCommand(
+                context, execution, schedule.accountId(), SearchRunKind.DISCOVERY);
     }
 
     private static String safeMessage(RuntimeException failure) {

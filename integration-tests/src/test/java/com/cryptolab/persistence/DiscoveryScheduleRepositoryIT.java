@@ -1,5 +1,6 @@
 package com.cryptolab.persistence;
 
+import com.cryptolab.account.domain.AccountRole;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cryptolab.experiment.domain.DiscoverySchedule;
@@ -47,6 +48,7 @@ class DiscoveryScheduleRepositoryIT {
         accountId = UUID.randomUUID();
         new JdbcAccountRepository(jdbc).create(
                 accountId, "scheduler", "scheduler", "$2a$12$stored-hash",
+                AccountRole.USER,
                 Instant.parse("2026-08-23T10:00:00Z"));
         repository = new JdbcDiscoveryScheduleRepository(jdbc);
     }

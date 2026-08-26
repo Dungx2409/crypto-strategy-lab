@@ -15,7 +15,9 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @RestControllerAdvice(assignableTypes = {
     ExperimentController.class,
     LeaderboardController.class,
-    MarketDatasetController.class
+    PublicLeaderboardController.class,
+    MarketDatasetController.class,
+    ManualRunController.class
 })
 final class ExperimentExceptionHandler {
 

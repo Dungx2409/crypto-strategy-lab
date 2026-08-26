@@ -122,7 +122,9 @@ public final class SearchCoordinator {
                 createdAt,
                 null,
                 null,
-                false);
+                false,
+                command.ownerAccountId(),
+                command.runKind());
         repository.create(run, command.executionConfig());
         return publish(details(run.id()));
     }
@@ -212,8 +214,32 @@ public final class SearchCoordinator {
                 .orElseThrow(() -> new SearchRunNotFoundException(searchRunId));
     }
 
+    public SearchRunSummary details(UUID accountId, UUID searchRunId) {
+        SearchRunSummary summary = details(searchRunId);
+        if (!accountId.equals(summary.run().ownerAccountId())) {
+            throw new SearchRunNotFoundException(searchRunId);
+        }
+        return summary;
+    }
+
+    public SearchRunSummary cancel(UUID accountId, UUID searchRunId) {
+        details(accountId, searchRunId);
+        return cancel(searchRunId);
+    }
+
     public void recordEvaluation(UUID searchRunId, BigDecimal score) {
         repository.recordEvaluation(searchRunId, score);
+    }
+
+    public List<SearchRunSummary> history(
+            UUID accountId, Instant beforeCreatedAt, UUID beforeId, int limit) {
+        if (limit < 1 || limit > 1000) {
+            throw new IllegalArgumentException("history limit must be between 1 and 1000");
+        }
+        if ((beforeCreatedAt == null) != (beforeId == null)) {
+            throw new IllegalArgumentException("history cursor is incomplete");
+        }
+        return repository.findOwned(accountId, beforeCreatedAt, beforeId, limit);
     }
 
     private SearchStopReason generateInBoundedBatches(

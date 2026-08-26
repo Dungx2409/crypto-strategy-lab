@@ -1,6 +1,7 @@
 package com.cryptolab.api.search;
 
 import com.cryptolab.experiment.domain.SearchRunStatus;
+import com.cryptolab.experiment.domain.SearchRunKind;
 import com.cryptolab.experiment.domain.SearchRunSummary;
 import com.cryptolab.experiment.domain.SearchStopReason;
 import com.cryptolab.experiment.domain.StopConditions;
@@ -10,6 +11,7 @@ import java.util.UUID;
 
 public record SearchRunResponse(
         UUID searchRunId,
+        SearchRunKind runKind,
         SearchRunStatus status,
         boolean cancelRequested,
         String generatorType,
@@ -38,6 +40,7 @@ public record SearchRunResponse(
         var run = summary.run();
         return new SearchRunResponse(
                 run.id(),
+                run.runKind(),
                 run.status(),
                 run.cancelRequested(),
                 run.generatorType(),
