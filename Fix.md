@@ -42,13 +42,14 @@ Trong yêu cầu thiết kế ban đầu (AD-24), hệ thống chỉ cho phép c
 Trong yêu cầu thu thập tin tức (News Crawler - Module 10), hệ thống hiện tại có rủi ro viết cứng (hard-code) các cấu trúc bóc tách HTML (CSS Selectors) của từng trang báo vào trong source code. Điều này tạo ra rủi ro rất lớn: 
 *   Mỗi khi các trang báo cập nhật giao diện (đổi tên class, cấu trúc thẻ), Crawler sẽ bị văng lỗi (Exception) và không thể lấy được dữ liệu.
 *   Lập trình viên phải liên tục can thiệp thủ công, sửa code, build và deploy lại hệ thống, gây tốn kém thời gian và làm gián đoạn luồng dữ liệu thời gian thực.
+*   **Sai lệch Kiến trúc (V19 & AD-30):** Thiết kế lưu cấu hình `crawler_templates` theo từng `account_id` là phân mảnh vô lý vì cấu trúc trang web là tài nguyên dùng chung (Global). Việc bắt buộc phải có con người bấm nút "Xác nhận" (Promote) thì bộ thẻ HTML mới do AI sinh ra mới được áp dụng đã đi ngược lại tinh thần Tự động hóa 100% của Đề bài.
 
 ### 2. Hướng giải quyết (Kế hoạch Refactor)
-Xây dựng cơ chế **Adaptive Crawling (Thu thập thích nghi) / Self-healing Crawler** kết hợp LLM:
-1.  **Chuyển cấu hình xuống DB:** Tạo bảng `crawler_configs` để lưu các CSS Selectors hiện tại thay vì để trong code.
-2.  **Bắt lỗi ngoại lệ:** Khi crawler không bóc tách được HTML (ví dụ không tìm thấy tiêu đề), nó không ném lỗi làm chết tiến trình mà sẽ kích hoạt cơ chế tự chữa lành.
-3.  **Dùng LLM phân tích lại DOM:** Gửi toàn bộ mã HTML thô (Raw DOM) của trang web bị lỗi đó cho một LLM chuyên dụng có cửa sổ ngữ cảnh lớn. Đặt Prompt yêu cầu LLM tìm và trả về các CSS Selectors mới chứa tiêu đề và nội dung bài báo.
-4.  **Cập nhật tự động (Auto-healing):** Hệ thống lấy CSS Selectors mới do LLM trả về, tự động lưu đè vào bảng `crawler_configs` và chạy lại job crawler bị lỗi. Toàn bộ quá trình diễn ra ngầm mà không cần Dev can thiệp.
+Xây dựng cơ chế **Adaptive Crawling (Thu thập thích nghi) / Self-healing Crawler** kết hợp LLM (Tự động 100%):
+1.  **Chuyển cấu hình xuống DB Dùng chung (Global):** Tạo bảng `crawler_configs` (hoặc xóa cột `account_id` khỏi `crawler_templates`) để lưu cấu hình cấp hệ thống thay vì để trong code hay lưu theo từng User.
+2.  **Bắt lỗi ngoại lệ & Tiền xử lý DOM:** Khi crawler bị văng lỗi, không làm chết tiến trình mà sẽ gọi Headless Browser (Playwright) tải lại mã nguồn HTML. Hệ thống sẽ tự động rút gọn DOM (bỏ rác, script, thuộc tính thừa) để chống tràn bộ nhớ AI.
+3.  **Dùng LLM phân tích lại DOM:** Gửi mã HTML đã rút gọn cho một LLM chuyên dụng có cửa sổ ngữ cảnh lớn. Đặt Prompt yêu cầu LLM tìm và trả về các CSS Selectors mới chứa tiêu đề và nội dung bài báo.
+4.  **Cập nhật tự động (Zero-Touch Auto-healing):** Hệ thống nhận cấu hình Selector mới từ LLM, **tự động lưu đè vào DB và chạy tiếp công việc cào tin tức**. Lược bỏ hoàn toàn bước cần con người vào kiểm duyệt/xác nhận.
 
 ---
 
@@ -74,14 +75,30 @@ Hệ thống hiện tại yêu cầu lập trình viên phải viết file Java,
 *   **Thiếu Zero-downtime scripting:** Người dùng không thể tự nhập lời nói (ví dụ: *"Mua khi giá cắt lên MA20"*) hoặc paste link báo để AI tự sinh code và nạp thẳng vào hệ thống lúc runtime.
 *   **Thiếu Sandbox AI:** Chưa có cơ chế cho AI tự chạy thử (backtest) đoạn code nó vừa sinh ra để tự sửa lỗi (Auto-correction loop) trước khi giao cho người dùng xác nhận.
 *   **Lỗi bảo mật dữ liệu (Tenant Leak):** Nếu cho phép người dùng tự tạo chiến lược, nhưng lại không có cột `user_id` trong DB, tất cả mọi người sẽ nhìn thấy chiến lược của nhau, gây rò rỉ thuật toán giao dịch riêng tư.
+*   **Sai lệch Kiến trúc Tích hợp AI (AD-26):** Thiết kế cũ cấm AI sinh code thực thi, bắt AI chỉ trả về một file JSON tĩnh. Điều này vi phạm yêu cầu "phải chạy code tạo ra nó". Ngoài ra, nếu ném thẳng URL bài báo cho LLM, AI sẽ không lướt web được và sẽ "ảo giác" (bịa nội dung).
 
 ### 2. Hướng giải quyết (Kế hoạch Refactor)
-Xây dựng **Kiến trúc Scripting động (Dynamic Scripting Architecture)** và **Tenant Isolation**:
-1.  **Thiết lập Sandbox Scripting:** Sử dụng Groovy, JS (GraalVM) hoặc SpEL để tạo môi trường chạy code kịch bản động ngay trên JVM.
-2.  **Vòng lặp Prompt - Generate - Test:** 
-    * User nhập ý tưởng bằng ngôn ngữ tự nhiên hoặc link báo.
-    * LLM dịch nó thành code Groovy.
-    * Đưa code vào Sandbox Backtest thu nhỏ để chạy thử nghiệm nghiệm thu. Nếu có lỗi (Exception) -> Báo LLM tự sửa lại code.
-    * Hiển thị kết quả ra màn hình cho người dùng kiểm tra và Xác nhận lưu.
-3.  **Dynamic Loading (Zero-downtime):** Sử dụng `GroovyClassLoader` để nạp class mới vào RAM và đưa thẳng vào `StrategyRegistry` để hoạt động tức thì mà không cần tắt Server.
-4.  **Tenant Isolation (Cách ly dữ liệu):** Tạo bảng `user_strategies` (chứa code động) bắt buộc có khóa ngoại `user_id`. Mọi lệnh truy vấn danh sách chiến lược phải filter theo ID người dùng đang đăng nhập (hoặc các chiến lược mặc định của hệ thống) để đảm bảo bảo mật tuyệt đối tài sản trí tuệ của từng user.
+Xây dựng **Kiến trúc Scripting động (Dynamic Scripting Architecture)**, **Tenant Isolation** và **Bộ định tuyến đầu vào**:
+1.  **Bộ định tuyến Đầu vào (Input Router) & Web Fetcher Proxy:** 
+    *   Nếu User nhập Text mô tả: Lấy thẳng đoạn Text đó làm Context gửi cho AI.
+    *   Nếu User dán Link bài báo (URL): Backend kích hoạt thư viện lướt web (Playwright/Jsoup) tải HTML về, vứt bỏ quảng cáo, trích xuất Văn bản thuần (Plain text) và nhét phần Text đó vào Prompt thay cho Link khô khan.
+2.  **Thiết lập Sandbox Scripting & Sinh Code Động:** Cởi trói cho LLM, yêu cầu dịch ý tưởng (hoặc nội dung bài báo) thành một đoạn code thực thi hoàn chỉnh (Groovy/JS). Sử dụng môi trường Sandbox ảo ngay trên JVM để chuẩn bị chạy thử.
+3.  **Vòng lặp Generate - Test tự động:** Đưa code do AI sinh ra vào Sandbox để chạy test với 250 nến. Nếu bị Exception, hệ thống ném lỗi lại bắt AI tự sửa. Chạy ngầm lặp lại cho đến khi ra đoạn Code chuẩn xác không lỗi mới hiển thị ra màn hình cho User kiểm tra và xác nhận lưu.
+4.  **Dynamic Loading (Zero-downtime):** Sử dụng `GroovyClassLoader` để nạp class mới vào RAM và đưa thẳng vào `StrategyRegistry` để hoạt động tức thì mà không cần tắt Server.
+5.  **Tenant Isolation (Cách ly dữ liệu):** Tạo bảng `user_strategies` (chứa code động) bắt buộc có khóa ngoại `user_id`. Mọi truy vấn chiến lược phải filter theo ID người dùng đang đăng nhập để bảo vệ tuyệt đối tài sản trí tuệ (chiến lược) của từng user.
+
+---
+
+## Lỗi #5: Thiếu các tính năng điều khiển và phân tích trên giao diện Backtest (Frontend Module 6-8)
+
+### 1. Phân tích lỗi
+Dù Backend (Core/API) đã xử lý hoàn chỉnh các luồng dữ liệu theo đúng yêu cầu đề bài, nhưng giao diện Frontend (file HTML và JS) hiện đang bỏ sót 3 tính năng quan trọng khiến người dùng không thể thao tác đầy đủ với quá trình Backtest & Leaderboard:
+*   **Thiếu 2 ô nhập liệu cho "Điều kiện dừng" (Stop Condition):** Giao diện chỉ có ô nhập số lượng ứng viên tối đa (Max candidates) nhưng lại thiếu ô nhập thời gian chạy tối đa (maxDuration) và số vòng lặp không cải thiện (noImprovementIterations). Điều này khiến vòng lặp có nguy cơ chạy không kiểm soát nếu người dùng muốn giới hạn theo thời gian.
+*   **Thiếu tính năng Sắp xếp (Sort) trên Bảng Leaderboard:** Dữ liệu Leaderboard trả về được hiển thị cố định theo Điểm (Score). Tuy nhiên, người dùng không thể click vào các tiêu đề cột (Return, Win Rate, Max Drawdown) để sắp xếp lại (Sort client-side) nhằm so sánh các chiến lược theo tiêu chí an toàn hoặc lợi nhuận.
+*   **Thiếu nút bấm "Chạy lại" (Rerun) trên UI:** Hệ thống Backend thiết kế theo chuẩn Immutable Provenance (thí nghiệm không thể ghi đè) và đã cung cấp API để Rerun (chạy lại cấu hình cũ trên dữ liệu mới). Tuy nhiên, trên giao diện chi tiết của một Leaderboard Entry lại không có nút bấm "Rerun" để kích hoạt API này.
+
+### 2. Hướng giải quyết (Kế hoạch Refactor)
+Bổ sung code thuần túy trên Frontend (HTML/JS) mà không cần can thiệp Backend:
+1.  **Thêm các ô Input Điều kiện dừng:** Bổ sung thẻ `<input>` cho `maxDuration` và `noImprovementIterations` vào form Search (file `index.html`). Cập nhật file `lab.js` để đọc giá trị từ 2 ô này và truyền vào object `stopConditions` trong JSON request gửi lên API.
+2.  **Gắn Event Listener Sắp xếp Leaderboard:** Gắn sự kiện `onclick` vào các thẻ `<th>` của bảng Leaderboard. Khi click, dùng hàm `sort()` của JavaScript để đảo lại thứ tự mảng dữ liệu `data.items` theo trường (field) tương ứng và gọi hàm render lại bảng.
+3.  **Thêm nút "Rerun this experiment":** Tại giao diện `Experiment details` (sau khi người dùng click vào một dòng Leaderboard), thêm một nút "Rerun". Khi bấm nút này, file JS sẽ gọi API `POST /api/v1/experiments/{experimentId}/rerun` và hiển thị kết quả so sánh trực quan kiểm chứng tính Tái lập (Reproducibility).
