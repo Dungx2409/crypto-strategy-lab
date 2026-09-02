@@ -89,9 +89,11 @@ class CandleStoreIT {
                 .isEqualTo(2);
         assertThat(binanceStore.findLatest(new TradingPair("BTCUSDT"), Timeframe.M5, 1))
                 .extracting(Candle::close)
+                .usingComparatorForType(BigDecimal::compareTo, BigDecimal.class)
                 .containsExactly(new BigDecimal("108"));
         assertThat(okxStore.findLatest(new TradingPair("BTCUSDT"), Timeframe.M5, 1))
                 .extracting(Candle::close)
+                .usingComparatorForType(BigDecimal::compareTo, BigDecimal.class)
                 .containsExactly(new BigDecimal("109"));
     }
 

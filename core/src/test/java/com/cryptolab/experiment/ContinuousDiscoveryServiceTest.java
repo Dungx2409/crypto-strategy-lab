@@ -1,5 +1,6 @@
 package com.cryptolab.experiment;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -152,9 +153,28 @@ class ContinuousDiscoveryServiceTest {
         }
 
         verify(searches, org.mockito.Mockito.times(25)).run(any(SearchStartCommand.class));
-        org.assertj.core.api.Assertions.assertThat(schedules.schedule.completedRuns()).isEqualTo(24);
-        org.assertj.core.api.Assertions.assertThat(schedules.schedule.activeSearchRunId()).isNotNull();
-        org.assertj.core.api.Assertions.assertThat(schedules.schedule.nextRunAt()).isEqualTo(NOW.plus(Duration.ofHours(25)));
+        assertThat(schedules.schedule.completedRuns()).isEqualTo(24);
+        assertThat(schedules.schedule.activeSearchRunId()).isNotNull();
+        assertThat(schedules.schedule.nextRunAt()).isEqualTo(NOW.plus(Duration.ofHours(25)));
+    }
+
+    @Test
+    void returnsSavedConfigurationVersionsForAnOwnedSchedule() {
+        UUID accountId = UUID.fromString("30000000-0000-0000-0000-000000000001");
+        DiscoveryScheduleRepository schedules = mock(DiscoveryScheduleRepository.class);
+        DiscoveryScheduleVersion version = new DiscoveryScheduleVersion(
+                SCHEDULE_ID, 1, "BTCUSDT", Timeframe.H1, Duration.ofDays(30),
+                new BigDecimal("10000"), 20, Duration.ofHours(24), NOW);
+        when(schedules.find(accountId, SCHEDULE_ID)).thenReturn(Optional.of(schedule(null)));
+        when(schedules.findVersions(accountId, SCHEDULE_ID)).thenReturn(List.of(version));
+
+        ContinuousDiscoveryService service = new ContinuousDiscoveryService(
+                schedules, mock(MarketDataProvider.class), mock(MarketDatasetService.class),
+                mock(SearchCoordinator.class), mock(StrategyRegistry.class),
+                Clock.fixed(NOW, ZoneOffset.UTC), () -> SEARCH_ID);
+
+        assertThat(service.versions(accountId, SCHEDULE_ID)).containsExactly(version);
+        verify(schedules).findVersions(accountId, SCHEDULE_ID);
     }
 
     private static DiscoverySchedule schedule(UUID activeRunId) {

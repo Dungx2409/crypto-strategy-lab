@@ -1,12 +1,12 @@
 # Crypto Strategy Lab
 
-Crypto Strategy Lab is a research and backtesting application for cryptocurrency
+Crypto Strategy Lab is a research and backtesting app for cryptocurrency
 strategies. It streams market candles, combines technical and news-based signals,
 searches strategy configurations, and stores reproducible backtest results. It is
 for study and experimentation only. It does not place real orders.
 
-The application is a Java 21 modular system with a Spring Boot API, a separate
-backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
+The stack is Java 21 modules with a Spring Boot API, a separate backtest worker,
+PostgreSQL, RabbitMQ, and a browser dashboard.
 
 ## Screenshots
 
@@ -28,66 +28,80 @@ backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
 
 ## Implemented features
 
-- A first-visit account gate that hides the dashboard until registration or
-  login succeeds. Sessions use an HTTP-only cookie and BCrypt password hashes.
-- A configurable local demo account for immediate access.
-- Four independent real-time candlestick charts for different timeframes, backed
-  by Java `HttpClient` REST and WebSocket adapters for Binance or OKX.
-- Interactive canvas charts with paged earlier history, wheel zoom, drag pan,
-  crosshair/OHLC inspection, volume, and continuously changing open candles.
-- Binance or OKX market provider selection.
-- MA, RSI, Bollinger Bands, Support/Resistance, MACD, News Sentiment, and bounded
-  executable `RULE` and `AI_DSL@1.0` strategy languages.
+- A first-visit account gate. The dashboard stays hidden until register or login
+  succeeds. Sessions use an HTTP-only cookie and BCrypt password hashes.
+- A configurable local demo account (`demo` / `crypto-demo` by default).
+- Six signed-in views: Realtime, Strategy Engine, Discovery, Backtest, News
+  Crawler, and Settings.
+- Settings shows logout only while signed in, plus market, news, sentiment,
+  queue, worker, and outbox health.
+- Four independent realtime candlestick charts. Market data comes from Java
+  `HttpClient` REST and WebSocket adapters. Choose Binance or OKX with
+  `CRYPTO_MARKET_PROVIDER` at startup (not from the UI).
+- A custom pair picker with CryptoCompare coin icons for BTCUSDT, ETHUSDT,
+  SOLUSDT, and BNBUSDT. Chart prices, MA, volume, and OHLC hover values use two
+  decimal places.
+- Interactive canvas charts with earlier history paging, wheel zoom, drag pan,
+  crosshair and OHLC inspection, volume, MA(20), and live open-candle updates.
+- Strategy plugins: `MA`, `RSI`, `BB`, `SR`, `MACD`, `NEWS_SENTIMENT`, plus
+  bounded executable `RULE` and `AI_DSL@1.0` languages. Per-plugin Fine tune
+  controls parameter search ranges and voting weight.
 - Majority and weighted signal-combination policies.
-- Random Search and multi-generation Genetic Search.
+- Manual Discovery with Random Search or Genetic Search, Quick (25) / Balanced
+  (125) / Deep (500) size presets, and advanced stop conditions.
+- A Discovery leaderboard with sort by score, return, win rate, max drawdown,
+  trades, or rank, in either direction. Selecting a row opens the experiment on
+  Backtest.
+- Account-owned Automatic discovery schedules. Each tick always runs Genetic
+  Search. Start, stop, edit, recover interrupted runs, and keep immutable
+  configuration versions. Open the Versions panel on a schedule row to list each
+  saved config. Use Open result to load that schedule's latest search run into
+  the Discovery leaderboard.
 - Durable job queue, scalable workers, retry, cancellation, and outbox/inbox
   processing.
 - Deterministic backtesting with immutable datasets and provenance. Result charts
-  reload the experiment's own candles and display indicator, signal, entry, and
-  exit overlays rather than using the current realtime chart.
-- Long and Short positions, position sizing, Stop Loss, Take Profit, and Trailing
-  Stop.
-- Performance metrics, trade history, filters, chart markers, and leaderboards.
-- Manual account-owned backtests with reloadable history and exact historical
-  date ranges up to 20,000 candles by default.
+  reload the experiment's own candles and draw indicator, signal, entry, and exit
+  overlays.
+- Long and short positions, position sizing, stop loss, take profit, and trailing
+  stop. Risk profiles: Standard, Conservative, Active, or Custom.
+- Performance metrics, trade history, P/L and exit filters, chart markers, and
+  account-owned manual run history with exact date ranges up to 20,000 candles by
+  default.
 - Natural-language and public article URL strategy authoring through Gemini.
-  Generated JSON contains bounded Trading DSL or registered plugins; it cannot
-  run arbitrary generated Java, JavaScript, or Groovy code.
-- Separate idea and tested-source confirmation, JSON/DSL repair attempts,
-  250-candle smoke tests, version history, and deletion.
-- Account-owned continuous Genetic Search schedules with start, stop, recovery,
-  and immutable configuration versions. The default interval is 24 hours.
+  Flow: Generate idea → Confirm and build code (includes a 250-candle smoke test)
+  → Save tested strategy. Output is bounded Trading DSL or registered plugins. It
+  cannot run arbitrary generated Java, JavaScript, or Groovy. `AI_DSL` strategies
+  can be saved for Backtest; they are not offered in the Discovery plugin catalog.
 - News collection from CryptoCompare, RSS or Atom feeds, and HTML websites.
-  Composite mode merges CryptoCompare and RSS while tolerating one provider
-  failure. Sentiment uses the local keyword model by default or Gemini when
-  selected.
+  Composite `all` mode merges CryptoCompare and RSS and tolerates one provider
+  failure. Sentiment uses the local keyword model by default, or Gemini when
+  selected. The News screen also sets crawl interval and coin filter.
 - Versioned crawler selector templates, scheduled live-page selector checks, and
-  Gemini-assisted replacement selectors that remain `NEEDS_REVIEW` until the
-  account owner confirms them. Active selectors also extract, store, and analyze
-  articles from HTML pages.
-- Flyway database migrations V1 through V21.
-- A real-time load proof in which 1,000 of 1,000 sessions received all four
-  timeframe topics.
+  Gemini-assisted replacement selectors that stay `NEEDS_REVIEW` until the account
+  owner confirms them.
+- Flyway migrations V1 through V22.
 
 ## Deliberate limits and not fully verified
 
-- Automatic runtime failover from Binance to OKX. Select one provider at startup.
-- Arbitrary generated Java source is deliberately not compiled or executed.
-  Natural-language authoring can create new executable logic through the
-  bounded `AI_DSL` or compose registered plugins, without rebuilding the app.
-- Each experiment uses one selected timeframe from the supported set. Strategies
-  that synchronize signals from several timeframes inside one experiment are not
-  implemented.
-- Real trading and exchange order execution. The application is a backtester.
+- Automatic runtime failover from Binance to OKX. Pick one provider at startup.
+  The realtime UI label stays on Binance even if OKX is configured.
+- Arbitrary generated Java source is not compiled or executed. Authoring creates
+  logic only through bounded `AI_DSL` or registered plugins.
+- Each experiment uses one timeframe. Multi-timeframe signal sync inside one
+  experiment is not implemented.
+- Real trading and exchange order execution. This app is a backtester.
+- Automatic discovery runs are account-owned and tracked, but their results do not
+  replace the main Discovery leaderboard until you press Open result on that
+  schedule.
 - A literal 24-hour soak test. Schedule recovery and repeated execution have
-  automated coverage, but a full-day run has not been recorded.
+  automated coverage. A full-day run has not been recorded.
 - Automated browser coverage for navigation, chart updates, and trade selection.
 - Tablet and mobile visual QA.
 
-Gemini strategy authoring, semantic sentiment, and selector repair require
-`GEMINI_API_KEY`. Live CryptoCompare collection requires `NEWS_API_KEY`.
-Deterministic keyword sentiment does not require an external key. The checked-in
-example leaves both keys blank.
+Gemini strategy authoring, semantic sentiment, and selector repair need
+`GEMINI_API_KEY`. Live CryptoCompare collection needs `NEWS_API_KEY`. Keyword
+sentiment does not need an external key. The checked-in example leaves both keys
+blank.
 
 ## Run with Docker
 
@@ -104,7 +118,7 @@ cp .env.example .env
 
 The defaults run without Gemini and without authenticated CryptoCompare news.
 The default local account is `demo` with password `crypto-demo`. Change or
-disable it in `.env` before exposing the application outside a local machine:
+disable it in `.env` before exposing the app outside a local machine:
 
 ```dotenv
 DEFAULT_ACCOUNT_ENABLED=true
@@ -117,15 +131,24 @@ NEWS_PROVIDER=all
 NEWS_RSS_URLS=https://www.coindesk.com/arc/outboundfeeds/rss/,https://cointelegraph.com/rss
 SENTIMENT_PROVIDER=keyword
 CRAWLER_CHECK_INTERVAL=15m
+CRYPTO_MARKET_PROVIDER=binance
+CRYPTO_MARKET_SUPPORTED_SYMBOLS=BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT
+CRYPTO_MARKET_MAXIMUM_RANGE_CANDLES=20000
+DISCOVERY_POLL_INTERVAL=1m
+SESSION_COOKIE_SECURE=false
 ```
 
-Set `SENTIMENT_PROVIDER=gemini` to use Gemini semantic sentiment. Selector checks
-run every 15 minutes by default; a failed check never activates an AI proposal
-without user confirmation.
+Set `SENTIMENT_PROVIDER=gemini` for Gemini semantic sentiment. Selector checks
+run every `CRAWLER_CHECK_INTERVAL` (default 15 minutes). A failed check never
+activates an AI proposal without user confirmation.
 
-Choose the provider from the News screen and click **Apply**. The choice affects
-manual and scheduled collection immediately. `NEWS_PROVIDER` sets the initial
-dropdown value:
+`CRYPTO_SEARCH_GENERATOR` (default `random` in Compose) sets the preferred
+manual Discovery method when both Random and Genetic are available. Automatic
+discovery schedules always use Genetic Search.
+
+Choose the news provider on the News screen and click **Apply**. The choice
+affects manual and scheduled collection immediately. `NEWS_PROVIDER` sets the
+initial dropdown value:
 
 ```dotenv
 # CryptoCompare only
@@ -138,27 +161,27 @@ NEWS_PROVIDER=rss
 NEWS_PROVIDER=all
 ```
 
-`rss` and `all` require at least one comma-separated URL in `NEWS_RSS_URLS`.
-The older value `composite` is accepted as an alias for `all`. HTML website
-templates are managed from the News screen and can run alongside any mode.
+`rss` and `all` need at least one comma-separated URL in `NEWS_RSS_URLS`. The
+older value `composite` is accepted as an alias for `all`. HTML website templates
+are managed from the News screen and can run alongside any mode.
 
-Build and start the complete application:
+Build and start the full stack:
 
 ```bash
 docker compose up -d --build
 docker compose ps
 ```
 
-Open `http://localhost:8080`. RabbitMQ management is available at
+Open `http://localhost:8080`. RabbitMQ management is at
 `http://localhost:15672` with the credentials from `.env`.
 
-Stop the application without deleting its database volume:
+Stop without deleting the database volume:
 
 ```bash
 docker compose down
 ```
 
-To run three worker replicas:
+Run three worker replicas:
 
 ```bash
 docker compose up -d --build --scale worker=3
@@ -166,23 +189,28 @@ docker compose up -d --build --scale worker=3
 
 ## Use the application
 
-1. Open `http://localhost:8080`. The application shows only the account form
-   until registration or login succeeds. Register a new account or sign in with
-   `demo` / `crypto-demo`.
-2. Use **Realtime** to select a market pair and inspect four independently
-   updating timeframes.
-3. Use **Strategy** to create a strategy from a prompt or article URL. This step
-   requires `GEMINI_API_KEY`. Confirm the proposed idea before saving its JSON.
-4. Use **Discovery** to run Random or Genetic Search, or create a repeating
-   Genetic schedule. Start with Quick, Balanced, or Deep. Raw limits stay under
-   Advanced search settings.
-5. Use **Backtest** to choose a strategy, period, and risk profile. Open Advanced
-   backtest settings only when you need custom dates, fees, sizing, or exits.
-   Review metrics, trades, and chart markers after the run completes.
-6. Use **News** to collect and inspect news sentiment. Live CryptoCompare data
-   requires `NEWS_API_KEY`.
-7. Return to Discovery or Backtest later to reload account-owned schedules,
-   experiments, versions, and results.
+1. Open `http://localhost:8080`. Only the account form is shown until register or
+   login succeeds. Register a new account or sign in with `demo` / `crypto-demo`.
+2. **Realtime.** Pick a pair (icons included), set the primary timeframe, and
+   inspect four independently updating charts.
+3. **Strategy Engine.** Tick the plugins you want, choose majority or weighted
+   combine, and open Fine tune when you need parameter ranges or voting weights.
+   To author with Gemini, write a prompt or paste an article URL, then Generate
+   idea → Confirm and build code → Save tested strategy. This path needs
+   `GEMINI_API_KEY`.
+4. **Discovery.** Run Random or Genetic Search with Quick, Balanced, or Deep.
+   Raw limits stay under Advanced search settings. Sort the leaderboard as needed.
+   Under Automatic discovery, create a repeating Genetic schedule, then use Open
+   result or Versions on each saved schedule row.
+5. **Backtest.** Choose a saved strategy, period, and risk profile. Open Advanced
+   backtest settings for custom dates, fees, sizing, or exits. Review metrics,
+   trades, filters, chart markers, and provenance. Reload earlier runs from Saved
+   manual runs.
+6. **News Crawler.** Collect and inspect news sentiment. Live CryptoCompare data
+   needs `NEWS_API_KEY`. Add HTML websites under Add a news website when you want
+   custom sources.
+7. **Settings.** Logout, and check system health for market data, news,
+   sentiment, queue depth, workers, and outbox.
 
 ## Develop and test
 

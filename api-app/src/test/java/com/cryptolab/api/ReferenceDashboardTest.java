@@ -16,13 +16,17 @@ class ReferenceDashboardTest {
                 "app-sidebar",
                 "Crypto Strategy Lab",
                 "data-view=\"realtime\"",
+                "data-view=\"strategy\"",
                 "data-view=\"discovery\"",
                 "data-view=\"backtest\"",
                 "data-view=\"news\"",
+                "data-view=\"settings\"",
                 "view-realtime",
+                "view-strategy",
                 "view-discovery",
                 "view-backtest",
                 "view-news",
+                "view-settings",
                 "Binance API + WebSocket");
     }
 
@@ -65,6 +69,7 @@ class ReferenceDashboardTest {
     void accountFeaturesExposeAuthoringSchedulesManualBacktestsAndCrawlerReview() throws IOException {
         String html = resource("/static/index.html");
         String features = resource("/static/account-features.js");
+        String styles = resource("/static/styles.css");
 
         assertThat(html).contains(
                 "id=\"auth-gate\"",
@@ -81,6 +86,7 @@ class ReferenceDashboardTest {
                 "save-strategy",
                 "strategy-source-preview",
                 "schedule-list",
+                "Start automatic discovery",
                 "manual-strategy",
                 "manual-period",
                 "backtest-risk-profile",
@@ -109,6 +115,12 @@ class ReferenceDashboardTest {
                 "/build",
                 "/confirm",
                 "/api/v1/discovery-schedules",
+                "/versions",
+                "toggleScheduleVersions",
+                "openDiscoveryResult",
+                "data-schedule-versions-trigger",
+                "schedule-versions",
+                "Open result",
                 "/api/v1/experiments",
                 "/api/v1/crawler-templates",
                 "query.set(\"from\"",
@@ -117,10 +129,16 @@ class ReferenceDashboardTest {
                 "applyBacktestPeriod",
                 "applyRiskProfile",
                 "Confirm");
+        assertThat(features)
+                .doesNotContain("versions.map(v => `v${v.version} ${v.symbol} ${v.timeframe}`).join");
+        assertThat(styles).contains(
+                ".schedule-versions",
+                ".schedule-version-item",
+                ".saved-row.schedule-row");
     }
 
     @Test
-    void discoveryExposesEveryAutomaticStopCondition() throws IOException {
+    void discoveryExposesStopConditionsLeaderboardSortAndAutomaticDiscovery() throws IOException {
         String html = resource("/static/index.html");
         String lab = resource("/static/lab.js");
 
@@ -130,7 +148,12 @@ class ReferenceDashboardTest {
                 "no-improvement-iterations",
                 "leaderboard-sort",
                 "leaderboard-direction",
-                "Max drawdown");
+                "Max drawdown",
+                "Quick · 25 tests",
+                "Balanced · 125 tests",
+                "Deep · 500 tests",
+                "Automatic discovery",
+                "Keep searching in the background");
         assertThat(lab).contains(
                 "selectedStopConditions",
                 "maxDuration: maxDurationSeconds === null ? null : `PT${maxDurationSeconds}S`",

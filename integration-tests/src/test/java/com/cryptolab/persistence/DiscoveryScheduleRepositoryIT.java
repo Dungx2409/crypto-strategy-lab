@@ -95,6 +95,28 @@ class DiscoveryScheduleRepositoryIT {
         assertThat(versions.getFirst().version()).isEqualTo(2);
         assertThat(versions.getFirst().symbol()).isEqualTo("ETHUSDT");
         assertThat(versions.getFirst().timeframe()).isEqualTo(Timeframe.H4);
+        assertThat(versions.getFirst().candidateLimit()).isEqualTo(250);
+        assertThat(versions.getFirst().interval()).isEqualTo(Duration.ofHours(12));
         assertThat(versions.getLast().version()).isEqualTo(1);
+        assertThat(versions.getLast().symbol()).isEqualTo("BTCUSDT");
+    }
+
+    @Test
+    void keepsLastSearchRunIdAfterACompletedRunClearsTheActiveRun() {
+        Instant now = Instant.parse("2026-08-23T14:00:00Z");
+        UUID scheduleId = UUID.randomUUID();
+        UUID searchRunId = UUID.randomUUID();
+        repository.create(new DiscoverySchedule(
+                scheduleId, accountId, "BTCUSDT", Timeframe.H1, Duration.ofDays(30),
+                new BigDecimal("10000"), 100, Duration.ofHours(24),
+                DiscoveryScheduleStatus.ACTIVE, now, null, null, 0, null, now, now));
+        assertThat(repository.claim(scheduleId, searchRunId, now.plus(Duration.ofHours(24)), now)).isTrue();
+
+        repository.completeRun(scheduleId, now.plusSeconds(30));
+
+        DiscoverySchedule completed = repository.find(accountId, scheduleId).orElseThrow();
+        assertThat(completed.activeSearchRunId()).isNull();
+        assertThat(completed.lastSearchRunId()).isEqualTo(searchRunId);
+        assertThat(completed.completedRuns()).isEqualTo(1);
     }
 }

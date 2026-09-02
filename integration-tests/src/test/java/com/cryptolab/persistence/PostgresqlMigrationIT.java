@@ -35,7 +35,7 @@ class PostgresqlMigrationIT {
         MigrateResult result = flyway.migrate();
 
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(21);
+        assertThat(result.migrationsExecuted).isEqualTo(22);
 
         Set<String> tables = readPublicTables();
         assertThat(tables)
@@ -70,6 +70,7 @@ class PostgresqlMigrationIT {
         assertThat(hasColumn("trades", "direction")).isTrue();
         assertThat(hasColumn("trades", "exit_reason")).isTrue();
         assertThat(hasColumn("strategy_drafts", "document_json")).isTrue();
+        assertThat(hasColumn("discovery_schedules", "last_search_run_id")).isTrue();
         assertThat(primaryKeyColumns("candles"))
                 .containsExactly("provider", "symbol", "timeframe", "open_time");
     }
