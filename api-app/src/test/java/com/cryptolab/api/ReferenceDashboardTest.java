@@ -58,26 +58,47 @@ class ReferenceDashboardTest {
         String features = resource("/static/account-features.js");
 
         assertThat(html).contains(
+                "id=\"auth-gate\"",
+                "id=\"auth-gate-form\"",
+                "id=\"auth-gate-username\"",
+                "id=\"auth-gate-password\"",
+                "class=\"app-shell\" hidden",
                 "account-name",
                 "strategy-prompt",
                 "article-url",
+                "data-authoring-mode=\"article\"",
+                "Generate from URL",
                 "confirm-strategy",
                 "schedule-list",
                 "manual-strategy",
+                "manual-period",
+                "backtest-risk-profile",
+                "backtest-advanced",
                 "manual-from",
                 "manual-to",
                 "manual-history-list",
+                "manual-backtest-message",
+                "manual-backtest-progress",
                 "trade-filter-direction",
                 "crawler-template-list",
+                "Advanced HTML selectors",
+                "search-size",
+                "schedule-lookback-preset",
+                "schedule-frequency-preset",
                 "account-features.js");
         assertThat(features).contains(
                 "/api/v1/auth/",
+                "byId(\"auth-gate\").hidden = Boolean(account)",
+                "byId(\"app-shell\").hidden = !account",
                 "/api/v1/user-strategies",
                 "/api/v1/discovery-schedules",
                 "/api/v1/experiments",
                 "/api/v1/crawler-templates",
                 "query.set(\"from\"",
                 "query.set(\"to\"",
+                "setManualBacktestProgress",
+                "applyBacktestPeriod",
+                "applyRiskProfile",
                 "Confirm");
     }
 

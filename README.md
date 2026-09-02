@@ -10,6 +10,10 @@ backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
 
 ## Screenshots
 
+### Account gate
+
+![Register or login](docs/screenshots/auth-gate.png)
+
 ### Realtime market charts
 
 ![Realtime market charts](docs/screenshots/realtime-dashboard.png)
@@ -24,7 +28,9 @@ backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
 
 ## Implemented features
 
-- Session accounts with BCrypt password hashing and account-owned data.
+- A first-visit account gate that hides the dashboard until registration or
+  login succeeds. Sessions use an HTTP-only cookie and BCrypt password hashes.
+- A configurable local demo account for immediate access.
 - Four independent real-time candlestick charts for different timeframes, backed
   by Java `HttpClient` REST and WebSocket adapters for Binance or OKX.
 - Interactive canvas charts with paged earlier history, wheel zoom, drag pan,
@@ -45,8 +51,8 @@ backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
 - Manual account-owned backtests with reloadable history and exact historical
   date ranges up to 20,000 candles by default.
 - Natural-language and public article URL strategy authoring through Gemini.
-  Generated JSON can define validated `RULE` logic or compose registered
-  plugins; it cannot run arbitrary generated Java code.
+  A validated `RULE` is converted to deterministic Java source, stored with the
+  strategy, compiled, and executed. The compiler rejects edited source.
 - Strategy idea confirmation, JSON repair attempts, smoke tests, version history,
   and deletion.
 - Account-owned continuous Genetic Search schedules with start, stop, recovery,
@@ -55,7 +61,8 @@ backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
   Gemini semantic sentiment with versioned model/preprocessing metadata.
 - Versioned crawler selector templates, scheduled live-page selector checks, and
   Gemini-assisted replacement selectors that remain `NEEDS_REVIEW` until the
-  account owner confirms them.
+  account owner confirms them. Active selectors also extract, store, and analyze
+  articles from HTML pages.
 - Flyway database migrations V1 through V19.
 - A real-time load proof in which 1,000 of 1,000 sessions received all four
   timeframe topics.
@@ -63,9 +70,8 @@ backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
 ## Deliberate limits and not fully verified
 
 - Automatic runtime failover from Binance to OKX. Select one provider at startup.
-- Arbitrary generated Java source is deliberately not compiled or executed.
-  Natural-language authoring can create new executable logic through the
-  validated `RULE` DSL or compose registered plugins, without rebuilding the app.
+- Arbitrary AI source is never accepted. The application compiles only Java that
+  it generates from validated `RULE` fields and verifies before execution.
 - Each experiment uses one selected timeframe from the supported set. Strategies
   that synchronize signals from several timeframes inside one experiment are not
   implemented.
@@ -75,9 +81,10 @@ backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
 - Automated browser coverage for navigation, chart updates, and trade selection.
 - Tablet and mobile visual QA.
 
-Gemini strategy authoring, semantic sentiment, and selector repair remain disabled
-until `GEMINI_API_KEY` is set. Live CryptoCompare collection similarly needs
-`NEWS_API_KEY`; deterministic keyword sentiment does not.
+Gemini strategy authoring, semantic sentiment, and selector repair require
+`GEMINI_API_KEY`. Live CryptoCompare collection requires `NEWS_API_KEY`.
+Deterministic keyword sentiment does not require an external key. The checked-in
+example leaves both keys blank.
 
 ## Run with Docker
 
@@ -93,11 +100,15 @@ cp .env.example .env
 ```
 
 The defaults run without Gemini and without authenticated CryptoCompare news.
-Leave those keys blank, or add them to `.env`:
+The default local account is `demo` with password `crypto-demo`. Change or
+disable it in `.env` before exposing the application outside a local machine:
 
 ```dotenv
+DEFAULT_ACCOUNT_ENABLED=true
+DEFAULT_ACCOUNT_USERNAME=demo
+DEFAULT_ACCOUNT_PASSWORD=crypto-demo
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-3.7-flash
+GEMINI_MODEL=gemini-2.5-flash
 NEWS_API_KEY=
 SENTIMENT_PROVIDER=keyword
 CRAWLER_CHECK_INTERVAL=15m
@@ -131,17 +142,19 @@ docker compose up -d --build --scale worker=3
 
 ## Use the application
 
-1. Open the dashboard and register an account or sign in.
+1. Open `http://localhost:8080`. The application shows only the account form
+   until registration or login succeeds. Register a new account or sign in with
+   `demo` / `crypto-demo`.
 2. Use **Realtime** to select a market pair and inspect four independently
    updating timeframes.
 3. Use **Strategy** to create a strategy from a prompt or article URL. This step
    requires `GEMINI_API_KEY`. Confirm the proposed idea before saving its JSON.
 4. Use **Discovery** to run Random or Genetic Search, or create a repeating
-   Genetic schedule. Choose the pair, timeframe, lookback, capital, and candidate
-   limit.
-5. Use **Backtest** to select a saved strategy, date range, fee, position size,
-   Short support, and risk exits. Review metrics, trades, and chart markers after
-   the run completes.
+   Genetic schedule. Start with Quick, Balanced, or Deep. Raw limits stay under
+   Advanced search settings.
+5. Use **Backtest** to choose a strategy, period, and risk profile. Open Advanced
+   backtest settings only when you need custom dates, fees, sizing, or exits.
+   Review metrics, trades, and chart markers after the run completes.
 6. Use **News** to collect and inspect news sentiment. Live CryptoCompare data
    requires `NEWS_API_KEY`.
 7. Return to Discovery or Backtest later to reload account-owned schedules,
@@ -184,6 +197,7 @@ integration-tests    -> api-app / worker-app
 
 - [Product requirements](docs/requirements/Crypto%20Strategy%20Lab%20%E2%80%93%20%C4%90%E1%BB%93%20%C3%A1n%20cu%E1%BB%91i%20k%E1%BB%B3.md)
 - [Additional requirements](docs/requirements/new_add_requirement.txt)
+- [Architecture summary](docs/architecture/ARCHITECTURE_SUMMARY.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Requirements traceability](docs/REQUIREMENTS_TRACEABILITY.md)
 - [Architecture proof matrix](docs/architecture/PROOF_MATRIX.md)

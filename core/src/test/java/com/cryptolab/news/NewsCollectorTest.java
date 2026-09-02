@@ -70,6 +70,48 @@ class NewsCollectorTest {
     }
 
     @Test
+    void collectRecentRefetchesLookbackWindowEvenWhenStoreAlreadyHasHeadlines() {
+        InMemoryStore store = new InMemoryStore();
+        NewsItem existing = item("news-recent");
+        store.saveNewsItems(List.of(existing), NOW.minusSeconds(10));
+        store.saveSentiment(new SentimentResult(
+                existing.newsId(),
+                SentimentLabel.POSITIVE,
+                BigDecimal.ONE,
+                StubAnalyzer.MODEL,
+                existing.inputVersion(),
+                "prep-v1",
+                NOW.minusSeconds(10)));
+        CountingTelemetry telemetry = new CountingTelemetry();
+        NewsProvider provider = since -> existing.publishedAt().isAfter(since) ? List.of(existing) : List.of();
+        NewsCollector collector = collector(provider, new StubAnalyzer(), store, telemetry);
+
+        var incremental = collector.collect();
+        var recent = collector.collectRecent();
+
+        assertThat(incremental.fetched()).isZero();
+        assertThat(recent.fetched()).isOne();
+        assertThat(recent.analyzed()).isZero();
+        assertThat(recent.message()).contains("already stored and scored");
+    }
+
+    @Test
+    void analyzePendingScoresStoredArticlesWithoutSentiment() {
+        InMemoryStore store = new InMemoryStore();
+        store.saveNewsItems(List.of(item("pending-1"), item("pending-2")), NOW.minusSeconds(30));
+        CountingTelemetry telemetry = new CountingTelemetry();
+        NewsCollector collector = collector(since -> List.of(), new StubAnalyzer(), store, telemetry);
+
+        var result = collector.analyzePending(20);
+
+        assertThat(result.fetched()).isEqualTo(2);
+        assertThat(result.analyzed()).isEqualTo(2);
+        assertThat(result.inferenceFailures()).isZero();
+        assertThat(store.latest).allSatisfy(insight -> assertThat(insight.sentiment()).isPresent());
+        assertThat(telemetry.completed).hasValue(2);
+    }
+
+    @Test
     void sentimentFailureRetriesTwiceButDoesNotRollbackCollectedNews() {
         InMemoryStore store = new InMemoryStore();
         CountingTelemetry telemetry = new CountingTelemetry();
@@ -164,8 +206,12 @@ class NewsCollectorTest {
         @Override
         public int saveNewsItems(List<NewsItem> items, Instant storedAt) {
             for (NewsItem item : items) {
+                Optional<SentimentResult> previous = latest.stream()
+                        .filter(existing -> existing.item().newsId().equals(item.newsId()))
+                        .flatMap(existing -> existing.sentiment().stream())
+                        .findFirst();
                 latest.removeIf(existing -> existing.item().newsId().equals(item.newsId()));
-                latest.add(new NewsInsight(item, Optional.empty()));
+                latest.add(new NewsInsight(item, previous));
             }
             return items.size();
         }

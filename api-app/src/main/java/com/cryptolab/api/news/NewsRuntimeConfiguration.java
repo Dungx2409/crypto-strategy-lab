@@ -6,10 +6,13 @@ import com.cryptolab.infrastructure.strategy.adapter.GeminiStrategyAuthoringMode
 import com.cryptolab.infrastructure.news.adapter.cryptocompare.CryptoCompareNewsProvider;
 import com.cryptolab.news.application.NewsCollector;
 import com.cryptolab.news.application.CrawlerTemplateService;
+import com.cryptolab.news.application.CrawlerNewsCollectionService;
+import com.cryptolab.news.port.CrawlerArticleExtractor;
 import com.cryptolab.news.port.CrawlerTemplateRepository;
 import com.cryptolab.news.port.CrawlerSelectorRepairModel;
 import com.cryptolab.news.port.CrawlerPageReader;
 import com.cryptolab.news.port.CrawlerSelectorMatcher;
+import com.cryptolab.news.port.NewsFeedPreferences;
 import com.cryptolab.news.port.NewsProvider;
 import com.cryptolab.news.port.NewsStore;
 import com.cryptolab.news.port.NewsTelemetry;
@@ -25,6 +28,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 @Configuration
 class NewsRuntimeConfiguration {
@@ -40,6 +45,17 @@ class NewsRuntimeConfiguration {
                 repository, repairModel, marketDataClock, UUID::randomUUID, pageReader, matcher);
     }
 
+    @Bean
+    CrawlerNewsCollectionService crawlerNewsCollectionService(
+            CrawlerTemplateRepository repository,
+            CrawlerPageReader pageReader,
+            CrawlerArticleExtractor extractor,
+            NewsCollector collector,
+            Clock marketDataClock) {
+        return new CrawlerNewsCollectionService(
+                repository, pageReader, extractor, collector, marketDataClock);
+    }
+
     @Bean(destroyMethod = "shutdownNow")
     ExecutorService newsCollectionExecutor() {
         return Executors.newSingleThreadExecutor(runnable -> {
@@ -47,6 +63,16 @@ class NewsRuntimeConfiguration {
             thread.setDaemon(true);
             return thread;
         });
+    }
+
+    @Bean(destroyMethod = "shutdown")
+    TaskScheduler newsCollectionTaskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("news-schedule-");
+        scheduler.setDaemon(true);
+        scheduler.initialize();
+        return scheduler;
     }
 
     @Bean
@@ -81,7 +107,7 @@ class NewsRuntimeConfiguration {
             GeminiStrategyAuthoringModel gemini,
             ObjectMapper objectMapper,
             Clock marketDataClock,
-            @Value("${crypto.ai.gemini.model:gemini-3.7-flash}") String model) {
+            @Value("${crypto.ai.gemini.model:gemini-2.5-flash}") String model) {
         return new GeminiSentimentAnalyzer(gemini, objectMapper, marketDataClock, model);
     }
 
@@ -91,6 +117,7 @@ class NewsRuntimeConfiguration {
             SentimentAnalyzer analyzer,
             NewsStore store,
             NewsTelemetry telemetry,
+            NewsFeedPreferences preferences,
             Clock marketDataClock,
             @Value("${crypto.news.initial-lookback:24h}") Duration initialLookback,
             @Value("${crypto.sentiment.max-attempts:2}") int maximumInferenceAttempts) {
@@ -99,6 +126,7 @@ class NewsRuntimeConfiguration {
                 analyzer,
                 store,
                 telemetry,
+                preferences,
                 marketDataClock,
                 initialLookback,
                 maximumInferenceAttempts);

@@ -275,10 +275,23 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
             return Map.of();
         }
         Set<UUID> expected = Set.copyOf(candidateIds);
-        long deadline = System.nanoTime() + 120_000_000_000L;
+        BigDecimal lowestFitness = BigDecimal.valueOf(-1_000_000);
+        // Duplicate genomes are skipped by UNIQUE(search_run_id, candidate_hash) and never get jobs.
+        // Wait only on persisted candidates (AD-23); treat skipped IDs as lowest fitness.
+        long deadline = System.nanoTime() + 300_000_000_000L;
         while (System.nanoTime() < deadline) {
             Map<UUID, BigDecimal> fitness = new HashMap<>();
             Set<UUID> terminal = new HashSet<>();
+            Set<UUID> persistedIds = new HashSet<>(jdbcTemplate.query(
+                    "SELECT id FROM candidates WHERE search_run_id = ?",
+                    (resultSet, rowNumber) -> resultSet.getObject("id", UUID.class),
+                    searchRunId));
+            for (UUID candidateId : expected) {
+                if (!persistedIds.contains(candidateId)) {
+                    fitness.put(candidateId, lowestFitness);
+                    terminal.add(candidateId);
+                }
+            }
             List<FitnessRow> rows = jdbcTemplate.query(
                     """
                     SELECT candidate.id AS candidate_id, job.status, metrics.score
@@ -303,7 +316,7 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                     fitness.put(row.candidateId(), row.score());
                     terminal.add(row.candidateId());
                 } else if ("FAILED".equals(row.status()) || "CANCELLED".equals(row.status())) {
-                    fitness.put(row.candidateId(), BigDecimal.valueOf(-1_000_000));
+                    fitness.put(row.candidateId(), lowestFitness);
                     terminal.add(row.candidateId());
                 }
             }
@@ -315,6 +328,9 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                     Boolean.class,
                     searchRunId);
             if (Boolean.TRUE.equals(cancelled)) {
+                for (UUID candidateId : expected) {
+                    fitness.putIfAbsent(candidateId, lowestFitness);
+                }
                 return Map.copyOf(fitness);
             }
             try {

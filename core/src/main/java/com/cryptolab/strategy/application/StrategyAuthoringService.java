@@ -9,6 +9,7 @@ import com.cryptolab.strategy.domain.StrategyDraft;
 import com.cryptolab.strategy.domain.StrategyDraftStatus;
 import com.cryptolab.strategy.domain.UserStrategy;
 import com.cryptolab.strategy.domain.UserStrategyDocument;
+import com.cryptolab.strategy.domain.extension.GeneratedRuleJavaSource;
 import com.cryptolab.strategy.port.StrategyAuthoringModel;
 import com.cryptolab.strategy.port.ArticleSourceReader;
 import com.cryptolab.strategy.port.StrategyDocumentDecoder;
@@ -96,7 +97,7 @@ public final class StrategyAuthoringService {
             try {
                 previous = model.generateJson(
                         draft.prompt(), draft.idea(), registry.availableStrategies(), previous, error);
-                UserStrategyDocument document = decoder.decode(previous);
+                UserStrategyDocument document = withGeneratedJava(decoder.decode(previous));
                 smokeTest(document);
                 UserStrategy saved = repository.saveVersion(
                         ids.get(), accountId, document, draft.prompt(), clock.instant());
@@ -132,6 +133,13 @@ public final class StrategyAuthoringService {
         var context = smokeContext();
         document.strategies().forEach(definition -> registry.create(definition).analyze(context));
         policyResolver.resolve(document.combinationPolicy());
+    }
+
+    private static UserStrategyDocument withGeneratedJava(UserStrategyDocument document) {
+        return new UserStrategyDocument(
+                document.name(), document.description(),
+                document.strategies().stream().map(GeneratedRuleJavaSource::enrich).toList(),
+                document.combinationPolicy());
     }
 
     private static StrategyContext smokeContext() {

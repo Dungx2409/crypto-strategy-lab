@@ -35,3 +35,6 @@ Thumbs.db
 *.log
 logs/
 data/
+
+.playwright-mcp/
+.tokensave

@@ -28,12 +28,29 @@ function suggestedValues(name, schema) {
     return second === value ? String(value) : `${value}, ${second}`;
 }
 
+const strategyIcons = {
+    MA: "〰",
+    RSI: "∿",
+    BB: "▤",
+    SR: "⌂",
+    MACD: "↗",
+    RULE: "☰",
+    NEWS_SENTIMENT: "◉",
+    SENTIMENT: "◉"
+};
+
+function strategyIcon(type) {
+    const key = String(type || "").toUpperCase();
+    return strategyIcons[key] || "⌘";
+}
+
 function renderStrategies() {
     const host = byId("strategy-list"); host.replaceChildren();
     labState.catalog.forEach(plugin => {
         const card = document.createElement("article"); card.className = "strategy-card"; card.dataset.type = plugin.type; card.dataset.version = plugin.version;
         const header = document.createElement("header"); const label = document.createElement("label"); const check = document.createElement("input"); check.type = "checkbox"; check.checked = true; check.className = "strategy-enabled";
-        label.append(check, document.createTextNode(` ${plugin.type}`)); const version = document.createElement("span"); version.className = "muted"; version.textContent = plugin.version; header.append(label, version); card.append(header);
+        const icon = document.createElement("span"); icon.className = "strategy-type-icon"; icon.setAttribute("aria-hidden", "true"); icon.textContent = strategyIcon(plugin.type);
+        label.append(check, icon, document.createTextNode(` ${plugin.type}`)); const version = document.createElement("span"); version.className = "muted"; version.textContent = plugin.version; header.append(label, version); card.append(header);
         const grid = document.createElement("div"); grid.className = "parameter-grid";
         Object.entries(plugin.parameterSchema).forEach(([name, schema]) => { const field = document.createElement("label"); field.textContent = name; const input = document.createElement("input"); input.dataset.parameter = name; input.dataset.parameterType = schema.type; input.value = suggestedValues(name, schema); field.append(input); grid.append(field); });
         const weightField = document.createElement("label");
@@ -48,7 +65,12 @@ function renderStrategies() {
         weight.className = "strategy-weight";
         weightField.append(weight);
         check.addEventListener("change", renderSelectedStrategyChips);
-        card.append(grid, weightField); host.append(card);
+        const advanced = document.createElement("details");
+        advanced.className = "strategy-advanced";
+        const summary = document.createElement("summary");
+        summary.textContent = "Fine tune";
+        advanced.append(summary, grid, weightField);
+        card.append(advanced); host.append(card);
     });
     renderSelectedStrategyChips();
 }
@@ -60,7 +82,11 @@ function renderSelectedStrategyChips() {
         if (!card.querySelector(".strategy-enabled").checked) return;
         const chip = document.createElement("span");
         chip.className = "chip";
-        chip.textContent = card.dataset.type;
+        const icon = document.createElement("span");
+        icon.className = "icon";
+        icon.setAttribute("aria-hidden", "true");
+        icon.textContent = strategyIcon(card.dataset.type);
+        chip.append(icon, document.createTextNode(card.dataset.type));
         host.append(chip);
     });
 }
@@ -98,16 +124,25 @@ async function materializeDataset() {
 }
 
 async function startSearch() {
-    byId("start-search").disabled = true; byId("search-message").textContent = "Materializing immutable market dataset…";
+    byId("start-search").disabled = true;
+    byId("search-message").textContent = "Materializing immutable market dataset…";
+    byId("search-status").textContent = "STARTING";
+    byId("search-status").className = "status status-degraded";
     try {
-        const dataset = await materializeDataset(); const config = selectedSearchConfiguration();
+        const dataset = await materializeDataset();
+        byId("search-message").textContent = "Submitting discovery run…";
+        const config = selectedSearchConfiguration();
         const optionalNumber = id => byId(id).value === "" ? null : Number(byId(id).value);
         const executionConfig = { initialCapital: Number(byId("initial-capital").value), feeRate: Number(byId("fee-rate").value), allowShort: byId("allow-short").checked, fillPolicy: labState.capabilities.fillPolicy, engineVersion: labState.capabilities.engineVersion, positionSizePct: Number(byId("position-size-pct").value), stopLossPct: optionalNumber("stop-loss-pct"), takeProfitPct: optionalNumber("take-profit-pct"), trailingStopPct: optionalNumber("trailing-stop-pct") };
+        const generator = byId("generator").value;
         const request = { symbol: dataset.symbol, timeframe: dataset.timeframe, from: dataset.from, to: dataset.to, datasetVersion: dataset.datasetVersion, datasetChecksum: dataset.checksum, ...config, randomSeed: Number(byId("random-seed").value), stopConditions: { maxCandidates: Number(byId("max-candidates").value), maxDuration: null, noImprovementIterations: null }, batchSize: Number(byId("batch-size").value), executionConfig };
-        const run = await api(`/api/v1/search-runs?generator=${encodeURIComponent(byId("generator").value)}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(request) });
-        labState.searchRunId = run.searchRunId; labState.searchStartedAt = Date.now(); byId("cancel-search").disabled = false; byId("search-message").textContent = `Search ${run.searchRunId}`;
+        const run = await api(`/api/v1/search-runs?generator=${encodeURIComponent(generator)}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(request) });
+        labState.searchRunId = run.searchRunId; labState.searchStartedAt = Date.now(); byId("cancel-search").disabled = false;
+        byId("search-message").textContent = generator === "genetic"
+            ? `Search ${run.searchRunId} · genetic generations wait for worker fitness between rounds`
+            : `Search ${run.searchRunId}`;
         subscribeProofTopics(run.searchRunId); renderSearch(run); beginPolling();
-    } catch (error) { byId("search-message").textContent = error.message; byId("start-search").disabled = false; }
+    } catch (error) { byId("search-message").textContent = error.message; byId("start-search").disabled = false; byId("search-status").textContent = "FAILED"; byId("search-status").className = "status status-offline"; }
 }
 
 async function cancelSearch() { if (!labState.searchRunId) return; try { renderSearch(await api(`/api/v1/search-runs/${labState.searchRunId}/cancel`, {method:"POST"})); } catch (error) { byId("search-message").textContent = error.message; } }
@@ -154,5 +189,17 @@ function handleProofFrame(frame) { if (frame.startsWith("CONNECTED")) { labState
 function sendProofSubscription(destination) { if (!labState.connected) return; const id=`proof-${[...labState.subscriptions.keys()].indexOf(destination)}`; labState.socket.send(`SUBSCRIBE\nid:${id}\ndestination:${destination}\nack:auto\n\n\u0000`); }
 function subscribeProofTopics(searchRunId) { const search=`/topic/search/${searchRunId}`, leaderboard=`/topic/leaderboard/${searchRunId}`; labState.subscriptions.set(search, renderSearch); labState.subscriptions.set(leaderboard, loadLeaderboard); sendProofSubscription(search); sendProofSubscription(leaderboard); }
 
-byId("start-search").addEventListener("click", startSearch); byId("cancel-search").addEventListener("click", cancelSearch); byId("combination-policy").addEventListener("change", event => byId("policy-threshold").disabled = event.target.value !== "WEIGHTED"); byId("policy-threshold").disabled = true;
+byId("start-search").addEventListener("click", startSearch); byId("cancel-search").addEventListener("click", cancelSearch);
+byId("search-size").addEventListener("change", event => {
+    const candidates = Number(event.target.value);
+    byId("max-candidates").value = candidates;
+    byId("batch-size").value = Math.min(50, Math.max(10, Math.ceil(candidates / 5)));
+});
+byId("max-candidates").addEventListener("input", () => { byId("search-size").value = ""; });
+byId("combination-policy").addEventListener("change", event => {
+    const weighted = event.target.value === "WEIGHTED";
+    byId("policy-threshold").disabled = !weighted;
+    byId("policy-threshold-field").hidden = !weighted;
+});
+byId("policy-threshold").disabled = true;
 loadCapabilities().catch(error => byId("search-message").textContent = error.message); refreshSystemStatus(); setInterval(refreshSystemStatus,5000); connectProofSocket();

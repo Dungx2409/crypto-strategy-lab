@@ -2,10 +2,13 @@ package com.cryptolab.api.news;
 
 import com.cryptolab.api.account.AuthenticatedAccount;
 import com.cryptolab.news.application.CrawlerTemplateService;
+import com.cryptolab.news.application.CrawlerNewsCollectionService;
+import com.cryptolab.news.domain.NewsCollectionResult;
 import com.cryptolab.news.domain.CrawlerTemplateVersion;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,9 +22,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/crawler-templates")
 public final class CrawlerTemplateController {
     private final CrawlerTemplateService service;
+    private final CrawlerNewsCollectionService collections;
 
-    public CrawlerTemplateController(CrawlerTemplateService service) {
+    @Autowired
+    public CrawlerTemplateController(
+            CrawlerTemplateService service, CrawlerNewsCollectionService collections) {
         this.service = service;
+        this.collections = collections;
+    }
+
+    CrawlerTemplateController(CrawlerTemplateService service) {
+        this(service, null);
     }
 
     @PostMapping
@@ -57,6 +68,11 @@ public final class CrawlerTemplateController {
     @PostMapping("/{templateId}/check")
     CrawlerTemplateVersion check(@PathVariable UUID templateId, HttpServletRequest request) {
         return service.check(account(request).id(), templateId);
+    }
+
+    @PostMapping("/{templateId}/collect")
+    NewsCollectionResult collect(@PathVariable UUID templateId, HttpServletRequest request) {
+        return collections.collect(account(request).id(), templateId);
     }
 
     private static AuthenticatedAccount account(HttpServletRequest request) {

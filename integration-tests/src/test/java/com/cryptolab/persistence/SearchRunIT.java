@@ -141,6 +141,43 @@ class SearchRunIT {
     }
 
     @Test
+    void awaitCandidateFitnessTreatsUnpersistedDuplicatesAsLowestScore() {
+        UUID runId = UUID.fromString("50000000-0000-0000-0000-000000000010");
+        UUID missingDuplicateId = UUID.fromString("50000000-0000-0000-0000-000000000099");
+        SearchCoordinator coordinator = coordinator(repository);
+
+        coordinator.start(command(runId, 1L, 1));
+        UUID persistedId = jdbc.queryForObject(
+                "SELECT id FROM candidates WHERE search_run_id = ?", UUID.class, runId);
+        UUID experimentId = jdbc.queryForObject(
+                "SELECT id FROM experiments WHERE search_run_id = ?", UUID.class, runId);
+        jdbc.update(
+                """
+                UPDATE backtest_jobs
+                SET status = 'COMPLETED', completed_at = ?
+                WHERE experiment_id = ?
+                """,
+                java.time.OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC),
+                experimentId);
+        jdbc.update(
+                """
+                INSERT INTO evaluation_metrics (
+                    experiment_id, total_return_pct, max_drawdown_pct, total_trades, score, win_rate_pct, metrics_json
+                ) VALUES (?, 12.5, 3.0, 4, 12.5, 50.0, CAST(? AS jsonb))
+                """,
+                experimentId,
+                "{\"source\":\"search-run-it\"}");
+
+        long startedAt = System.nanoTime();
+        Map<UUID, BigDecimal> fitness = repository.awaitCandidateFitness(
+                runId, List.of(persistedId, missingDuplicateId));
+
+        assertThat(System.nanoTime() - startedAt).isLessThan(TimeUnit.SECONDS.toNanos(2));
+        assertThat(fitness.get(persistedId)).isEqualByComparingTo("12.5");
+        assertThat(fitness.get(missingDuplicateId)).isEqualByComparingTo("-1000000");
+    }
+
+    @Test
     void concurrentCancellationStopsAtTheNextPersistedBatchBoundary() throws Exception {
         BlockingRepository blocking = new BlockingRepository(repository);
         SearchCoordinator coordinator = coordinator(blocking);
@@ -306,6 +343,11 @@ class SearchRunIT {
         @Override
         public void recordEvaluation(UUID searchRunId, BigDecimal score) {
             delegate.recordEvaluation(searchRunId, score);
+        }
+
+        @Override
+        public Map<UUID, BigDecimal> awaitCandidateFitness(UUID searchRunId, List<UUID> candidateIds) {
+            return delegate.awaitCandidateFitness(searchRunId, candidateIds);
         }
 
         @Override
