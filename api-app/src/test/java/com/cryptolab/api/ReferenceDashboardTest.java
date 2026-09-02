@@ -127,11 +127,18 @@ class ReferenceDashboardTest {
         assertThat(html).contains(
                 "max-candidates",
                 "max-duration-seconds",
-                "no-improvement-iterations");
+                "no-improvement-iterations",
+                "leaderboard-sort",
+                "leaderboard-direction",
+                "Max drawdown");
         assertThat(lab).contains(
                 "selectedStopConditions",
                 "maxDuration: maxDurationSeconds === null ? null : `PT${maxDurationSeconds}S`",
-                "Configure at least one automatic stop condition");
+                "Configure at least one automatic stop condition",
+                "weight-value",
+                "toFixed(1)",
+                "sort: byId(\"leaderboard-sort\").value",
+                "direction: byId(\"leaderboard-direction\").value");
     }
 
     private static String resource(String path) throws IOException {

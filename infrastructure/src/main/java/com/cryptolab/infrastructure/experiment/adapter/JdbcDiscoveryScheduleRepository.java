@@ -33,13 +33,13 @@ public class JdbcDiscoveryScheduleRepository implements DiscoveryScheduleReposit
         jdbcTemplate.update("""
                 INSERT INTO discovery_schedules (
                     id, account_id, symbol, timeframe, lookback_seconds, initial_capital,
-                    candidate_limit, interval_seconds, status, next_run_at, active_search_run_id,
-                    completed_runs, last_error, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                candidate_limit, interval_seconds, status, next_run_at, active_search_run_id,
+                last_search_run_id, completed_runs, last_error, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, schedule.id(), schedule.accountId(), schedule.symbol(), schedule.timeframe().exchangeCode(),
                 schedule.lookback().toSeconds(), schedule.initialCapital(), schedule.candidateLimit(),
-                schedule.interval().toSeconds(), schedule.status().name(), utc(schedule.nextRunAt()),
-                schedule.activeSearchRunId(), schedule.completedRuns(), schedule.lastError(),
+            schedule.interval().toSeconds(), schedule.status().name(), utc(schedule.nextRunAt()),
+            schedule.activeSearchRunId(), schedule.lastSearchRunId(), schedule.completedRuns(), schedule.lastError(),
                 utc(schedule.createdAt()), utc(schedule.updatedAt()));
         insertVersion(schedule.id(), 1, schedule.symbol(), schedule.timeframe(), schedule.lookback(),
                 schedule.initialCapital(), schedule.candidateLimit(), schedule.interval(), schedule.createdAt());
@@ -80,9 +80,9 @@ public class JdbcDiscoveryScheduleRepository implements DiscoveryScheduleReposit
     public boolean claim(UUID scheduleId, UUID searchRunId, Instant nextRunAt, Instant updatedAt) {
         return jdbcTemplate.update("""
                 UPDATE discovery_schedules
-                SET active_search_run_id = ?, next_run_at = ?, last_error = NULL, updated_at = ?
+            SET active_search_run_id = ?, last_search_run_id = ?, next_run_at = ?, last_error = NULL, updated_at = ?
                 WHERE id = ? AND status = 'ACTIVE' AND active_search_run_id IS NULL AND next_run_at <= ?
-                """, searchRunId, utc(nextRunAt), utc(updatedAt), scheduleId, utc(updatedAt)) == 1;
+            """, searchRunId, searchRunId, utc(nextRunAt), utc(updatedAt), scheduleId, utc(updatedAt)) == 1;
     }
 
     @Override
@@ -185,8 +185,9 @@ public class JdbcDiscoveryScheduleRepository implements DiscoveryScheduleReposit
                 Duration.ofSeconds(rs.getLong("lookback_seconds")), rs.getBigDecimal("initial_capital"),
                 rs.getLong("candidate_limit"), Duration.ofSeconds(rs.getLong("interval_seconds")),
                 DiscoveryScheduleStatus.valueOf(rs.getString("status")), instant(rs, "next_run_at"),
-                rs.getObject("active_search_run_id", UUID.class), rs.getLong("completed_runs"),
-                rs.getString("last_error"), instant(rs, "created_at"), instant(rs, "updated_at"));
+                rs.getObject("active_search_run_id", UUID.class), rs.getObject("last_search_run_id", UUID.class),
+                rs.getLong("completed_runs"), rs.getString("last_error"),
+                instant(rs, "created_at"), instant(rs, "updated_at"));
     }
 
     private void insertVersion(

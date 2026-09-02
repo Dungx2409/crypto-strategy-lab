@@ -59,12 +59,14 @@ class DiscoveryScheduleRepositoryIT {
         repository.create(new DiscoverySchedule(
                 scheduleId, accountId, "BTCUSDT", Timeframe.H1, Duration.ofDays(30),
                 new BigDecimal("10000"), 100, Duration.ofHours(24),
-                DiscoveryScheduleStatus.ACTIVE, now, null, 0, null, now, now));
+                DiscoveryScheduleStatus.ACTIVE, now, null, null, 0, null, now, now));
 
         assertThat(repository.findDue(now, 10)).extracting(DiscoverySchedule::id).contains(scheduleId);
         assertThat(repository.claim(scheduleId, searchRunId, now.plus(Duration.ofHours(24)), now)).isTrue();
         assertThat(repository.claim(scheduleId, UUID.randomUUID(), now.plus(Duration.ofHours(24)), now)).isFalse();
         assertThat(repository.find(accountId, scheduleId).orElseThrow().activeSearchRunId())
+                .isEqualTo(searchRunId);
+        assertThat(repository.find(accountId, scheduleId).orElseThrow().lastSearchRunId())
                 .isEqualTo(searchRunId);
 
         repository.recoverInterrupted(now.plusSeconds(60));
@@ -82,7 +84,7 @@ class DiscoveryScheduleRepositoryIT {
         repository.create(new DiscoverySchedule(
                 scheduleId, accountId, "BTCUSDT", Timeframe.H1, Duration.ofDays(30),
                 new BigDecimal("10000"), 100, Duration.ofHours(24),
-                DiscoveryScheduleStatus.ACTIVE, now, null, 0, null, now, now));
+                DiscoveryScheduleStatus.ACTIVE, now, null, null, 0, null, now, now));
 
         repository.updateConfiguration(
                 accountId, scheduleId, "ETHUSDT", Timeframe.H4, Duration.ofDays(90),

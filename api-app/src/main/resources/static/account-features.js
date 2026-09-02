@@ -160,7 +160,171 @@ async function saveSchedule() {
     } catch(error){byId("schedule-message").textContent=error.message;}
 }
 async function loadSchedules(){renderSchedules(await api("/api/v1/discovery-schedules"));}
-function renderSchedules(items){const host=byId("schedule-list");host.replaceChildren();if(!items.length){host.textContent=accountFeatureState.account?"◷ No schedules.":"⇢ Sign in to manage schedules.";return;}items.forEach(item=>{const row=document.createElement("article");row.className="saved-row";const text=document.createElement("div");text.innerHTML="<strong></strong><small></small>";text.querySelector("strong").textContent=`◷ ${item.symbol} ${item.timeframe} · ${item.status}`;text.querySelector("small").textContent=`Runs ${item.completedRuns} · next ${new Date(item.nextRunAt).toLocaleString()}${item.lastError?` · ${item.lastError}`:""}`;const actions=document.createElement("div");actions.className="button-row";actions.append(featureButton(item.status==="ACTIVE"?"Stop":"Start",async()=>{await api(`/api/v1/discovery-schedules/${item.id}/${item.status==="ACTIVE"?"stop":"start"}`,{method:"POST"});await loadSchedules();},true,item.status==="ACTIVE"?"■":"▶"),featureButton("Edit",()=>{accountFeatureState.editingScheduleId=item.id;byId("schedule-symbol").value=item.symbol;byId("schedule-timeframe").value=item.timeframe;byId("schedule-lookback").value=Math.round(Number(item.lookback)/86400)||365;byId("schedule-capital").value=item.initialCapital;byId("schedule-candidates").value=item.candidateLimit;byId("schedule-interval").value=Math.round(Number(item.interval)/3600)||24;byId("schedule-lookback-preset").value=byId("schedule-lookback").value;byId("schedule-frequency-preset").value=byId("schedule-interval").value;byId("schedule-lookback").closest("details").open=true;byId("create-schedule").textContent="Save changes";},true,"✎"),featureButton("Versions",async()=>{const versions=await api(`/api/v1/discovery-schedules/${item.id}/versions`);byId("schedule-message").textContent=versions.map(v=>`v${v.version} ${v.symbol} ${v.timeframe}`).join(" · ");},true,"☰"));row.append(text,actions);host.append(row);});}
+async function openDiscoveryResult(searchRunId) {
+    if (!searchRunId) return;
+    labState.searchRunId = searchRunId;
+    const run = await api(`/api/v1/search-runs/${searchRunId}`);
+    if (typeof renderSearch === "function") renderSearch(run);
+    await loadLeaderboard();
+    if (typeof showView === "function") showView("discovery");
+    byId("schedule-message").textContent = `Showing discovery result ${searchRunId.slice(0, 8)}.`;
+}
+const TIMEFRAME_LABELS = {M1:"1m",M5:"5m",M15:"15m",M30:"30m",H1:"1h",H2:"2h",H4:"4h",D1:"1d"};
+
+function timeframeLabel(value) {
+    return TIMEFRAME_LABELS[value] || value || "-";
+}
+
+function durationToSeconds(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return NaN;
+    const match = value.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/);
+    if (!match) {
+        const seconds = Number(value);
+        return Number.isFinite(seconds) ? seconds : NaN;
+    }
+    return Number(match[1] || 0) * 86400
+        + Number(match[2] || 0) * 3600
+        + Number(match[3] || 0) * 60
+        + Number(match[4] || 0);
+}
+
+function scheduleDurationDays(value) {
+    const seconds = durationToSeconds(value);
+    if (!Number.isFinite(seconds) || seconds <= 0) return "-";
+    return `${Math.max(1, Math.round(seconds / 86400))}d`;
+}
+
+function scheduleDurationHours(value) {
+    const seconds = durationToSeconds(value);
+    if (!Number.isFinite(seconds) || seconds <= 0) return "-";
+    return `${Math.max(1, Math.round(seconds / 3600))}h`;
+}
+
+function closeScheduleVersionMenus(except) {
+    document.querySelectorAll(".schedule-versions").forEach(panel => {
+        if (except && panel === except) return;
+        panel.hidden = true;
+        const trigger = panel.closest(".saved-row")?.querySelector("[data-schedule-versions-trigger]");
+        if (trigger) trigger.setAttribute("aria-expanded", "false");
+    });
+}
+
+function renderScheduleVersions(panel, versions) {
+    panel.replaceChildren();
+    if (!versions.length) {
+        const empty = document.createElement("p");
+        empty.className = "schedule-versions-empty";
+        empty.textContent = "No saved versions yet.";
+        panel.append(empty);
+        return;
+    }
+    const list = document.createElement("ul");
+    list.className = "schedule-versions-list";
+    versions.forEach(version => {
+        const item = document.createElement("li");
+        item.className = "schedule-version-item";
+        const title = document.createElement("strong");
+        title.textContent = `v${version.version} · ${version.symbol} ${timeframeLabel(version.timeframe)}`;
+        const detail = document.createElement("small");
+        detail.textContent = [
+            `History ${scheduleDurationDays(version.lookback)}`,
+            `Every ${scheduleDurationHours(version.interval)}`,
+            `Capital ${version.initialCapital}`,
+            `Tests ${version.candidateLimit}`,
+            `Saved ${new Date(version.createdAt).toLocaleString()}`
+        ].join(" · ");
+        item.append(title, detail);
+        list.append(item);
+    });
+    panel.append(list);
+}
+
+async function toggleScheduleVersions(scheduleId, trigger, panel) {
+    const opening = panel.hidden;
+    closeScheduleVersionMenus(panel);
+    if (!opening) {
+        panel.hidden = true;
+        trigger.setAttribute("aria-expanded", "false");
+        return;
+    }
+    panel.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+    panel.replaceChildren();
+    const loading = document.createElement("p");
+    loading.className = "schedule-versions-empty";
+    loading.textContent = "Loading versions…";
+    panel.append(loading);
+    try {
+        renderScheduleVersions(panel, await api(`/api/v1/discovery-schedules/${scheduleId}/versions`));
+    } catch (error) {
+        panel.replaceChildren();
+        const failed = document.createElement("p");
+        failed.className = "schedule-versions-empty";
+        failed.textContent = error.message;
+        panel.append(failed);
+    }
+}
+
+function renderSchedules(items) {
+    const host = byId("schedule-list");
+    host.replaceChildren();
+    if (!items.length) {
+        host.textContent = accountFeatureState.account ? "◷ No schedules." : "⇢ Sign in to manage schedules.";
+        return;
+    }
+    items.forEach(item => {
+        const row = document.createElement("article");
+        row.className = "saved-row schedule-row";
+        const main = document.createElement("div");
+        main.className = "saved-row-main";
+        const text = document.createElement("div");
+        text.innerHTML = "<strong></strong><small></small>";
+        text.querySelector("strong").textContent = `◷ ${item.symbol} ${item.timeframe} · ${item.status}`;
+        const result = item.lastSearchRunId ? ` · result ${item.lastSearchRunId.slice(0, 8)}` : "";
+        const active = item.activeSearchRunId ? ` · running ${item.activeSearchRunId.slice(0, 8)}` : "";
+        text.querySelector("small").textContent = `Runs ${item.completedRuns}${result}${active} · next ${new Date(item.nextRunAt).toLocaleString()}${item.lastError ? ` · ${item.lastError}` : ""}`;
+        const actions = document.createElement("div");
+        actions.className = "button-row";
+        const versionsPanel = document.createElement("div");
+        versionsPanel.className = "schedule-versions";
+        versionsPanel.hidden = true;
+        versionsPanel.id = `schedule-versions-${item.id}`;
+        if (item.lastSearchRunId || item.activeSearchRunId) {
+            actions.append(featureButton("Open result", () => openDiscoveryResult(item.lastSearchRunId || item.activeSearchRunId), true, "♜"));
+        }
+        const versionsButton = featureButton("Versions", event => {
+            event.stopPropagation();
+            return toggleScheduleVersions(item.id, versionsButton, versionsPanel);
+        }, true, "☰");
+        versionsButton.dataset.scheduleVersionsTrigger = "true";
+        versionsButton.setAttribute("aria-expanded", "false");
+        versionsButton.setAttribute("aria-controls", versionsPanel.id);
+        actions.append(
+            featureButton(item.status === "ACTIVE" ? "Stop" : "Start", async () => {
+                await api(`/api/v1/discovery-schedules/${item.id}/${item.status === "ACTIVE" ? "stop" : "start"}`, {method: "POST"});
+                await loadSchedules();
+            }, true, item.status === "ACTIVE" ? "■" : "▶"),
+            featureButton("Edit", () => {
+                accountFeatureState.editingScheduleId = item.id;
+                byId("schedule-symbol").value = item.symbol;
+                byId("schedule-timeframe").value = item.timeframe;
+                byId("schedule-lookback").value = Math.round(Number(item.lookback) / 86400) || 365;
+                byId("schedule-capital").value = item.initialCapital;
+                byId("schedule-candidates").value = item.candidateLimit;
+                byId("schedule-interval").value = Math.round(Number(item.interval) / 3600) || 24;
+                byId("schedule-lookback-preset").value = byId("schedule-lookback").value;
+                byId("schedule-frequency-preset").value = byId("schedule-interval").value;
+                byId("schedule-lookback").closest("details").open = true;
+                byId("create-schedule").textContent = "Save changes";
+            }, true, "✎"),
+            versionsButton
+        );
+        main.append(text, actions);
+        row.append(main, versionsPanel);
+        host.append(row);
+    });
+}
 
 function localDateTime(date) {
     return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
@@ -290,7 +454,37 @@ async function runManualBacktest() {
     }
 }
 async function loadManualHistory(){const items=await api("/api/v1/experiments/mine");byId("manual-history-count").textContent=`${items.length} saved manual runs`;renderManualHistory(items);}
-function renderManualHistory(items){const host=byId("manual-history-list");host.replaceChildren();if(!items.length){host.textContent=accountFeatureState.account?"▥ No saved manual runs.":"⇢ Sign in to load saved runs.";return;}items.forEach(item=>{const row=document.createElement("article");row.className="saved-row";const text=document.createElement("div");text.innerHTML="<strong></strong><small></small>";text.querySelector("strong").textContent=`▥ ${item.dataset.symbol} ${item.dataset.timeframe} · ${item.status}`;text.querySelector("small").textContent=item.metrics?`Return ${item.metrics.totalReturnPct}% · Win ${item.metrics.winRatePct}% · ${item.metrics.totalTrades} trades`:"Result is not complete";row.append(text,featureButton("Load result",()=>loadExperiment(item.experimentId),true,"⇢"));host.append(row);});}
+function shortDate(value) {
+    return value ? new Date(value).toLocaleString() : "not finished";
+}
+function strategyLabel(item) {
+    const names = item.strategies?.map(strategy => strategy.type).join(" + ");
+    return names || "strategy";
+}
+function renderManualHistory(items) {
+    const host = byId("manual-history-list");
+    host.replaceChildren();
+    if (!items.length) {
+        host.textContent = accountFeatureState.account ? "▥ No saved manual runs." : "⇢ Sign in to load saved runs.";
+        return;
+    }
+    items.forEach(item => {
+        const row = document.createElement("article");
+        row.className = "saved-row";
+        const text = document.createElement("div");
+        text.innerHTML = "<strong></strong><small></small>";
+        const started = shortDate(item.startedAt);
+        const range = `${shortDate(item.dataset.from)} → ${shortDate(item.dataset.to)}`;
+        const capital = Number(item.executionConfig?.initialCapital ?? 0).toLocaleString();
+        text.querySelector("strong").textContent =
+            `▥ ${item.dataset.symbol} ${item.dataset.timeframe} · ${strategyLabel(item)} · ${started}`;
+        text.querySelector("small").textContent = item.metrics
+            ? `Return ${item.metrics.totalReturnPct}% · Win ${item.metrics.winRatePct}% · Drawdown ${item.metrics.maxDrawdownPct}% · ${item.metrics.totalTrades} trades · $${capital} · ${range} · ${item.experimentId.slice(0, 8)}`
+            : `Result is not complete · $${capital} · ${range} · ${item.experimentId.slice(0, 8)}`;
+        row.append(text, featureButton("Load result", () => loadExperiment(item.experimentId), true, "⇢"));
+        host.append(row);
+    });
+}
 function applyTradeFilters(){const details=window.cryptoLabCurrentExperiment;if(!details)return;const minimum=byId("trade-filter-pnl").value===""?-Infinity:Number(byId("trade-filter-pnl").value),direction=byId("trade-filter-direction").value,reason=byId("trade-filter-reason").value;window.cryptoLabBacktest.render({...details,trades:(details.trades||[]).filter(trade=>Number(trade.pnl)>=minimum&&(!direction||trade.direction===direction)&&(!reason||trade.exitReason===reason))});}
 
 async function loadCrawlerTemplates(){renderCrawlerTemplates(await api("/api/v1/crawler-templates"));}
@@ -309,6 +503,10 @@ byId("confirm-strategy").addEventListener("click", confirmStrategy);
 byId("save-strategy").addEventListener("click", saveStrategy);
 setAuthoringMode(byId("authoring-source").value || "prompt");
 byId("create-schedule").addEventListener("click",saveSchedule);byId("run-manual-backtest").addEventListener("click",runManualBacktest);byId("apply-trade-filters").addEventListener("click",applyTradeFilters);byId("create-crawler-template").addEventListener("click",createCrawlerTemplate);
+document.addEventListener("click", event => {
+    if (event.target.closest(".schedule-row")) return;
+    closeScheduleVersionMenus();
+});
 byId("schedule-lookback-preset").addEventListener("change",applySchedulePresets);byId("schedule-frequency-preset").addEventListener("change",applySchedulePresets);
 byId("manual-period").addEventListener("change",applyBacktestPeriod);byId("backtest-risk-profile").addEventListener("change",applyRiskProfile);
 ["schedule-lookback","schedule-interval"].forEach(id=>byId(id).addEventListener("input",()=>{byId(id==="schedule-lookback"?"schedule-lookback-preset":"schedule-frequency-preset").value="";}));

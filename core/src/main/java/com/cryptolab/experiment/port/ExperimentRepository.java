@@ -6,7 +6,9 @@ import com.cryptolab.experiment.domain.ExperimentDetails;
 import com.cryptolab.experiment.domain.ExperimentPlan;
 import com.cryptolab.experiment.domain.ExperimentStatus;
 import com.cryptolab.experiment.domain.LeaderboardEntry;
+import com.cryptolab.experiment.domain.LeaderboardSort;
 import com.cryptolab.experiment.domain.Ranking;
+import com.cryptolab.experiment.domain.SortDirection;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -26,7 +28,8 @@ public interface ExperimentRepository {
 
     void replaceLeaderboard(UUID searchRunId, List<Ranking> rankings, Instant updatedAt);
 
-    List<LeaderboardEntry> findLeaderboard(UUID searchRunId, int limit);
+    List<LeaderboardEntry> findLeaderboard(
+            UUID searchRunId, int limit, LeaderboardSort sort, SortDirection direction);
 
     Optional<ExperimentDetails> findDetails(UUID experimentId);
 

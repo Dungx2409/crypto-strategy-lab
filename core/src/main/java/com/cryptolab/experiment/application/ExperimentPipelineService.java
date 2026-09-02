@@ -11,9 +11,11 @@ import com.cryptolab.experiment.domain.ExperimentProvenance;
 import com.cryptolab.experiment.domain.ExperimentStateMachine;
 import com.cryptolab.experiment.domain.ExperimentStatus;
 import com.cryptolab.experiment.domain.LeaderboardEntry;
+import com.cryptolab.experiment.domain.LeaderboardSort;
 import com.cryptolab.experiment.domain.MarketDataset;
 import com.cryptolab.experiment.domain.Ranking;
 import com.cryptolab.experiment.domain.RerunResult;
+import com.cryptolab.experiment.domain.SortDirection;
 import com.cryptolab.experiment.port.BacktestPort;
 import com.cryptolab.experiment.port.ExperimentEvaluator;
 import com.cryptolab.experiment.port.ExperimentRepository;
@@ -96,10 +98,15 @@ public final class ExperimentPipelineService {
     }
 
     public List<LeaderboardEntry> leaderboard(UUID searchRunId, int limit) {
+        return leaderboard(searchRunId, limit, LeaderboardSort.SCORE, SortDirection.DESC);
+    }
+
+    public List<LeaderboardEntry> leaderboard(
+            UUID searchRunId, int limit, LeaderboardSort sort, SortDirection direction) {
         if (limit < 1 || limit > 500) {
             throw new IllegalArgumentException("leaderboard limit must be between 1 and 500");
         }
-        return repository.findLeaderboard(searchRunId, limit);
+        return repository.findLeaderboard(searchRunId, limit, sort, direction);
     }
 
     public RerunResult rerun(UUID sourceExperimentId) {

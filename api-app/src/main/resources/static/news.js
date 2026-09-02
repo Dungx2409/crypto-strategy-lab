@@ -31,6 +31,7 @@ function collectionSummary(body, verb) {
 }
 
 function renderNews(items) {
+    items = items.filter(item => !isExampleArticle(item));
     latestNewsItems = items.map(item => ({...item}));
     newsList.replaceChildren();
     const totals = {POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0};
@@ -84,6 +85,14 @@ function renderNews(items) {
         }
         newsList.append(article);
     });
+}
+
+function isExampleArticle(item) {
+    const url = String(item.url || "");
+    const provider = String(item.provider || "");
+    return url.includes("example.com")
+        || url.includes("example.test")
+        || provider.toLowerCase().includes("example");
 }
 
 window.cryptoLabNews = {

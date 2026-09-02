@@ -65,7 +65,7 @@ public final class ContinuousDiscoveryService {
         return schedules.create(new DiscoverySchedule(
                 ids.get(), accountId, symbol, timeframe, lookback, initialCapital,
                 candidateLimit, interval, DiscoveryScheduleStatus.ACTIVE, now,
-                null, 0, null, now, now));
+                null, null, 0, null, now, now));
     }
 
     public java.util.List<DiscoverySchedule> list(UUID accountId) {
@@ -108,7 +108,7 @@ public final class ContinuousDiscoveryService {
         DiscoverySchedule proposed = new DiscoverySchedule(
                 current.id(), current.accountId(), symbol, timeframe, lookback, initialCapital,
                 candidateLimit, interval, current.status(), current.nextRunAt(), null,
-                current.completedRuns(), current.lastError(), current.createdAt(), clock.instant());
+                current.lastSearchRunId(), current.completedRuns(), current.lastError(), current.createdAt(), clock.instant());
         return schedules.updateConfiguration(
                 accountId, scheduleId, proposed.symbol(), proposed.timeframe(), proposed.lookback(),
                 proposed.initialCapital(), proposed.candidateLimit(), proposed.interval(), proposed.updatedAt());

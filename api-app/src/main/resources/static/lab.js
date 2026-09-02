@@ -55,7 +55,12 @@ function renderStrategies() {
         Object.entries(plugin.parameterSchema).forEach(([name, schema]) => { const field = document.createElement("label"); field.textContent = name; const input = document.createElement("input"); input.dataset.parameter = name; input.dataset.parameterType = schema.type; input.value = suggestedValues(name, schema); field.append(input); grid.append(field); });
         const weightField = document.createElement("label");
         weightField.className = "weight-field";
-        weightField.textContent = "Voting weight";
+        const weightCaption = document.createElement("span");
+        weightCaption.className = "weight-caption";
+        weightCaption.textContent = "Voting weight";
+        const weightValue = document.createElement("strong");
+        weightValue.className = "weight-value";
+        weightValue.textContent = "1.0";
         const weight = document.createElement("input");
         weight.type = "range";
         weight.min = "0.1";
@@ -63,7 +68,15 @@ function renderStrategies() {
         weight.step = "0.1";
         weight.value = "1";
         weight.className = "strategy-weight";
-        weightField.append(weight);
+        weight.setAttribute("aria-valuetext", "1.0");
+        const syncWeightValue = () => {
+            const formatted = Number(weight.value).toFixed(1);
+            weightValue.textContent = formatted;
+            weight.setAttribute("aria-valuetext", formatted);
+        };
+        weight.addEventListener("input", syncWeightValue);
+        syncWeightValue();
+        weightField.append(weightCaption, weightValue, weight);
         check.addEventListener("change", renderSelectedStrategyChips);
         const advanced = document.createElement("details");
         advanced.className = "strategy-advanced";
@@ -187,7 +200,7 @@ function renderSearch(run) {
 
 function beginPolling() { clearInterval(labState.poll); labState.poll = setInterval(async () => { if (!labState.searchRunId) return; try { const run = await api(`/api/v1/search-runs/${labState.searchRunId}`); renderSearch(run); await loadLeaderboard(); } catch (error) { byId("search-message").textContent = error.message; } }, 2000); }
 async function loadLeaderboard() {
-    if (!labState.searchRunId) return; const data = await api(`/api/v1/leaderboard?searchRunId=${labState.searchRunId}&limit=50`); const body = byId("leaderboard-body"); body.replaceChildren();
+    if (!labState.searchRunId) return; const query = new URLSearchParams({searchRunId: labState.searchRunId, limit: "50", sort: byId("leaderboard-sort").value, direction: byId("leaderboard-direction").value}); const data = await api(`/api/v1/leaderboard?${query}`); const body = byId("leaderboard-body"); body.replaceChildren();
     if (!data.items.length) { const row = body.insertRow(); const cell = row.insertCell(); cell.colSpan = 7; cell.className = "empty"; cell.textContent = "No completed experiments yet."; return; }
     data.items.forEach(item => { const row = body.insertRow(); row.dataset.experimentId = item.experimentId; if (labState.selectedExperimentId === item.experimentId) row.dataset.selectedExperiment = "true"; [item.rank,item.strategySummary,`${item.returnPct}%`,`${item.winRatePct ?? "-"}%`,`${item.maxDrawdownPct}%`,item.totalTrades,item.score].forEach(value => { const cell = row.insertCell(); cell.textContent = value; }); row.addEventListener("click", () => { loadExperiment(item.experimentId); if (typeof showView === "function") showView("backtest"); }); });
     if (!labState.selectedExperimentId && data.items[0]) { loadExperiment(data.items[0].experimentId); } else if (labState.selectedExperimentId && !document.querySelector("[data-selected-experiment]")) { const exists = data.items.some(i => i.experimentId === labState.selectedExperimentId); if (!exists && data.items[0]) loadExperiment(data.items[0].experimentId); }
@@ -220,6 +233,7 @@ function sendProofSubscription(destination) { if (!labState.connected) return; c
 function subscribeProofTopics(searchRunId) { const search=`/topic/search/${searchRunId}`, leaderboard=`/topic/leaderboard/${searchRunId}`; labState.subscriptions.set(search, renderSearch); labState.subscriptions.set(leaderboard, loadLeaderboard); sendProofSubscription(search); sendProofSubscription(leaderboard); }
 
 byId("start-search").addEventListener("click", startSearch); byId("cancel-search").addEventListener("click", cancelSearch);
+["leaderboard-sort","leaderboard-direction"].forEach(id => byId(id).addEventListener("change", loadLeaderboard));
 byId("search-size").addEventListener("change", event => {
     const candidates = Number(event.target.value);
     byId("max-candidates").value = candidates;

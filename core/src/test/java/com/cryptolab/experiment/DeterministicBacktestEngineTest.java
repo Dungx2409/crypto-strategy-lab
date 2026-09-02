@@ -119,6 +119,36 @@ class DeterministicBacktestEngineTest {
     }
 
     @Test
+    void weightedPolicyDefaultsMissingStrategyWeightsToOne() {
+        List<StrategyDefinition> strategies = List.of(new StrategyDefinition("MA", "1.0", Map.of()));
+        var policy = new CombinationPolicyDefinition(
+                "WEIGHTED", "1.0", Map.of("RSI", new BigDecimal("0.5")), BigDecimal.ZERO);
+        CandidateStrategy candidate = new CandidateStrategy(
+                ExperimentTestFixtures.CANDIDATE_ID,
+                strategies,
+                policy,
+                com.cryptolab.experiment.domain.CandidateCanonicalizer.hash(strategies, policy));
+        MarketDataset dataset = ExperimentTestFixtures.dataset();
+        StrategyRegistry alwaysBuy = new SingleStrategyRegistry(context ->
+                new Signal(SignalType.BUY, BigDecimal.ONE, context.evaluatedAt(), "buy"));
+        DeterministicBacktestEngine engine = new DeterministicBacktestEngine(
+                ignored -> candidate,
+                ignored -> dataset,
+                alwaysBuy,
+                definition -> new com.cryptolab.strategy.domain.policy.WeightedVotePolicy(BigDecimal.ZERO),
+                Clock.systemUTC());
+
+        BacktestResult result = engine.run(new BacktestCommand(
+                ExperimentTestFixtures.EXPERIMENT_ID,
+                candidate.candidateId(),
+                dataset.reference(),
+                ExperimentTestFixtures.executionConfig()));
+
+        assertThat(result.trades()).singleElement().satisfies(trade ->
+                assertThat(trade.direction()).isEqualTo(TradeDirection.LONG));
+    }
+
+    @Test
     void positionSizeLimitsCapitalCommittedToATrade() {
         CandidateStrategy candidate = ExperimentTestFixtures.candidate();
         MarketDataset dataset = ExperimentTestFixtures.dataset();
@@ -379,7 +409,7 @@ class DeterministicBacktestEngineTest {
 
         @Override
         public Strategy create(StrategyDefinition definition) {
-            return strategy(analyzer);
+            return strategy(definition.type(), definition.version(), analyzer);
         }
 
         @Override
@@ -397,10 +427,14 @@ class DeterministicBacktestEngineTest {
     }
 
     private static Strategy strategy(Analyzer analyzer) {
+        return strategy("TEST", "1.0", analyzer);
+    }
+
+    private static Strategy strategy(String type, String version, Analyzer analyzer) {
         return new Strategy() {
             @Override
             public StrategyDescriptor descriptor() {
-                return new StrategyDescriptor("TEST", "1.0", Map.of());
+                return new StrategyDescriptor(type, version, Map.of());
             }
 
             @Override

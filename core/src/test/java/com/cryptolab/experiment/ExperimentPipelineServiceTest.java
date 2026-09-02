@@ -14,7 +14,9 @@ import com.cryptolab.experiment.domain.ExperimentPlan;
 import com.cryptolab.experiment.domain.ExperimentStatus;
 import com.cryptolab.experiment.domain.GeneratorSnapshot;
 import com.cryptolab.experiment.domain.LeaderboardEntry;
+import com.cryptolab.experiment.domain.LeaderboardSort;
 import com.cryptolab.experiment.domain.Ranking;
+import com.cryptolab.experiment.domain.SortDirection;
 import com.cryptolab.experiment.port.ExperimentRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -140,7 +142,8 @@ class ExperimentPipelineServiceTest {
         }
 
         @Override
-        public List<LeaderboardEntry> findLeaderboard(UUID searchRunId, int limit) {
+        public List<LeaderboardEntry> findLeaderboard(
+                UUID searchRunId, int limit, LeaderboardSort sort, SortDirection direction) {
             return List.of();
         }
 

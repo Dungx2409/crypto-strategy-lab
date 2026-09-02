@@ -20,9 +20,11 @@ import com.cryptolab.experiment.domain.ExperimentDetails;
 import com.cryptolab.experiment.domain.ExperimentPlan;
 import com.cryptolab.experiment.domain.ExperimentStatus;
 import com.cryptolab.experiment.domain.LeaderboardEntry;
+import com.cryptolab.experiment.domain.LeaderboardSort;
 import com.cryptolab.experiment.domain.MarketDataset;
 import com.cryptolab.experiment.domain.MarketDatasetRef;
 import com.cryptolab.experiment.domain.Ranking;
+import com.cryptolab.experiment.domain.SortDirection;
 import com.cryptolab.experiment.port.CandidateProvider;
 import com.cryptolab.experiment.port.ExperimentRepository;
 import com.cryptolab.experiment.port.MarketDatasetProvider;
@@ -259,8 +261,10 @@ class ExperimentControllerTest {
         }
 
         @Override
-        public List<LeaderboardEntry> findLeaderboard(UUID searchRunId, int limit) {
+        public List<LeaderboardEntry> findLeaderboard(
+                UUID searchRunId, int limit, LeaderboardSort sort, SortDirection direction) {
             return rankings.getOrDefault(searchRunId, List.of()).stream()
+                    .sorted(leaderboardComparator(sort, direction))
                     .limit(limit)
                     .map(ranking -> {
                         CandidateStrategy candidate = states.get(ranking.experimentId()).plan.candidate();
@@ -271,6 +275,22 @@ class ExperimentControllerTest {
                         return new LeaderboardEntry(searchRunId, ranking, summary);
                     })
                     .toList();
+        }
+
+        private static java.util.Comparator<Ranking> leaderboardComparator(
+                LeaderboardSort sort, SortDirection direction) {
+            java.util.Comparator<Ranking> comparator = switch (sort) {
+                case RANK -> java.util.Comparator.comparingInt(Ranking::rank);
+                case SCORE -> java.util.Comparator.comparing(ranking -> ranking.metrics().score());
+                case RETURN -> java.util.Comparator.comparing(ranking -> ranking.metrics().totalReturnPct());
+                case WIN_RATE -> java.util.Comparator.comparing(ranking -> ranking.metrics().winRatePct());
+                case MAX_DRAWDOWN -> java.util.Comparator.comparing(ranking -> ranking.metrics().maxDrawdownPct());
+                case TRADES -> java.util.Comparator.comparingInt(ranking -> ranking.metrics().totalTrades());
+            };
+            if (direction == SortDirection.DESC) {
+                comparator = comparator.reversed();
+            }
+            return comparator.thenComparingInt(Ranking::rank);
         }
 
         @Override

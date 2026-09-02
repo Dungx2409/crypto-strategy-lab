@@ -8,6 +8,7 @@ import com.cryptolab.marketdata.domain.Candle;
 import com.cryptolab.marketdata.domain.Timeframe;
 import com.cryptolab.shared.domain.SentimentObservation;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -50,9 +51,11 @@ public final class MarketDatasetService {
         if (ordered.isEmpty()) {
             throw new IllegalArgumentException("dataset candles must not be empty");
         }
+        Instant datasetTo = ordered.getLast().openTime().plus(timeframe.duration());
         List<SentimentObservation> orderedSentiment = List.copyOf(Objects.requireNonNull(
                         sentimentObservations, "sentimentObservations must not be null"))
                 .stream()
+                .filter(observation -> !observation.observedAt().isAfter(datasetTo))
                 .sorted(Comparator.comparing(SentimentObservation::observedAt)
                         .thenComparing(SentimentObservation::sourceId))
                 .toList();
@@ -61,7 +64,7 @@ public final class MarketDatasetService {
                 symbol,
                 timeframe,
                 ordered.getFirst().openTime(),
-                ordered.getLast().openTime().plus(timeframe.duration()),
+                datasetTo,
                 datasetVersion,
                 checksum);
         return repository.save(

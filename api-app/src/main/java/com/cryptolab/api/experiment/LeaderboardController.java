@@ -1,6 +1,8 @@
 package com.cryptolab.api.experiment;
 
 import com.cryptolab.experiment.application.ExperimentPipelineService;
+import com.cryptolab.experiment.domain.LeaderboardSort;
+import com.cryptolab.experiment.domain.SortDirection;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,7 +22,15 @@ public final class LeaderboardController {
     @GetMapping
     public LeaderboardResponse leaderboard(
             @RequestParam UUID searchRunId,
-            @RequestParam(defaultValue = "50") int limit) {
-        return LeaderboardResponse.from(searchRunId, pipeline.leaderboard(searchRunId, limit));
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String direction) {
+        return LeaderboardResponse.from(
+                searchRunId,
+                pipeline.leaderboard(
+                        searchRunId,
+                        limit,
+                        LeaderboardSort.parse(sort),
+                        SortDirection.parse(direction)));
     }
 }

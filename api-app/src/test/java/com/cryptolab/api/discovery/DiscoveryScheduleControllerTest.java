@@ -73,7 +73,7 @@ class DiscoveryScheduleControllerTest {
         DiscoverySchedule running = new DiscoverySchedule(
                 SCHEDULE_ID, ACCOUNT_ID, "BTCUSDT", Timeframe.H1, Duration.ofDays(365),
                 new BigDecimal("10000"), 125, Duration.ofHours(24), DiscoveryScheduleStatus.ACTIVE,
-                now, UUID.randomUUID(), 0, null, now, now);
+now, UUID.randomUUID(), UUID.randomUUID(), 0, null, now, now);
         when(repository.find(ACCOUNT_ID, SCHEDULE_ID)).thenReturn(java.util.Optional.of(running));
 
         mockMvc.perform(put("/api/v1/discovery-schedules/{id}", SCHEDULE_ID)

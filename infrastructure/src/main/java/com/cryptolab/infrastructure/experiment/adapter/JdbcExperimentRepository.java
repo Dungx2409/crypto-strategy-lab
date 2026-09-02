@@ -11,10 +11,12 @@ import com.cryptolab.experiment.domain.ExperimentStateMachine;
 import com.cryptolab.experiment.domain.ExperimentStatus;
 import com.cryptolab.experiment.domain.GeneratorSnapshot;
 import com.cryptolab.experiment.domain.LeaderboardEntry;
+import com.cryptolab.experiment.domain.LeaderboardSort;
 import com.cryptolab.experiment.domain.MarketDataset;
 import com.cryptolab.experiment.domain.MarketDatasetRef;
 import com.cryptolab.experiment.domain.Ranking;
 import com.cryptolab.experiment.domain.RecordedSignal;
+import com.cryptolab.experiment.domain.SortDirection;
 import com.cryptolab.experiment.domain.Trade;
 import com.cryptolab.experiment.port.CandidateProvider;
 import com.cryptolab.experiment.port.ExperimentRepository;
@@ -210,7 +212,9 @@ public class JdbcExperimentRepository
     }
 
     @Override
-    public List<LeaderboardEntry> findLeaderboard(UUID searchRunId, int limit) {
+    public List<LeaderboardEntry> findLeaderboard(
+            UUID searchRunId, int limit, LeaderboardSort sort, SortDirection direction) {
+        String orderBy = leaderboardOrderBy(sort, direction);
         return jdbcTemplate.query(
                 """
                 SELECT l.search_run_id, l.rank, l.experiment_id, l.score, l.return_pct,
@@ -219,9 +223,9 @@ public class JdbcExperimentRepository
                 JOIN experiments e ON e.id = l.experiment_id
                 JOIN candidates c ON c.id = e.candidate_id
                 WHERE l.search_run_id = ?
-                ORDER BY l.rank
+                ORDER BY %s, l.rank
                 LIMIT ?
-                """,
+                """.formatted(orderBy),
                 (resultSet, rowNumber) -> {
                     CandidateStrategy candidate = read(
                             resultSet.getString("candidate_spec_json"), CandidateStrategy.class);
@@ -244,6 +248,19 @@ public class JdbcExperimentRepository
                 },
                 searchRunId,
                 limit);
+    }
+
+    private static String leaderboardOrderBy(LeaderboardSort sort, SortDirection direction) {
+        String column = switch (sort) {
+            case RANK -> "l.rank";
+            case SCORE -> "l.score";
+            case RETURN -> "l.return_pct";
+            case WIN_RATE -> "l.win_rate_pct";
+            case MAX_DRAWDOWN -> "l.max_drawdown_pct";
+            case TRADES -> "l.total_trades";
+        };
+        String sqlDirection = direction == SortDirection.ASC ? "ASC" : "DESC";
+        return column + " " + sqlDirection;
     }
 
     @Override

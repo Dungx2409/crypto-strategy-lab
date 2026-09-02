@@ -19,6 +19,7 @@ public record DiscoverySchedule(
         DiscoveryScheduleStatus status,
         Instant nextRunAt,
         UUID activeSearchRunId,
+        UUID lastSearchRunId,
         long completedRuns,
         String lastError,
         Instant createdAt,

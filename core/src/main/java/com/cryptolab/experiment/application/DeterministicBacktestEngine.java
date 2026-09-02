@@ -17,6 +17,7 @@ import com.cryptolab.experiment.port.MarketDatasetProvider;
 import com.cryptolab.marketdata.domain.Candle;
 import com.cryptolab.marketdata.domain.TradingPair;
 import com.cryptolab.strategy.domain.CombinationPolicy;
+import com.cryptolab.strategy.domain.CombinationPolicyDefinition;
 import com.cryptolab.strategy.domain.CombinedSignal;
 import com.cryptolab.strategy.domain.Signal;
 import com.cryptolab.strategy.domain.SignalType;
@@ -102,7 +103,7 @@ public final class DeterministicBacktestEngine implements BacktestPort {
                 weightedSignals.add(new WeightedSignal(
                         strategy.descriptor(),
                         signal,
-                        weightFor(candidate.combinationPolicy().weights(), strategy.descriptor().type())));
+                        weightFor(candidate.combinationPolicy(), strategy.descriptor().type())));
             }
             CombinedSignal combined = policy.combine(weightedSignals);
             recordedSignals.add(new RecordedSignal(
@@ -166,15 +167,15 @@ public final class DeterministicBacktestEngine implements BacktestPort {
         }
     }
 
-    private static BigDecimal weightFor(Map<String, BigDecimal> weights, String strategyType) {
+    private static BigDecimal weightFor(CombinationPolicyDefinition policy, String strategyType) {
+        if (!policy.type().startsWith("WEIGHTED")) {
+            return BigDecimal.ONE;
+        }
+        Map<String, BigDecimal> weights = policy.weights();
         if (weights.isEmpty()) {
             return BigDecimal.ONE;
         }
-        BigDecimal weight = weights.get(strategyType);
-        if (weight == null) {
-            throw new IllegalArgumentException("missing combination weight for strategy " + strategyType);
-        }
-        return weight;
+        return weights.getOrDefault(strategyType, BigDecimal.ONE);
     }
 
     private static BigDecimal normalizedStrength(BigDecimal score) {
