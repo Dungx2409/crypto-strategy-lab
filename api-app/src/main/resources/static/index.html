@@ -7,7 +7,26 @@
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<div class="app-shell">
+<main id="auth-gate" class="auth-gate" aria-labelledby="auth-gate-title">
+    <section class="auth-card">
+        <div class="auth-brand"><span class="brand-mark">⚗</span><strong>Crypto Strategy Lab</strong></div>
+        <p class="eyebrow">Account required</p>
+        <h1 id="auth-gate-title">Sign in to open the lab</h1>
+        <p class="auth-copy">Register a new account or use the demo account below.</p>
+        <form id="auth-gate-form">
+            <label>Username<input id="auth-gate-username" autocomplete="username" required></label>
+            <label>Password<input id="auth-gate-password" type="password" autocomplete="current-password" minlength="8" required></label>
+            <div class="button-row">
+                <button id="auth-gate-login" type="submit"><span class="btn-icon" aria-hidden="true">⇢</span>Login</button>
+                <button id="auth-gate-register" class="secondary" type="button"><span class="btn-icon" aria-hidden="true">＋</span>Register</button>
+            </div>
+        </form>
+        <p id="auth-gate-message" class="message" role="status">Sessions use an HTTP-only cookie.</p>
+        <p class="demo-account">Demo account: <code>demo</code> / <code>crypto-demo</code></p>
+    </section>
+</main>
+
+<div id="app-shell" class="app-shell" hidden>
     <aside class="app-sidebar">
         <a class="brand" href="#realtime" data-view="realtime" aria-label="Crypto Strategy Lab home">
             <span class="brand-mark">⚗</span><strong>Crypto<br>Strategy Lab</strong>
@@ -48,46 +67,261 @@
                     <article class="market-card" data-chart-index="3"><header><div><strong>BTCUSDT · <select id="timeframe-3" class="chart-timeframe"><option>1m</option><option>5m</option><option>15m</option><option>30m</option><option>1h</option><option>2h</option><option selected>4h</option><option>1d</option></select></strong><small class="chart-ma">MA(20) —</small></div><div><b class="chart-price">—</b><span class="chart-change">—</span><em class="chart-signal hold">HOLD</em></div></header><canvas id="market-chart-3" width="720" height="360" aria-label="Fourth market chart"></canvas><footer><span class="chart-volume">Volume —</span><span class="chart-update">Waiting for data</span></footer></article>
                 </div>
                 <aside class="realtime-rail">
-                    <article class="panel"><h2>Candle update rules</h2><div class="rule"><strong>Same open time</strong><span>Replace the current candle</span></div><div class="rule"><strong>New open time</strong><span>Append one candle</span></div></article>
-                    <article class="panel"><div class="panel-heading"><h2>Connection</h2><span id="connection-health" class="health down">DOWN</span></div><dl class="status-list"><div><dt>Provider</dt><dd>Binance adapter</dd></div><div><dt>Last data</dt><dd id="last-market-update">—</dd></div><div><dt>Stream</dt><dd id="stream-count">0 charts</dd></div></dl></article>
-                    <article class="panel"><h2>Legend</h2><ul class="legend"><li><i class="up"></i>Close at or above open</li><li><i class="down"></i>Close below open</li><li><i class="ma"></i>MA(20)</li><li><i class="volume"></i>Volume</li></ul></article>
+                    <article class="panel">
+                        <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">⟳</span><div><h2>Candle update rules</h2></div></div></div>
+                        <div class="rule"><strong><span class="icon" aria-hidden="true">↺</span>Same open time</strong><span>Replace the current candle</span></div>
+                        <div class="rule"><strong><span class="icon" aria-hidden="true">＋</span>New open time</strong><span>Append one candle</span></div>
+                    </article>
+                    <article class="panel">
+                        <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">◉</span><div><h2>Connection</h2></div></div><span id="connection-health" class="health down">DOWN</span></div>
+                        <dl class="status-list"><div><dt>Provider</dt><dd>Binance adapter</dd></div><div><dt>Last data</dt><dd id="last-market-update">—</dd></div><div><dt>Stream</dt><dd id="stream-count">0 charts</dd></div></dl>
+                    </article>
+                    <article class="panel">
+                        <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">▣</span><div><h2>Legend</h2></div></div></div>
+                        <ul class="legend"><li><i class="up"></i>Close at or above open</li><li><i class="down"></i>Close below open</li><li><i class="ma"></i>MA(20)</li><li><i class="volume"></i>Volume</li></ul>
+                    </article>
                 </aside>
             </div>
         </section>
 
         <section id="view-strategy" class="view" data-title="Strategy Engine" data-subtitle="Configure versioned plugins without coupling strategies to market or persistence adapters">
             <div class="strategy-layout">
-                <section class="panel"><div class="panel-heading"><div><p class="eyebrow">Plugin library</p><h2 id="strategy-title">Strategy configuration</h2></div></div><p class="muted">Select plugins and edit comma-separated parameter choices.</p><div id="strategy-list" class="strategy-list" aria-live="polite"></div></section>
-                <section class="panel combination-card"><h2>Composite strategy</h2><div id="selected-strategy-chips" class="chip-list"></div><div class="controls compact"><label>Combination policy<select id="combination-policy"><option value="MAJORITY">Majority</option><option value="WEIGHTED">Weighted</option></select></label><label>Threshold<input id="policy-threshold" type="number" value="0.5" min="0" max="1" step="0.05"></label></div><div class="signal-preview"><article class="long"><span>LONG</span><strong>↑</strong></article><article><span>HOLD</span><strong>−</strong></article><article class="short"><span>SHORT</span><strong>↓</strong></article></div><p class="muted">The search generator varies both strategy membership and parameters.</p><button class="primary" type="button" data-view="discovery">Open Discovery</button></section>
+                <section class="panel">
+                    <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">⌘</span><div><p class="eyebrow">Plugin library</p><h2 id="strategy-title">Choose strategies</h2></div></div></div>
+                    <p class="muted">Pick the signals you trust. Default settings work for most tests.</p>
+                    <div id="strategy-list" class="strategy-list" aria-live="polite"></div>
+                </section>
+                <section class="panel combination-card">
+                    <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">⊕</span><div><h2>Combine signals</h2></div></div></div>
+                    <div id="selected-strategy-chips" class="chip-list"></div>
+                    <div class="controls compact">
+                        <label>Decision method<select id="combination-policy"><option value="MAJORITY">Simple majority</option><option value="WEIGHTED">Weighted vote</option></select></label>
+                        <label id="policy-threshold-field" hidden>Signal threshold<input id="policy-threshold" type="number" value="0.5" min="0" max="1" step="0.05"></label>
+                    </div>
+                    <div class="signal-preview">
+                        <article class="long"><span>LONG</span><strong>↑</strong></article>
+                        <article><span>HOLD</span><strong>−</strong></article>
+                        <article class="short"><span>SHORT</span><strong>↓</strong></article>
+                    </div>
+                    <p class="muted">Discovery tests different combinations for you.</p>
+                    <button class="primary" type="button" data-view="discovery"><span class="btn-icon" aria-hidden="true">⌕</span>Open Discovery</button>
+                </section>
             </div>
-            <section class="panel feature-panel"><div class="panel-heading"><div><p class="eyebrow">Gemini authoring</p><h2>Create a saved strategy</h2></div><span id="authoring-status" class="status status-offline">SIGN IN</span></div><div class="controls"><label>Input source<select id="authoring-source"><option value="prompt">Natural-language prompt</option><option value="article">Article URL</option></select></label><label id="strategy-prompt-field" class="wide-field">Prompt<textarea id="strategy-prompt" rows="4" placeholder="Combine a fast trend signal with RSI confirmation"></textarea></label><label id="article-url-field" class="wide-field" hidden>Public article URL<input id="article-url" type="url" placeholder="https://example.com/strategy-article"></label></div><div class="button-row"><button id="propose-strategy" type="button">Generate idea</button><button id="confirm-strategy" class="secondary" type="button" disabled>Confirm and build JSON</button></div><p id="authoring-message" class="message">Gemini calls stay disabled until GEMINI_API_KEY is configured.</p><article id="strategy-idea" class="idea-card" hidden></article><div id="saved-strategies" class="saved-list"></div></section>
+            <section class="panel feature-panel">
+                <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">✦</span><div><p class="eyebrow">Gemini authoring</p><h2>Create a saved strategy</h2></div></div><span id="authoring-status" class="status status-offline">SIGN IN</span></div>
+                <p class="muted authoring-help">Describe a strategy in plain language, or paste a public article URL and let Gemini draft the idea for you.</p>
+                <div class="authoring-mode" role="group" aria-label="Strategy input mode">
+                    <button type="button" class="authoring-mode-btn active" data-authoring-mode="prompt"><span class="btn-icon" aria-hidden="true">✎</span>Write a prompt</button>
+                    <button type="button" class="authoring-mode-btn" data-authoring-mode="article"><span class="btn-icon" aria-hidden="true">🔗</span>Generate from URL</button>
+                </div>
+                <select id="authoring-source" hidden aria-hidden="true">
+                    <option value="prompt" selected>Natural-language prompt</option>
+                    <option value="article">Article URL</option>
+                </select>
+                <div class="authoring-fields">
+                    <label id="strategy-prompt-field" class="wide-field authoring-prompt-label">Describe your strategy idea
+                        <textarea id="strategy-prompt" rows="10" placeholder="Example: Buy when a fast MA crosses above a slow MA, but only if RSI is below 40. Sell on the opposite cross or when RSI goes above 70. Prefer BTCUSDT on the 1h timeframe."></textarea>
+                    </label>
+                    <label id="article-url-field" class="wide-field" hidden>Public article URL
+                        <input id="article-url" type="url" placeholder="https://example.com/crypto-strategy-article">
+                        <span class="field-hint">Gemini reads the page, extracts the trading idea, then asks you to confirm before building JSON.</span>
+                    </label>
+                </div>
+                <div class="button-row">
+                    <button id="propose-strategy" type="button"><span class="btn-icon" aria-hidden="true">✦</span>Generate idea</button>
+                    <button id="confirm-strategy" class="secondary" type="button" disabled><span class="btn-icon" aria-hidden="true">✓</span>Confirm and build JSON</button>
+                </div>
+                <p id="authoring-message" class="message">Gemini calls stay disabled until GEMINI_API_KEY is configured.</p>
+                <article id="strategy-idea" class="idea-card" hidden></article>
+                <div id="saved-strategies" class="saved-list"></div>
+            </section>
         </section>
 
         <section id="view-discovery" class="view" data-title="Strategy Engine & Loop Discovery" data-subtitle="Generate, backtest, evaluate, rank, and keep the best reproducible combinations">
-            <div class="pipeline panel"><div><b>✣</b><span>Generate</span></div><i>→</i><div><b>▥</b><span>Backtest</span></div><i>→</i><div><b>⌁</b><span>Evaluate</span></div><i>→</i><div><b>▥</b><span>Rank</span></div><i>→</i><div><b>♜</b><span>Leaderboard</span></div></div>
+            <div class="pipeline panel"><div><b>⌁</b><span>Generate</span></div><i>→</i><div><b>▥</b><span>Backtest</span></div><i>→</i><div><b>⌁</b><span>Evaluate</span></div><i>→</i><div><b>▥</b><span>Rank</span></div><i>→</i><div><b>♜</b><span>Leaderboard</span></div></div>
             <div class="discovery-grid">
-                <section class="panel"><div class="panel-heading"><div><p class="eyebrow">Continuous loop</p><h2 id="search-title">Search run</h2></div><span id="search-status" class="status status-offline">IDLE</span></div><div class="controls compact"><label>Generator<select id="generator"></select></label><label>Max candidates<input id="max-candidates" type="number" value="125" min="1" max="100000"></label><label>Random seed<input id="random-seed" type="number" value="20260818"></label><label>Batch size<input id="batch-size" type="number" value="25" min="1" max="1000"></label></div><div class="button-row"><button id="start-search" type="button">Start search</button><button id="cancel-search" class="secondary" type="button" disabled>Cancel</button></div><p id="search-message" class="message" role="status">Waiting for a market dataset.</p><div class="progress-track"><span id="search-progress-bar"></span></div><div class="metric-grid"><article><span>Generated</span><strong id="generated-count">0</strong></article><article><span>Pending</span><strong id="pending-count">0</strong></article><article><span>Queued</span><strong id="queued-count">0</strong></article><article><span>Running</span><strong id="running-count">0</strong></article><article><span>Completed</span><strong id="completed-count">0</strong></article><article><span>Failed</span><strong id="failed-count">0</strong></article><article><span>Elapsed</span><strong id="elapsed-time">0s</strong></article><article><span>Best score</span><strong id="best-score">—</strong></article></div></section>
-                <section class="panel"><div class="panel-heading"><div><p class="eyebrow">Top strategies</p><h2 id="leaderboard-title">Leaderboard</h2></div><span class="muted">Select a row to inspect the result</span></div><div class="table-wrap"><table><thead><tr><th>Rank</th><th>Strategy</th><th>Return</th><th>Win rate</th><th>MDD</th><th>Trades</th><th>Score</th></tr></thead><tbody id="leaderboard-body"><tr><td colspan="7" class="empty">No completed experiments yet.</td></tr></tbody></table></div></section>
+                <section class="panel">
+                    <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">⟳</span><div><p class="eyebrow">Continuous loop</p><h2 id="search-title">Find strong strategies</h2></div></div><span id="search-status" class="status status-offline">IDLE</span></div>
+                    <div class="controls compact simple-controls">
+                        <label>Method<select id="generator"></select></label>
+                        <label>Search size<select id="search-size"><option value="25">Quick · 25 tests</option><option value="125" selected>Balanced · 125 tests</option><option value="500">Deep · 500 tests</option></select></label>
+                    </div>
+                    <details class="advanced-panel"><summary>Advanced search settings</summary><div class="controls compact"><label>Exact test count<input id="max-candidates" type="number" value="125" min="1" max="100000"></label><label>Repeatable seed<input id="random-seed" type="number" value="20260818"></label><label>Queue batch<input id="batch-size" type="number" value="25" min="1" max="1000"></label></div></details>
+                    <div class="button-row">
+                        <button id="start-search" type="button"><span class="btn-icon" aria-hidden="true">▶</span>Start discovery</button>
+                        <button id="cancel-search" class="secondary" type="button" disabled><span class="btn-icon" aria-hidden="true">■</span>Stop</button>
+                    </div>
+                    <p id="search-message" class="message" role="status">Waiting for market data.</p>
+                    <div class="progress-track"><span id="search-progress-bar"></span></div>
+                    <div class="metric-grid">
+                        <article><span><span class="icon" aria-hidden="true">⌁</span>Generated</span><strong id="generated-count">0</strong></article>
+                        <article><span><span class="icon" aria-hidden="true">…</span>Pending</span><strong id="pending-count">0</strong></article>
+                        <article><span><span class="icon" aria-hidden="true">☰</span>Queued</span><strong id="queued-count">0</strong></article>
+                        <article><span><span class="icon" aria-hidden="true">⟳</span>Running</span><strong id="running-count">0</strong></article>
+                        <article><span><span class="icon" aria-hidden="true">✓</span>Completed</span><strong id="completed-count">0</strong></article>
+                        <article><span><span class="icon" aria-hidden="true">✕</span>Failed</span><strong id="failed-count">0</strong></article>
+                        <article><span><span class="icon" aria-hidden="true">⏱</span>Elapsed</span><strong id="elapsed-time">0s</strong></article>
+                        <article><span><span class="icon" aria-hidden="true">★</span>Best score</span><strong id="best-score">—</strong></article>
+                    </div>
+                </section>
+                <section class="panel">
+                    <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">♜</span><div><p class="eyebrow">Top strategies</p><h2 id="leaderboard-title">Leaderboard</h2></div></div><span class="muted">Select a row to inspect the result</span></div>
+                    <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Strategy</th><th>Return</th><th>Win rate</th><th>MDD</th><th>Trades</th><th>Score</th></tr></thead><tbody id="leaderboard-body"><tr><td colspan="7" class="empty">No completed experiments yet.</td></tr></tbody></table></div>
+                </section>
             </div>
-            <section class="panel feature-panel"><div class="panel-heading"><div><p class="eyebrow">24-hour schedules</p><h2>Continuous Genetic discovery</h2></div><span class="muted">Saved per account</span></div><div class="controls"><label>Pair<select id="schedule-symbol"><option>BTCUSDT</option><option>ETHUSDT</option><option>SOLUSDT</option><option>BNBUSDT</option></select></label><label>Timeframe<select id="schedule-timeframe"><option>15m</option><option selected>1h</option><option>4h</option><option>1d</option></select></label><label>Lookback days<input id="schedule-lookback" type="number" value="365" min="1"></label><label>Capital<input id="schedule-capital" type="number" value="10000" min="1"></label><label>Candidates per run<input id="schedule-candidates" type="number" value="125" min="1"></label><label>Interval hours<input id="schedule-interval" type="number" value="24" min="1"></label></div><button id="create-schedule" type="button">Create schedule</button><p id="schedule-message" class="message"></p><div id="schedule-list" class="saved-list"></div></section>
+            <section class="panel feature-panel">
+                <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">◷</span><div><p class="eyebrow">Automatic discovery</p><h2>Keep searching in the background</h2></div></div><span class="muted">Saved to your account</span></div>
+                <div class="controls simple-controls">
+                    <label>Coin<select id="schedule-symbol"><option>BTCUSDT</option><option>ETHUSDT</option><option>SOLUSDT</option><option>BNBUSDT</option></select></label>
+                    <label>Timeframe<select id="schedule-timeframe"><option>15m</option><option selected>1h</option><option>4h</option><option>1d</option></select></label>
+                    <label>History<select id="schedule-lookback-preset"><option value="30">One month</option><option value="90">Three months</option><option value="365" selected>One year</option></select></label>
+                    <label>Run<select id="schedule-frequency-preset"><option value="24" selected>Every day</option><option value="12">Twice a day</option><option value="168">Every week</option></select></label>
+                </div>
+                <details class="advanced-panel"><summary>Advanced schedule settings</summary><div class="controls"><label>History days<input id="schedule-lookback" type="number" value="365" min="1"></label><label>Starting capital<input id="schedule-capital" type="number" value="10000" min="1"></label><label>Tests per run<input id="schedule-candidates" type="number" value="125" min="1"></label><label>Interval hours<input id="schedule-interval" type="number" value="24" min="1"></label></div></details>
+                <button id="create-schedule" type="button"><span class="btn-icon" aria-hidden="true">＋</span>Start automatic discovery</button>
+                <p id="schedule-message" class="message"></p>
+                <div id="schedule-list" class="saved-list"></div>
+            </section>
         </section>
 
         <section id="view-backtest" class="view" data-title="Backtest & Trade Results" data-subtitle="Inspect deterministic trades, metrics, signals, and immutable provenance">
-            <div class="backtest-toolbar panel compact-panel"><label>Pair / Coin<select id="manual-symbol"><option>BTCUSDT</option><option>ETHUSDT</option><option>SOLUSDT</option><option>BNBUSDT</option></select></label><label>Timeframe<select id="manual-timeframe"><option>5m</option><option>15m</option><option selected>1h</option><option>4h</option><option>1d</option></select></label><label>Saved strategy<select id="manual-strategy"><option value="">Sign in and create a strategy</option></select></label><label>From<input id="manual-from" type="datetime-local"></label><label>To<input id="manual-to" type="datetime-local"></label><label>Initial capital<input id="initial-capital" type="number" value="10000" min="1" step="100"></label><label>Position size %<input id="position-size-pct" type="number" value="100" min="1" max="100" step="1"></label><label>Stop Loss %<input id="stop-loss-pct" type="number" min="0.1" max="100" step="0.1" placeholder="Disabled"></label><label>Trailing Stop %<input id="trailing-stop-pct" type="number" min="0.1" max="100" step="0.1" placeholder="Disabled"></label><label>Take Profit %<input id="take-profit-pct" type="number" min="0.1" max="100" step="0.1" placeholder="Disabled"></label><label>Fee rate<input id="fee-rate" type="number" value="0.001" min="0" step="0.0001"></label><label class="short-control">Allow short<input id="allow-short" type="checkbox"></label><label>Execution<input id="execution-version" value="Loading engine" readonly></label><button id="run-manual-backtest" type="button">Run manual backtest</button></div>
-            <div class="panel compact-panel filter-bar"><label>Minimum P/L<input id="trade-filter-pnl" type="number" step="0.01" placeholder="Any"></label><label>Direction<select id="trade-filter-direction"><option value="">All</option><option>LONG</option><option>SHORT</option></select></label><label>Exit reason<select id="trade-filter-reason"><option value="">All</option><option>SIGNAL</option><option>STOP_LOSS</option><option>TAKE_PROFIT</option><option>TRAILING_STOP</option><option>DATASET_END</option></select></label><button id="apply-trade-filters" class="secondary" type="button">Apply filters</button><span id="manual-history-count" class="muted"></span></div>
-            <section class="panel compact-panel"><div class="panel-heading"><div><p class="eyebrow">Account history</p><h2>Saved manual runs</h2></div><span class="muted">Load any immutable result</span></div><div id="manual-history-list" class="saved-list">Sign in to load saved runs.</div></section>
-            <section class="panel"><div class="panel-heading"><div><p class="eyebrow">Reproducible result</p><h2 id="experiment-title">Top #1 / Experiment details</h2></div><span id="experiment-rank" class="status status-offline">NO SELECTION</span></div><p id="experiment-message" class="muted">Select a leaderboard result.</p><div id="backtest-metrics" class="summary-grid"><article><span>Win rate</span><strong id="metric-win-rate">—</strong></article><article><span>Total return</span><strong id="metric-return">—</strong></article><article><span>Max drawdown</span><strong id="metric-drawdown">—</strong></article><article><span>Total trades</span><strong id="metric-trades">—</strong></article></div><div class="backtest-layout"><div><canvas id="backtest-chart" width="1100" height="520" aria-label="Backtest chart with signals and trades"></canvas><div class="backtest-legend"><span>MA / strategy indicators</span><span class="positive">▲ BUY / entry</span><span class="negative">▼ SELL / exit</span></div></div><div class="table-wrap trade-table"><table><thead><tr><th>#</th><th>Direction</th><th>Entry</th><th>Entry price</th><th>Exit</th><th>Exit price</th><th>Exit reason</th><th>P/L</th></tr></thead><tbody id="trade-table-body"><tr><td colspan="8" class="empty">No trades.</td></tr></tbody></table></div></div><div id="provenance-grid" class="provenance-grid"></div><div class="artifact-grid"><article><h3>Signals</h3><div id="signals" class="artifact-list empty">No signals.</div></article><article><h3>Trades</h3><div id="trades" class="artifact-list empty">No trades.</div></article></div><details><summary>Immutable provenance JSON</summary><pre id="provenance-json">{}</pre></details></section>
+            <section class="panel compact-panel backtest-setup">
+                <div class="controls simple-controls">
+                    <label>Coin<select id="manual-symbol"><option>BTCUSDT</option><option>ETHUSDT</option><option>SOLUSDT</option><option>BNBUSDT</option></select></label>
+                    <label>Timeframe<select id="manual-timeframe"><option>5m</option><option>15m</option><option selected>1h</option><option>4h</option><option>1d</option></select></label>
+                    <label class="grow-field">Strategy<select id="manual-strategy"><option value="">Create a strategy first</option></select></label>
+                    <label>Period<select id="manual-period"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="custom">Custom dates</option></select></label>
+                    <label>Risk profile<select id="backtest-risk-profile"><option value="standard" selected>Standard</option><option value="conservative">Conservative</option><option value="active">Active</option><option value="custom">Custom</option></select></label>
+                    <button id="run-manual-backtest" type="button"><span class="btn-icon" aria-hidden="true">▶</span>Run backtest</button>
+                </div>
+                <details id="backtest-advanced" class="advanced-panel"><summary>Advanced backtest settings</summary><div class="backtest-toolbar"><label>From<input id="manual-from" type="datetime-local"></label><label>To<input id="manual-to" type="datetime-local"></label><label>Starting capital<input id="initial-capital" type="number" value="10000" min="1" step="100"></label><label>Position size %<input id="position-size-pct" type="number" value="100" min="1" max="100" step="1"></label><label>Stop Loss %<input id="stop-loss-pct" type="number" min="0.1" max="100" step="0.1" placeholder="Off"></label><label>Trailing Stop %<input id="trailing-stop-pct" type="number" min="0.1" max="100" step="0.1" placeholder="Off"></label><label>Take Profit %<input id="take-profit-pct" type="number" min="0.1" max="100" step="0.1" placeholder="Off"></label><label>Fee rate<input id="fee-rate" type="number" value="0.001" min="0" step="0.0001"></label><label class="short-control">Allow short<input id="allow-short" type="checkbox"></label><label>Execution<input id="execution-version" value="Loading engine" readonly></label></div></details>
+                <p id="manual-backtest-message" class="message" role="status"></p>
+                <div id="manual-backtest-progress" class="progress-track backtest-progress" hidden><span id="manual-backtest-progress-bar"></span></div>
+            </section>
+            <div class="panel compact-panel filter-bar">
+                <label>Minimum P/L<input id="trade-filter-pnl" type="number" step="0.01" placeholder="Any"></label>
+                <label>Direction<select id="trade-filter-direction"><option value="">All</option><option>LONG</option><option>SHORT</option></select></label>
+                <label>Exit reason<select id="trade-filter-reason"><option value="">All</option><option>SIGNAL</option><option>STOP_LOSS</option><option>TAKE_PROFIT</option><option>TRAILING_STOP</option><option>DATASET_END</option></select></label>
+                <button id="apply-trade-filters" class="secondary" type="button"><span class="btn-icon" aria-hidden="true">▽</span>Apply filters</button>
+                <span id="manual-history-count" class="muted"></span>
+            </div>
+            <section class="panel compact-panel">
+                <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">☰</span><div><p class="eyebrow">Account history</p><h2>Saved manual runs</h2></div></div><span class="muted">Load any immutable result</span></div>
+                <div id="manual-history-list" class="saved-list">Sign in to load saved runs.</div>
+            </section>
+            <section class="panel">
+                <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">▥</span><div><p class="eyebrow">Reproducible result</p><h2 id="experiment-title">Top #1 / Experiment details</h2></div></div><span id="experiment-rank" class="status status-offline">NO SELECTION</span></div>
+                <p id="experiment-message" class="muted">Select a leaderboard result.</p>
+                <div id="backtest-metrics" class="summary-grid">
+                    <article><span><span class="icon" aria-hidden="true">◎</span>Win rate</span><strong id="metric-win-rate">—</strong></article>
+                    <article><span><span class="icon" aria-hidden="true">▲</span>Total return</span><strong id="metric-return">—</strong></article>
+                    <article><span><span class="icon" aria-hidden="true">▼</span>Max drawdown</span><strong id="metric-drawdown">—</strong></article>
+                    <article><span><span class="icon" aria-hidden="true">⇄</span>Total trades</span><strong id="metric-trades">—</strong></article>
+                </div>
+                <div class="backtest-layout">
+                    <div>
+                        <canvas id="backtest-chart" width="1100" height="520" aria-label="Backtest chart with signals and trades"></canvas>
+                        <div class="backtest-legend"><span>MA / strategy indicators</span><span class="positive">▲ BUY / entry</span><span class="negative">▼ SELL / exit</span></div>
+                    </div>
+                    <div class="table-wrap trade-table"><table><thead><tr><th>#</th><th>Direction</th><th>Entry</th><th>Entry price</th><th>Exit</th><th>Exit price</th><th>Exit reason</th><th>P/L</th></tr></thead><tbody id="trade-table-body"><tr><td colspan="8" class="empty">No trades.</td></tr></tbody></table></div>
+                </div>
+                <div id="provenance-grid" class="provenance-grid"></div>
+                <div class="artifact-grid">
+                    <article><h3><span class="icon" aria-hidden="true">⌁</span> Signals</h3><div id="signals" class="artifact-list empty">No signals.</div></article>
+                    <article><h3><span class="icon" aria-hidden="true">⇄</span> Trades</h3><div id="trades" class="artifact-list empty">No trades.</div></article>
+                </div>
+                <details><summary>Immutable provenance JSON</summary><pre id="provenance-json">{}</pre></details>
+            </section>
         </section>
 
         <section id="view-news" class="view" data-title="News Crawler & Market Sentiment" data-subtitle="Collect normalized news and analyze it through a replaceable sentiment port">
-            <div class="news-toolbar panel compact-panel"><label>Provider<input value="CryptoCompare" readonly></label><label>Stored items<select><option>Latest 20</option></select></label><div class="news-actions"><span id="news-status" class="status status-offline">DOWN</span><button id="refresh-news" type="button">Collect now</button></div></div>
-            <div class="news-layout"><section class="panel"><div class="panel-heading"><div><p class="eyebrow">Normalized input</p><h2 id="news-title">News + Sentiment</h2></div></div><p id="news-message" role="status">Loading stored news…</p><div id="news-list" class="news-list" aria-live="polite"></div></section><aside class="panel"><h2>Sentiment analysis</h2><div class="sentiment-summary"><div><span>Positive</span><strong id="sentiment-positive">0</strong></div><div><span>Neutral</span><strong id="sentiment-neutral">0</strong></div><div><span>Negative</span><strong id="sentiment-negative">0</strong></div></div><p class="muted">Each result stores the model name, model version, preprocessing version, and score.</p><div class="architecture-flow"><span>NewsProvider</span><i>→</i><span>NewsCollector</span><i>→</i><span>SentimentAnalyzer</span></div></aside></div>
-            <section class="panel feature-panel"><div class="panel-heading"><div><p class="eyebrow">HTML source tracking</p><h2>Versioned crawler template</h2></div><span class="muted">Gemini repairs need review</span></div><div class="controls"><label class="wide-field">Site URL<input id="crawler-site-url" type="url" placeholder="https://news.example.com"></label><label>Item selector<input id="crawler-item-selector" value="article"></label><label>Title selector<input id="crawler-title-selector" value="h2"></label><label>Link selector<input id="crawler-link-selector" value="a"></label><label>Date selector<input id="crawler-date-selector" value="time"></label></div><button id="create-crawler-template" type="button">Save template</button><p id="crawler-message" class="message"></p><div id="crawler-template-list" class="saved-list"></div></section>
+            <div class="news-toolbar panel compact-panel">
+                <label>Provider<input value="CryptoCompare" readonly></label>
+                <label>Auto-crawl every
+                    <select id="news-interval">
+                        <option value="1m">1 minute</option>
+                        <option value="2m">2 minutes</option>
+                        <option value="5m" selected>5 minutes</option>
+                        <option value="1h">1 hour</option>
+                    </select>
+                </label>
+                <label>Coin / pair
+                    <select id="news-coin">
+                        <option value="ALL" selected>All coins</option>
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
+                        <option value="SOL">SOL</option>
+                        <option value="BNB">BNB</option>
+                        <option value="XRP">XRP</option>
+                        <option value="BTCUSDT">BTCUSDT → BTC</option>
+                        <option value="ETHUSDT">ETHUSDT → ETH</option>
+                        <option value="SOLUSDT">SOLUSDT → SOL</option>
+                        <option value="BNBUSDT">BNBUSDT → BNB</option>
+                    </select>
+                </label>
+                <div class="news-actions">
+                    <span id="news-status" class="status status-offline">DOWN</span>
+                    <button id="save-news-preferences" class="secondary" type="button"><span class="btn-icon" aria-hidden="true">💾</span>Apply</button>
+                    <button id="refresh-news" type="button"><span class="btn-icon" aria-hidden="true">⟳</span>Collect & analyze</button>
+                    <button id="analyze-news" class="secondary" type="button"><span class="btn-icon" aria-hidden="true">◉</span>Analyze pending</button>
+                </div>
+            </div>
+            <div class="news-layout">
+                <section class="panel">
+                    <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">▤</span><div><p class="eyebrow">Normalized input</p><h2 id="news-title">News + Sentiment</h2></div></div></div>
+                    <p id="news-message" role="status">Loading stored news…</p>
+                    <div id="news-list" class="news-list" aria-live="polite"></div>
+                </section>
+                <aside class="panel">
+                    <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">◉</span><div><h2>Sentiment analysis</h2></div></div></div>
+                    <div class="sentiment-summary">
+                        <div><span><span class="icon" aria-hidden="true">▲</span>Positive</span><strong id="sentiment-positive">0</strong></div>
+                        <div><span><span class="icon" aria-hidden="true">−</span>Neutral</span><strong id="sentiment-neutral">0</strong></div>
+                        <div><span><span class="icon" aria-hidden="true">▼</span>Negative</span><strong id="sentiment-negative">0</strong></div>
+                    </div>
+                    <p class="muted">Collect now stores articles, then runs sentiment on each one. Crawler collect also fetches article page text before analysis.</p>
+                    <div class="architecture-flow"><span>NewsProvider</span><i>→</i><span>NewsCollector</span><i>→</i><span>SentimentAnalyzer</span></div>
+                </aside>
+            </div>
+            <section class="panel feature-panel">
+                <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">🌐</span><div><p class="eyebrow">HTML sources</p><h2>Add a news website</h2></div></div><span class="muted">Gemini repairs need review</span></div>
+                <div class="controls simple-controls">
+                    <label class="grow-field">Website URL<input id="crawler-site-url" type="url" placeholder="https://news.example.com"></label>
+                    <button id="create-crawler-template" type="button"><span class="btn-icon" aria-hidden="true">＋</span>Add website</button>
+                </div>
+                <details class="advanced-panel"><summary>Advanced HTML selectors</summary><div class="controls"><label>Article<input id="crawler-item-selector" value="article"></label><label>Title<input id="crawler-title-selector" value="h2"></label><label>Link<input id="crawler-link-selector" value="a"></label><label>Date<input id="crawler-date-selector" value="time"></label></div></details>
+                <p id="crawler-message" class="message"></p>
+                <div id="crawler-template-list" class="saved-list"></div>
+            </section>
         </section>
 
         <section id="view-settings" class="view" data-title="System Status" data-subtitle="Independent health and queue state for the application and worker topology">
-            <section class="panel feature-panel"><div class="panel-heading"><div><p class="eyebrow">Account</p><h2>Session sign in</h2></div><span id="auth-status" class="status status-offline">SIGNED OUT</span></div><div class="controls"><label>Username<input id="auth-username" autocomplete="username"></label><label>Password<input id="auth-password" type="password" autocomplete="current-password"></label></div><div class="button-row"><button id="register-account" type="button">Register</button><button id="login-account" class="secondary" type="button">Login</button><button id="logout-account" class="secondary" type="button" disabled>Logout</button></div><p id="auth-message" class="message">Sessions use an HTTP-only cookie.</p></section>
-            <section class="panel status-panel" aria-labelledby="status-title"><div class="panel-heading"><div><p class="eyebrow">Operations</p><h2 id="status-title">System status</h2></div><span id="status-updated" class="muted">Checking…</span></div><div class="status-grid"><article><span>Market Data</span><strong id="system-market" class="health down">DOWN</strong></article><article><span>News</span><strong id="system-news" class="health down">DOWN</strong></article><article><span>Sentiment</span><strong id="system-sentiment" class="health down">DOWN</strong></article><article><span>Queue</span><strong id="system-queue" class="health down">DOWN</strong></article><article><span>Queue depth</span><strong id="system-queue-depth">0</strong></article><article><span>Worker consumers</span><strong id="system-workers">0</strong></article><article><span>Running jobs</span><strong id="system-running">0</strong></article><article><span>Pending outbox</span><strong id="system-outbox">0</strong></article></div></section>
+            <section class="panel feature-panel">
+                <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">👤</span><div><p class="eyebrow">Account</p><h2>Session sign in</h2></div></div><span id="auth-status" class="status status-offline">SIGNED OUT</span></div>
+                <div class="controls">
+                    <label>Username<input id="auth-username" autocomplete="username"></label>
+                    <label>Password<input id="auth-password" type="password" autocomplete="current-password"></label>
+                </div>
+                <div class="button-row">
+                    <button id="register-account" type="button"><span class="btn-icon" aria-hidden="true">＋</span>Register</button>
+                    <button id="login-account" class="secondary" type="button"><span class="btn-icon" aria-hidden="true">⇢</span>Login</button>
+                    <button id="logout-account" class="secondary" type="button" disabled><span class="btn-icon" aria-hidden="true">⏻</span>Logout</button>
+                </div>
+                <p id="auth-message" class="message">Sessions use an HTTP-only cookie.</p>
+            </section>
+            <section class="panel status-panel" aria-labelledby="status-title">
+                <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">⚙</span><div><p class="eyebrow">Operations</p><h2 id="status-title">System status</h2></div></div><span id="status-updated" class="muted">Checking…</span></div>
+                <div class="status-grid">
+                    <article><span><span class="icon" aria-hidden="true">⌁</span>Market Data</span><strong id="system-market" class="health down">DOWN</strong></article>
+                    <article><span><span class="icon" aria-hidden="true">▤</span>News</span><strong id="system-news" class="health down">DOWN</strong></article>
+                    <article><span><span class="icon" aria-hidden="true">◉</span>Sentiment</span><strong id="system-sentiment" class="health down">DOWN</strong></article>
+                    <article><span><span class="icon" aria-hidden="true">☰</span>Queue</span><strong id="system-queue" class="health down">DOWN</strong></article>
+                    <article><span><span class="icon" aria-hidden="true">▤</span>Queue depth</span><strong id="system-queue-depth">0</strong></article>
+                    <article><span><span class="icon" aria-hidden="true">⚙</span>Worker consumers</span><strong id="system-workers">0</strong></article>
+                    <article><span><span class="icon" aria-hidden="true">⟳</span>Running jobs</span><strong id="system-running">0</strong></article>
+                    <article><span><span class="icon" aria-hidden="true">✉</span>Pending outbox</span><strong id="system-outbox">0</strong></article>
+                </div>
+            </section>
         </section>
     </main>
 </div>

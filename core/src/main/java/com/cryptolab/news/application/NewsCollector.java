@@ -6,6 +6,7 @@ import com.cryptolab.news.domain.NewsHealthStatus;
 import com.cryptolab.news.domain.NewsInsight;
 import com.cryptolab.news.domain.NewsItem;
 import com.cryptolab.news.domain.SentimentResult;
+import com.cryptolab.news.port.NewsFeedPreferences;
 import com.cryptolab.news.port.NewsProvider;
 import com.cryptolab.news.port.NewsStore;
 import com.cryptolab.news.port.NewsTelemetry;
@@ -23,6 +24,7 @@ public final class NewsCollector {
     private final SentimentAnalyzer analyzer;
     private final NewsStore store;
     private final NewsTelemetry telemetry;
+    private final NewsFeedPreferences preferences;
     private final Clock clock;
     private final Duration initialLookback;
     private final int maximumInferenceAttempts;
@@ -37,10 +39,31 @@ public final class NewsCollector {
             Clock clock,
             Duration initialLookback,
             int maximumInferenceAttempts) {
+        this(
+                provider,
+                analyzer,
+                store,
+                telemetry,
+                NewsFeedPreferences.allCoins(),
+                clock,
+                initialLookback,
+                maximumInferenceAttempts);
+    }
+
+    public NewsCollector(
+            NewsProvider provider,
+            SentimentAnalyzer analyzer,
+            NewsStore store,
+            NewsTelemetry telemetry,
+            NewsFeedPreferences preferences,
+            Clock clock,
+            Duration initialLookback,
+            int maximumInferenceAttempts) {
         this.provider = Objects.requireNonNull(provider, "provider must not be null");
         this.analyzer = Objects.requireNonNull(analyzer, "analyzer must not be null");
         this.store = Objects.requireNonNull(store, "store must not be null");
         this.telemetry = Objects.requireNonNull(telemetry, "telemetry must not be null");
+        this.preferences = Objects.requireNonNull(preferences, "preferences must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         this.initialLookback = Objects.requireNonNull(initialLookback, "initialLookback must not be null");
         if (initialLookback.isNegative() || initialLookback.isZero()) {
@@ -55,9 +78,26 @@ public final class NewsCollector {
     public synchronized NewsCollectionResult collect() {
         Instant now = clock.instant();
         Instant since = store.latestPublishedAt().orElse(now.minus(initialLookback));
+        return collectSince(since, now);
+    }
+
+    /**
+     * Manual dashboard collect: always re-fetch the configured lookback window so a click
+     * does not return zero merely because the store already has the newest headline.
+     */
+    public synchronized NewsCollectionResult collectRecent() {
+        Instant now = clock.instant();
+        return collectSince(now.minus(initialLookback), now);
+    }
+
+    public synchronized NewsCollectionResult collect(List<NewsItem> items) {
+        return collect(distinct(items), clock.instant());
+    }
+
+    private NewsCollectionResult collectSince(Instant since, Instant now) {
         List<NewsItem> fetched;
         try {
-            fetched = distinct(provider.fetchSince(since));
+            fetched = distinct(provider.fetchSince(since, preferences.categoriesCsv()));
         } catch (RuntimeException providerFailure) {
             telemetry.collectionFailed(providerFailure);
             health = new NewsHealthSnapshot(
@@ -72,7 +112,21 @@ public final class NewsCollector {
                     now,
                     health.lastError());
         }
+        return collect(fetched, now);
+    }
 
+    public synchronized NewsCollectionResult analyzePending(int limit) {
+        if (limit < 1 || limit > 100) {
+            throw new IllegalArgumentException("limit must be between 1 and 100");
+        }
+        List<NewsItem> pending = store.findLatest(limit).stream()
+                .filter(insight -> insight.sentiment().isEmpty())
+                .map(NewsInsight::item)
+                .toList();
+        return collect(pending, clock.instant());
+    }
+
+    private NewsCollectionResult collect(List<NewsItem> fetched, Instant now) {
         int stored = store.saveNewsItems(fetched, now);
         int analyzed = 0;
         int inferenceFailures = 0;
@@ -101,6 +155,11 @@ public final class NewsCollector {
 
         NewsHealthStatus sentimentStatus = sentimentStatus(fetched.size(), analyzed, inferenceFailures);
         String message = lastInferenceFailure == null ? null : safeMessage(lastInferenceFailure);
+        if (message == null && fetched.isEmpty()) {
+            message = "No articles found in the recent lookback window";
+        } else if (message == null && analyzed == 0 && fetched.size() > 0) {
+            message = "Articles were already stored and scored";
+        }
         health = new NewsHealthSnapshot(NewsHealthStatus.UP, sentimentStatus, now, message);
         return new NewsCollectionResult(
                 fetched.size(), stored, analyzed, inferenceFailures,

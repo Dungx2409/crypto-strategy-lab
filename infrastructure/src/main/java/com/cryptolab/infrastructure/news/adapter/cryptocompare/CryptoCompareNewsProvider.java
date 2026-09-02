@@ -53,9 +53,15 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
 
     @Override
     public List<NewsItem> fetchSince(Instant since) {
+        return fetchSince(since, "");
+    }
+
+    @Override
+    public List<NewsItem> fetchSince(Instant since, String categoriesCsv) {
         Objects.requireNonNull(since, "since must not be null");
-        JsonNode root = parse(transport.get(requestUri()));
-        if (!"100".equals(root.path("Type").asText()) || !root.path("Data").isArray()) {
+        JsonNode root = parse(transport.get(requestUri(categoriesCsv)));
+        String type = root.path("Type").asText();
+        if ((!"100".equals(type) && !"101".equals(type)) || !root.path("Data").isArray()) {
             throw new IllegalStateException(
                     "CryptoCompare response error: " + root.path("Message").asText("missing Data array"));
         }
@@ -68,9 +74,23 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
                 .toList();
     }
 
-    private URI requestUri() {
+    private URI requestUri(String categoriesCsv) {
         String separator = endpoint.toString().contains("?") ? "&" : "?";
-        return URI.create(endpoint + separator + "lang=EN&sortOrder=latest&extraParams=CryptoStrategyLab");
+        StringBuilder query = new StringBuilder(endpoint.toString())
+                .append(separator)
+                .append("lang=EN&sortOrder=latest&extraParams=CryptoStrategyLab");
+        String categories = normalizeCategories(categoriesCsv);
+        if (!categories.isBlank()) {
+            query.append("&categories=").append(categories);
+        }
+        return URI.create(query.toString());
+    }
+
+    private static String normalizeCategories(String categoriesCsv) {
+        if (categoriesCsv == null || categoriesCsv.isBlank()) {
+            return "";
+        }
+        return categoriesCsv.trim().toUpperCase().replace(' ', ',');
     }
 
     private JsonNode parse(String json) {

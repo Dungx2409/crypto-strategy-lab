@@ -45,10 +45,15 @@ management:
       show-details: when_authorized
 
 crypto:
+  accounts:
+    default:
+      enabled: ${DEFAULT_ACCOUNT_ENABLED:false}
+      username: ${DEFAULT_ACCOUNT_USERNAME:demo}
+      password: ${DEFAULT_ACCOUNT_PASSWORD:crypto-demo}
   ai:
     gemini:
       api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_MODEL:gemini-3.7-flash}
+      model: ${GEMINI_MODEL:gemini-2.5-flash}
       timeout: 30s
   market:
     provider: ${CRYPTO_MARKET_PROVIDER:binance}

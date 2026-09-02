@@ -15,7 +15,7 @@ class StrategyAuthoringAdaptersTest {
     @Test
     void blankGeminiKeyFailsClearlyWithoutMakingANetworkRequest() {
         var model = new GeminiStrategyAuthoringModel(
-                java.net.http.HttpClient.newHttpClient(), objectMapper, "", "gemini-3.7-flash", Duration.ofSeconds(1));
+                java.net.http.HttpClient.newHttpClient(), objectMapper, "", "gemini-2.5-flash", Duration.ofSeconds(1));
 
         assertThatThrownBy(() -> model.proposeIdea("trend strategy", List.of()))
                 .isInstanceOf(IllegalStateException.class)

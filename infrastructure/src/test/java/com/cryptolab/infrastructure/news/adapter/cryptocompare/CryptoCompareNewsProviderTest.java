@@ -32,16 +32,39 @@ class CryptoCompareNewsProviderTest {
                 URI.create("https://news.test/data/v2/news/"),
                 10);
 
-        var items = provider.fetchSince(Instant.ofEpochSecond(1787051000));
+        var items = provider.fetchSince(Instant.ofEpochSecond(1787051000), "btc");
 
         assertThat(requested.get().getQuery())
-                .contains("lang=EN", "sortOrder=latest", "extraParams=CryptoStrategyLab");
+                .contains("lang=EN", "sortOrder=latest", "extraParams=CryptoStrategyLab", "categories=BTC");
         assertThat(items).singleElement().satisfies(item -> {
             assertThat(item.newsId()).isEqualTo("cryptocompare:42");
             assertThat(item.provider()).isEqualTo("Example Feed");
             assertThat(item.normalizedText()).isEqualTo("Bitcoin rally Adoption & growth");
             assertThat(item.inputVersion()).startsWith("sha256:").hasSize(71);
         });
+    }
+
+    @Test
+    void acceptsType101SuccessEnvelopeAndOmitsBlankCategories() {
+        AtomicReference<URI> requested = new AtomicReference<>();
+        CryptoCompareNewsProvider provider = new CryptoCompareNewsProvider(
+                uri -> {
+                    requested.set(uri);
+                    return """
+                            {"Type":101,"Message":"News list successfully returned","Data":[
+                              {"id":"7","source":"feed","title":"Ether update",
+                               "url":"https://example.test/7","published_on":1787054400,"body":"ETH news"}
+                            ]}
+                            """;
+                },
+                new ObjectMapper(),
+                URI.create("https://news.test/data/v2/news/"),
+                10);
+
+        var items = provider.fetchSince(Instant.ofEpochSecond(1787051000), " ");
+
+        assertThat(requested.get().getQuery()).doesNotContain("categories=");
+        assertThat(items).extracting(item -> item.newsId()).containsExactly("cryptocompare:7");
     }
 
     @Test

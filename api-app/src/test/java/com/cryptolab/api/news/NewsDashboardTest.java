@@ -14,11 +14,16 @@ class NewsDashboardTest {
         String news = resource("/static/news.js");
 
         assertThat(html)
-                .contains("News + Sentiment", "news-status", "news-list", "/news.js");
+                .contains("News + Sentiment", "news-status", "news-list", "/news.js")
+                .contains("Collect & analyze", "Analyze pending", "analyze-news")
+                .contains("news-interval", "news-coin", "Auto-crawl every");
         assertThat(news)
                 .contains("/api/v1/news/collect")
+                .contains("/api/v1/news/analyze")
+                .contains("/api/v1/news/preferences")
                 .contains("/api/v1/news?limit=20")
                 .contains("item.sentiment", "item.score", "item.modelVersion")
+                .contains("analyzed")
                 .doesNotContain("/api/v1/market")
                 .doesNotContain("location.reload");
     }
