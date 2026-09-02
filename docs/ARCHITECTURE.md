@@ -2,7 +2,7 @@
 
 ## Scope
 
-The written requirements define the product scope. The five supplied images guide layout and visual style. Prompt and article-link strategy authoring use Gemini and restricted JSON. Crawler selector repairs also use Gemini and require user review before activation.
+The written requirements define the product scope. The five supplied images guide layout and visual style. Prompt and article-link strategy authoring use Gemini, restricted JSON, and a bounded Trading DSL. Crawler selector repairs also use Gemini and require user review before activation.
 
 The platform supports research and coursework. It never places real orders.
 
@@ -377,7 +377,7 @@ Why: Controllers, streaming services, persistence, strategies, and browser code 
 
 Alternatives: Expose provider JSON to the browser; add provider branches to `MarketDataService`; query both exchanges and merge their candles.
 
-Consequences: Changing provider requires an API restart. This is replacement, not automatic failover or multi-exchange aggregation. The OKX adapter currently accepts the supported USDT pairs and converts symbols such as `BTCUSDT` to `BTC-USDT`. Binance remains the default.
+Consequences: Changing provider requires an API restart. This is replacement, not automatic failover or multi-exchange aggregation. Candle cache keys and read indexes include the normalized provider, so equal symbol/timeframe/open-time keys from Binance and OKX cannot collide. Existing rows remain labelled Binance because earlier application versions always wrote that label. The OKX adapter currently accepts the supported USDT pairs and converts symbols such as `BTCUSDT` to `BTC-USDT`. Binance remains the default.
 
 Evidence: Provider selection tests, OKX mapper and provider tests, the generalized provider DTO ArchUnit rule, the full Maven gate, and a runtime call that returned normalized OKX candles through the unchanged market REST endpoint.
 
@@ -395,19 +395,21 @@ Consequences: Sessions live in API memory and end when that API instance restart
 
 Evidence: Account service and controller tests, BCrypt hash test, Flyway V14 migration test, and PostgreSQL repository integration test.
 
-### AD-26: Gemini writes restricted strategy JSON, never executable code
+### AD-26: Gemini writes bounded Trading DSL inside restricted strategy JSON
 
-Context: A signed-in user must describe a strategy in natural language, review the idea, and add it without rebuilding the Java application. Running generated Java would allow file, process, reflection, and network access inside the API.
+Context: A signed-in user must describe a strategy in natural language, review both its idea and generated logic, and add it without rebuilding the Java application. Running a general-purpose generated language would allow file, process, reflection, and network access inside the API.
 
-Decision: Gemini first returns a plain-language idea. Only an explicit confirmation asks Gemini for JSON. The JSON may contain a name, description, registered strategy definitions, and a registered combination policy. The application decodes it, creates every plugin and policy through the existing registries, and runs each strategy against 250 fixed candles. It requests a repaired JSON document after a decode, validation, or smoke-test failure, with a total limit of three responses. Accepted documents are stored per account with a name-based version number.
+Decision: Gemini first returns a plain-language idea. The first explicit confirmation builds a JSON document containing an `AI_DSL@1.0` source and runs it against 250 fixed candles. The preview is persisted in the draft with `CODE_READY_FOR_CONFIRMATION`; a second explicit confirmation atomically stores the account-owned immutable strategy version and marks the draft `READY`. Decode, parse, validation, or runtime failures are returned to Gemini for repair, with a total limit of three responses.
 
-Why: JSON can compose existing tested plugins without introducing executable code. The confirmation step prevents an initial prompt from becoming a saved strategy without review. The fixed smoke input finds invalid parameters and runtime failures before storage.
+The DSL accepts exactly `BUY WHEN` and `SELL WHEN` rules, boolean operators, comparisons, OHLCV fields, and the bounded `SMA`, `RSI`, and `CHANGE_PCT` functions. Source length is limited to 4,000 characters, token count to 256, AST size to 128 nodes, and indicator periods to 2 through 500. It has no assignment, loop, reflection, arbitrary call, file, network, or process primitive. Evaluation sees only the current candle prefix and uses the engine's evaluation timestamp. Missing history does not match a rule, and simultaneous BUY/SELL matches resolve to HOLD.
 
-Alternatives: Compile generated Java; interpret a general scripting language; save the first model response without confirmation.
+Why: This language lets Gemini create new executable signal logic while its grammar and interpreter exclude the capabilities that make general-purpose generated code unsafe. Persisting the smoke-tested preview gives the user source-level review before storage and survives an API restart.
 
-Consequences: Users can create new configurations and combinations, but they cannot invent a new indicator algorithm outside the registered plugin set. `GEMINI_API_KEY` is blank by default. The API starts without it and reports that authoring is unavailable until an operator supplies the key. Strategy versions remain immutable rows and can be deleted only by their owning account.
+Alternatives: Compile generated Java; interpret Groovy or JavaScript in the JVM; save the first model response without source review; restrict authoring to configurations of existing plugins.
 
-Evidence: `StrategyAuthoringServiceTest`, Flyway V15, account ownership in `JdbcUserStrategyRepository`, and the full Maven verification gate.
+Consequences: `AI_DSL` is available to authoring and backtesting but excluded from shared catalog discovery, because its required source belongs to an account-owned document. `GEMINI_API_KEY` is blank by default. The API starts without it and reports that authoring is unavailable until an operator supplies the key. Strategy versions remain immutable rows and can be deleted only by their owning account.
+
+Evidence: `AiDslStrategyTest`, `StrategyAuthoringServiceTest`, `ExperimentPipelineIT`, Flyway V15 and V21, account ownership in `JdbcUserStrategyRepository`, and the full Maven verification gate.
 
 ### AD-27: Continuous discovery uses persisted account-owned schedules
 

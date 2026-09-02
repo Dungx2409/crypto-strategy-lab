@@ -35,7 +35,7 @@ class PostgresqlMigrationIT {
         MigrateResult result = flyway.migrate();
 
         assertThat(result.success).isTrue();
-        assertThat(result.migrationsExecuted).isEqualTo(19);
+        assertThat(result.migrationsExecuted).isEqualTo(21);
 
         Set<String> tables = readPublicTables();
         assertThat(tables)
@@ -69,6 +69,9 @@ class PostgresqlMigrationIT {
         assertThat(hasColumn("leaderboard_entries", "win_rate_pct")).isTrue();
         assertThat(hasColumn("trades", "direction")).isTrue();
         assertThat(hasColumn("trades", "exit_reason")).isTrue();
+        assertThat(hasColumn("strategy_drafts", "document_json")).isTrue();
+        assertThat(primaryKeyColumns("candles"))
+                .containsExactly("provider", "symbol", "timeframe", "open_time");
     }
 
     private Set<String> readPublicTables() throws Exception {
@@ -118,6 +121,29 @@ class PostgresqlMigrationIT {
             try (ResultSet resultSet = statement.executeQuery()) {
                 assertThat(resultSet.next()).isTrue();
                 return resultSet.getInt(1) == 1;
+            }
+        }
+    }
+
+    private java.util.List<String> primaryKeyColumns(String table) throws Exception {
+        try (Connection connection = POSTGRES.createConnection("");
+                var statement = connection.prepareStatement(
+                        """
+                        SELECT k.column_name
+                        FROM information_schema.table_constraints c
+                        JOIN information_schema.key_column_usage k
+                          ON k.constraint_schema = c.constraint_schema
+                         AND k.constraint_name = c.constraint_name
+                        WHERE c.table_schema = 'public'
+                          AND c.table_name = ?
+                          AND c.constraint_type = 'PRIMARY KEY'
+                        ORDER BY k.ordinal_position
+                        """)) {
+            statement.setString(1, table);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                java.util.List<String> columns = new java.util.ArrayList<>();
+                while (resultSet.next()) columns.add(resultSet.getString(1));
+                return columns;
             }
         }
     }

@@ -15,13 +15,18 @@ public interface UserStrategyRepository {
 
     Optional<StrategyDraft> findDraft(UUID accountId, UUID draftId);
 
-    void updateDraft(UUID accountId, UUID draftId, StrategyDraftStatus status, String failureMessage, Instant updatedAt);
+    void updateDraft(
+            UUID accountId,
+            UUID draftId,
+            StrategyDraftStatus status,
+            UserStrategyDocument preview,
+            String failureMessage,
+            Instant updatedAt);
 
-    UserStrategy saveVersion(
+    UserStrategy publishVersion(
             UUID id,
             UUID accountId,
-            UserStrategyDocument document,
-            String sourcePrompt,
+            UUID draftId,
             Instant createdAt);
 
     List<UserStrategy> findAll(UUID accountId);

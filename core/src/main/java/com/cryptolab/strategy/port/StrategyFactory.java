@@ -12,5 +12,9 @@ public interface StrategyFactory {
 
     Map<String, Object> parameterSchema();
 
+    default boolean availableForDiscovery() {
+        return true;
+    }
+
     Strategy create(StrategyDefinition definition);
 }

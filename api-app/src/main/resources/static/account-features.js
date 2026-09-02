@@ -36,6 +36,8 @@ async function logout() {
     byId("manual-history-count").textContent = "";
     renderManualHistory([]);
     byId("strategy-idea").hidden = true;
+    byId("strategy-source-preview").hidden = true;
+    byId("save-strategy").disabled = true;
 }
 
 async function proposeStrategy() {
@@ -45,17 +47,30 @@ async function proposeStrategy() {
         byId("authoring-message").textContent = article ? "Reading article and asking Gemini…" : "Asking Gemini for an idea…";
         const draft = await api("/api/v1/user-strategies/drafts", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
         accountFeatureState.draftId = draft.id; byId("strategy-idea").hidden = false; byId("strategy-idea").textContent = draft.idea;
-        byId("confirm-strategy").disabled = false; byId("authoring-message").textContent = "Review the idea, then confirm it.";
+        byId("strategy-source-preview").hidden = true; byId("save-strategy").disabled = true;
+        byId("confirm-strategy").disabled = false; byId("authoring-message").textContent = "Review the idea, then build and test its code.";
     } catch (error) { byId("authoring-message").textContent = error.message; }
 }
 
 async function confirmStrategy() {
     try {
-        byId("confirm-strategy").disabled = true; byId("authoring-message").textContent = "Building, validating, and smoke-testing JSON…";
+        byId("confirm-strategy").disabled = true; byId("authoring-message").textContent = "Building, validating, and smoke-testing Trading DSL…";
+        const draft = await api(`/api/v1/user-strategies/drafts/${accountFeatureState.draftId}/build`, {method:"POST"});
+        const sources = draft.preview.strategies.filter(item=>item.type==="AI_DSL").map(item=>item.parameters.source);
+        byId("strategy-source-preview").textContent = sources.length?sources.join("\n\n"):JSON.stringify(draft.preview,null,2);
+        byId("strategy-source-preview").hidden = false; byId("save-strategy").disabled = false;
+        byId("authoring-message").textContent = "The code passed the 250-candle smoke test. Review it before saving.";
+    } catch (error) { byId("authoring-message").textContent = error.message; byId("confirm-strategy").disabled = false; }
+}
+
+async function saveStrategy() {
+    try {
+        byId("save-strategy").disabled = true;
         const saved = await api(`/api/v1/user-strategies/drafts/${accountFeatureState.draftId}/confirm`, {method:"POST"});
         byId("authoring-message").textContent = `${saved.document.name} version ${saved.version} is ready.`;
+        byId("strategy-source-preview").hidden = true; accountFeatureState.draftId = null;
         await loadSavedStrategies();
-    } catch (error) { byId("authoring-message").textContent = error.message; }
+    } catch (error) { byId("authoring-message").textContent = error.message; byId("save-strategy").disabled = false; }
 }
 
 async function loadSavedStrategies() {
@@ -97,6 +112,6 @@ async function createCrawlerTemplate(){try{await api("/api/v1/crawler-templates"
 function renderCrawlerTemplates(items){const host=byId("crawler-template-list");host.replaceChildren();if(!items.length){host.textContent=accountFeatureState.account?"No crawler templates.":"Sign in to manage templates.";return;}items.forEach(item=>{const row=document.createElement("article");row.className="saved-row";const text=document.createElement("div");text.innerHTML="<strong></strong><small></small>";text.querySelector("strong").textContent=`${item.siteUrl} · v${item.version}`;text.querySelector("small").textContent=`${item.selectors.itemSelector} | ${item.selectors.titleSelector}`;const actions=document.createElement("div");actions.className="button-row";actions.append(featureButton("Check now",async()=>{try{const result=await api(`/api/v1/crawler-templates/${item.templateId}/check`,{method:"POST"});if(result.status==="NEEDS_REVIEW"){byId("crawler-message").replaceChildren(document.createTextNode(`HTML changed. Review v${result.version}: ${JSON.stringify(result.selectors)} `),featureButton("Confirm",async()=>{await api(`/api/v1/crawler-templates/${item.templateId}/versions/${result.version}/confirm`,{method:"POST"});await loadCrawlerTemplates();}));}else byId("crawler-message").textContent="Active selectors still match.";}catch(error){byId("crawler-message").textContent=error.message;}},true),featureButton("Repair with Gemini",async()=>{const sample=window.prompt("Paste the changed HTML sample");if(!sample)return;try{const repaired=await api(`/api/v1/crawler-templates/${item.templateId}/repair`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sampleHtml:sample,failure:"Stored selectors no longer match"})});byId("crawler-message").replaceChildren(document.createTextNode(`Review v${repaired.version}: ${JSON.stringify(repaired.selectors)} `),featureButton("Confirm",async()=>{await api(`/api/v1/crawler-templates/${item.templateId}/versions/${repaired.version}/confirm`,{method:"POST"});await loadCrawlerTemplates();}));}catch(error){byId("crawler-message").textContent=error.message;}},true));row.append(text,actions);host.append(row);});}
 
 byId("register-account").addEventListener("click",()=>authenticate("register"));byId("login-account").addEventListener("click",()=>authenticate("login"));byId("logout-account").addEventListener("click",logout);
-byId("authoring-source").addEventListener("change",event=>{const article=event.target.value==="article";byId("article-url-field").hidden=!article;byId("strategy-prompt-field").hidden=article;});byId("propose-strategy").addEventListener("click",proposeStrategy);byId("confirm-strategy").addEventListener("click",confirmStrategy);
+byId("authoring-source").addEventListener("change",event=>{const article=event.target.value==="article";byId("article-url-field").hidden=!article;byId("strategy-prompt-field").hidden=article;});byId("propose-strategy").addEventListener("click",proposeStrategy);byId("confirm-strategy").addEventListener("click",confirmStrategy);byId("save-strategy").addEventListener("click",saveStrategy);
 byId("create-schedule").addEventListener("click",saveSchedule);byId("run-manual-backtest").addEventListener("click",runManualBacktest);byId("apply-trade-filters").addEventListener("click",applyTradeFilters);byId("create-crawler-template").addEventListener("click",createCrawlerTemplate);
 refreshAccount();

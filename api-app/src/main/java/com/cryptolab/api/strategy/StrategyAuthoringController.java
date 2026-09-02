@@ -44,6 +44,11 @@ public final class StrategyAuthoringController {
                 .body(service.confirm(account(servletRequest).id(), draftId));
     }
 
+    @PostMapping("/drafts/{draftId}/build")
+    StrategyDraft build(@PathVariable UUID draftId, HttpServletRequest servletRequest) {
+        return service.build(account(servletRequest).id(), draftId);
+    }
+
     @GetMapping
     List<UserStrategy> list(HttpServletRequest request) {
         return service.list(account(request).id());

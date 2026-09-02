@@ -60,6 +60,17 @@ public final class SpringStrategyRegistry implements StrategyRegistry {
     @Override
     public List<StrategyPluginDescriptor> availableStrategies() {
         return factories.values().stream()
+                .filter(StrategyFactory::availableForDiscovery)
+                .map(factory -> new StrategyPluginDescriptor(
+                        factory.type(), factory.version(), factory.parameterSchema()))
+                .sorted(Comparator.comparing(StrategyPluginDescriptor::type)
+                        .thenComparing(StrategyPluginDescriptor::version))
+                .toList();
+    }
+
+    @Override
+    public List<StrategyPluginDescriptor> authoringStrategies() {
+        return factories.values().stream()
                 .map(factory -> new StrategyPluginDescriptor(
                         factory.type(), factory.version(), factory.parameterSchema()))
                 .sorted(Comparator.comparing(StrategyPluginDescriptor::type)

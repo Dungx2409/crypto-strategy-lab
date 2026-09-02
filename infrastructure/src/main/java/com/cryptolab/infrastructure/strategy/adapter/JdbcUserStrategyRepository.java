@@ -49,16 +49,29 @@ public class JdbcUserStrategyRepository implements UserStrategyRepository {
 
     @Override
     public void updateDraft(
-            UUID accountId, UUID draftId, StrategyDraftStatus status, String failureMessage, Instant updatedAt) {
+            UUID accountId,
+            UUID draftId,
+            StrategyDraftStatus status,
+            UserStrategyDocument preview,
+            String failureMessage,
+            Instant updatedAt) {
         jdbcTemplate.update("""
-                UPDATE strategy_drafts SET status = ?, failure_message = ?, updated_at = ?
+                UPDATE strategy_drafts
+                SET status = ?, document_json = CAST(? AS jsonb), failure_message = ?, updated_at = ?
                 WHERE account_id = ? AND id = ?
-                """, status.name(), failureMessage, utc(updatedAt), accountId, draftId);
+                """, status.name(), preview == null ? null : json(preview), failureMessage,
+                utc(updatedAt), accountId, draftId);
     }
 
     @Override
-    public UserStrategy saveVersion(
-            UUID id, UUID accountId, UserStrategyDocument document, String sourcePrompt, Instant createdAt) {
+    @org.springframework.transaction.annotation.Transactional
+    public UserStrategy publishVersion(
+            UUID id, UUID accountId, UUID draftId, Instant createdAt) {
+        StrategyDraft draft = findDraft(accountId, draftId)
+                .filter(item -> item.status() == StrategyDraftStatus.CODE_READY_FOR_CONFIRMATION)
+                .orElseThrow(() -> new IllegalStateException(
+                        "strategy draft does not have tested code awaiting confirmation"));
+        UserStrategyDocument document = draft.preview();
         Integer version = jdbcTemplate.queryForObject("""
                 SELECT COALESCE(MAX(version), 0) + 1 FROM user_strategies
                 WHERE account_id = ? AND normalized_name = lower(?)
@@ -68,8 +81,16 @@ public class JdbcUserStrategyRepository implements UserStrategyRepository {
                     (id, account_id, name, normalized_name, version, document_json, source_prompt, created_at)
                 VALUES (?, ?, ?, lower(?), ?, CAST(? AS jsonb), ?, ?)
                 """, id, accountId, document.name(), document.name(), version,
-                json(document), sourcePrompt, utc(createdAt));
-        return new UserStrategy(id, accountId, version, document, sourcePrompt, createdAt);
+                json(document), draft.prompt(), utc(createdAt));
+        int changed = jdbcTemplate.update("""
+                UPDATE strategy_drafts SET status = ?, updated_at = ?
+                WHERE id = ? AND account_id = ? AND status = ?
+                """, StrategyDraftStatus.READY.name(), utc(createdAt), draftId, accountId,
+                StrategyDraftStatus.CODE_READY_FOR_CONFIRMATION.name());
+        if (changed != 1) {
+            throw new IllegalStateException("strategy draft changed before it could be saved");
+        }
+        return new UserStrategy(id, accountId, version, document, draft.prompt(), createdAt);
     }
 
     @Override
@@ -94,11 +115,17 @@ public class JdbcUserStrategyRepository implements UserStrategyRepository {
     }
 
     private StrategyDraft draft(ResultSet rs, int row) throws SQLException {
-        return new StrategyDraft(
-                rs.getObject("id", UUID.class), rs.getObject("account_id", UUID.class),
-                rs.getString("prompt"), rs.getString("idea"),
-                StrategyDraftStatus.valueOf(rs.getString("status")), rs.getString("failure_message"),
-                instant(rs, "created_at"), instant(rs, "updated_at"));
+        try {
+            String preview = rs.getString("document_json");
+            return new StrategyDraft(
+                    rs.getObject("id", UUID.class), rs.getObject("account_id", UUID.class),
+                    rs.getString("prompt"), rs.getString("idea"),
+                    StrategyDraftStatus.valueOf(rs.getString("status")),
+                    preview == null ? null : objectMapper.readValue(preview, UserStrategyDocument.class),
+                    rs.getString("failure_message"), instant(rs, "created_at"), instant(rs, "updated_at"));
+        } catch (JsonProcessingException exception) {
+            throw new SQLException("Stored strategy draft JSON is invalid", exception);
+        }
     }
 
     private UserStrategy strategy(ResultSet rs, int row) throws SQLException {

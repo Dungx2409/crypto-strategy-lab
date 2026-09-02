@@ -9,8 +9,9 @@ import com.cryptolab.strategy.domain.StrategyDraft;
 import com.cryptolab.strategy.domain.StrategyDraftStatus;
 import com.cryptolab.strategy.domain.UserStrategy;
 import com.cryptolab.strategy.domain.UserStrategyDocument;
-import com.cryptolab.strategy.port.StrategyAuthoringModel;
+import com.cryptolab.strategy.domain.extension.AiDslStrategy;
 import com.cryptolab.strategy.port.ArticleSourceReader;
+import com.cryptolab.strategy.port.StrategyAuthoringModel;
 import com.cryptolab.strategy.port.StrategyDocumentDecoder;
 import com.cryptolab.strategy.port.StrategyRegistry;
 import com.cryptolab.strategy.port.UserStrategyRepository;
@@ -75,42 +76,57 @@ public final class StrategyAuthoringService {
     }
 
     public StrategyDraft propose(UUID accountId, String prompt) {
-        String idea = model.proposeIdea(prompt, registry.availableStrategies());
+        String idea = model.proposeIdea(prompt, registry.authoringStrategies());
         Instant now = clock.instant();
         return repository.createDraft(new StrategyDraft(
                 ids.get(), accountId, prompt, idea,
-                StrategyDraftStatus.IDEA_PENDING_CONFIRMATION, null, now, now));
+                StrategyDraftStatus.IDEA_PENDING_CONFIRMATION, null, null, now, now));
     }
 
-    public UserStrategy confirm(UUID accountId, UUID draftId) {
+    public StrategyDraft build(UUID accountId, UUID draftId) {
         StrategyDraft draft = repository.findDraft(accountId, draftId)
                 .orElseThrow(() -> new StrategyDraftNotFoundException(draftId));
         if (draft.status() != StrategyDraftStatus.IDEA_PENDING_CONFIRMATION) {
             throw new IllegalStateException("strategy draft is not waiting for confirmation");
         }
-        repository.updateDraft(accountId, draftId, StrategyDraftStatus.BUILDING, null, clock.instant());
+        repository.updateDraft(
+                accountId, draftId, StrategyDraftStatus.BUILDING, null, null, clock.instant());
         String previous = null;
         String error = null;
         RuntimeException lastFailure = null;
         for (int attempt = 1; attempt <= MAX_JSON_ATTEMPTS; attempt++) {
             try {
                 previous = model.generateJson(
-                        draft.prompt(), draft.idea(), registry.availableStrategies(), previous, error);
+                        draft.prompt(), draft.idea(), registry.authoringStrategies(), previous, error);
                 UserStrategyDocument document = decoder.decode(previous);
                 smokeTest(document);
-                UserStrategy saved = repository.saveVersion(
-                        ids.get(), accountId, document, draft.prompt(), clock.instant());
-                repository.updateDraft(accountId, draftId, StrategyDraftStatus.READY, null, clock.instant());
-                return saved;
+                repository.updateDraft(
+                        accountId,
+                        draftId,
+                        StrategyDraftStatus.CODE_READY_FOR_CONFIRMATION,
+                        document,
+                        null,
+                        clock.instant());
+                return repository.findDraft(accountId, draftId).orElseThrow();
             } catch (RuntimeException failure) {
                 lastFailure = failure;
                 error = safeMessage(failure);
             }
         }
-        repository.updateDraft(accountId, draftId, StrategyDraftStatus.FAILED, error, clock.instant());
+        repository.updateDraft(
+                accountId, draftId, StrategyDraftStatus.FAILED, null, error, clock.instant());
         throw new StrategyAuthoringFailedException(
                 "Gemini could not produce a valid strategy after " + MAX_JSON_ATTEMPTS + " attempts",
                 lastFailure);
+    }
+
+    public UserStrategy confirm(UUID accountId, UUID draftId) {
+        StrategyDraft draft = repository.findDraft(accountId, draftId)
+                .orElseThrow(() -> new StrategyDraftNotFoundException(draftId));
+        if (draft.status() != StrategyDraftStatus.CODE_READY_FOR_CONFIRMATION) {
+            throw new IllegalStateException("strategy draft does not have tested code awaiting confirmation");
+        }
+        return repository.publishVersion(ids.get(), accountId, draftId, clock.instant());
     }
 
     public List<UserStrategy> list(UUID accountId) {
@@ -129,6 +145,12 @@ public final class StrategyAuthoringService {
     }
 
     private void smokeTest(UserStrategyDocument document) {
+        boolean hasGeneratedSource = document.strategies().stream()
+                .anyMatch(definition -> definition.type().equals(AiDslStrategy.TYPE)
+                        && definition.version().equals(AiDslStrategy.VERSION));
+        if (!hasGeneratedSource) {
+            throw new IllegalArgumentException("generated strategy must include AI_DSL@1.0 source");
+        }
         var context = smokeContext();
         document.strategies().forEach(definition -> registry.create(definition).analyze(context));
         policyResolver.resolve(document.combinationPolicy());

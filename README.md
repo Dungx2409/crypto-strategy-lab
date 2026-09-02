@@ -30,8 +30,8 @@ backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
 - Interactive canvas charts with paged earlier history, wheel zoom, drag pan,
   crosshair/OHLC inspection, volume, and continuously changing open candles.
 - Binance or OKX market provider selection.
-- MA, RSI, Bollinger Bands, Support/Resistance, MACD, News Sentiment, and a safe
-  executable `RULE` strategy DSL for AI-authored metric/operator conditions.
+- MA, RSI, Bollinger Bands, Support/Resistance, MACD, News Sentiment, and bounded
+  executable `RULE` and `AI_DSL@1.0` strategy languages.
 - Majority and weighted signal-combination policies.
 - Random Search and multi-generation Genetic Search.
 - Durable job queue, scalable workers, retry, cancellation, and outbox/inbox
@@ -45,10 +45,10 @@ backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
 - Manual account-owned backtests with reloadable history and exact historical
   date ranges up to 20,000 candles by default.
 - Natural-language and public article URL strategy authoring through Gemini.
-  Generated JSON can define validated `RULE` logic or compose registered
-  plugins; it cannot run arbitrary generated Java code.
-- Strategy idea confirmation, JSON repair attempts, smoke tests, version history,
-  and deletion.
+  Generated JSON contains bounded Trading DSL or registered plugins; it cannot
+  run arbitrary generated Java, JavaScript, or Groovy code.
+- Separate idea and tested-source confirmation, JSON/DSL repair attempts,
+  250-candle smoke tests, version history, and deletion.
 - Account-owned continuous Genetic Search schedules with start, stop, recovery,
   and immutable configuration versions. The default interval is 24 hours.
 - News collection with deterministic keyword sentiment by default and optional
@@ -56,7 +56,7 @@ backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
 - Versioned crawler selector templates, scheduled live-page selector checks, and
   Gemini-assisted replacement selectors that remain `NEEDS_REVIEW` until the
   account owner confirms them.
-- Flyway database migrations V1 through V19.
+- Flyway database migrations V1 through V21.
 - A real-time load proof in which 1,000 of 1,000 sessions received all four
   timeframe topics.
 
@@ -65,7 +65,7 @@ backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
 - Automatic runtime failover from Binance to OKX. Select one provider at startup.
 - Arbitrary generated Java source is deliberately not compiled or executed.
   Natural-language authoring can create new executable logic through the
-  validated `RULE` DSL or compose registered plugins, without rebuilding the app.
+  bounded `AI_DSL` or compose registered plugins, without rebuilding the app.
 - Each experiment uses one selected timeframe from the supported set. Strategies
   that synchronize signals from several timeframes inside one experiment are not
   implemented.

@@ -114,6 +114,8 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .button-row { justify-content: flex-start; margin-bottom: 10px; }
 .progress-track { height: 8px; overflow: hidden; border-radius: 999px; background: #edf0f5; }
 .progress-track span { display: block; width: 0; height: 100%; background: linear-gradient(90deg,#176ce9,#5a35ea); transition: width .2s; }
+.progress-track span.indeterminate { animation: indeterminate-progress 1.4s ease-in-out infinite alternate; }
+@keyframes indeterminate-progress { from { transform: translateX(0); } to { transform: translateX(185%); } }
 .metric-grid, .status-grid, .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
 .metric-grid article, .status-grid article, .summary-grid article { display: grid; gap: 4px; padding: 11px; border: 1px solid #e5e8ee; border-radius: 8px; background: #fafbfc; }
 .metric-grid span, .status-grid span, .summary-grid span { color: #778092; font-size: .65rem; }.metric-grid strong, .summary-grid strong { font-size: .9rem; }
