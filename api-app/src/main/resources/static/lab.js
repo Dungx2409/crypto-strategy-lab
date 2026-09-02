@@ -124,12 +124,13 @@ function beginPolling() { clearInterval(labState.poll); labState.poll = setInter
 async function loadLeaderboard() {
     if (!labState.searchRunId) return; const data = await api(`/api/v1/leaderboard?searchRunId=${labState.searchRunId}&limit=50`); const body = byId("leaderboard-body"); body.replaceChildren();
     if (!data.items.length) { const row = body.insertRow(); const cell = row.insertCell(); cell.colSpan = 7; cell.className = "empty"; cell.textContent = "No completed experiments yet."; return; }
-    data.items.forEach(item => { const row = body.insertRow(); row.dataset.experimentId = item.experimentId; [item.rank,item.strategySummary,`${item.returnPct}%`,`${item.winRatePct ?? "-"}%`,`${item.maxDrawdownPct}%`,item.totalTrades,item.score].forEach(value => { const cell = row.insertCell(); cell.textContent = value; }); row.addEventListener("click", () => loadExperiment(item.experimentId)); });
-    if (!document.querySelector("[data-selected-experiment]") && data.items[0]) loadExperiment(data.items[0].experimentId);
+    data.items.forEach(item => { const row = body.insertRow(); row.dataset.experimentId = item.experimentId; if (labState.selectedExperimentId === item.experimentId) row.dataset.selectedExperiment = "true"; [item.rank,item.strategySummary,`${item.returnPct}%`,`${item.winRatePct ?? "-"}%`,`${item.maxDrawdownPct}%`,item.totalTrades,item.score].forEach(value => { const cell = row.insertCell(); cell.textContent = value; }); row.addEventListener("click", () => { loadExperiment(item.experimentId); if (typeof showView === "function") showView("backtest"); }); });
+    if (!labState.selectedExperimentId && data.items[0]) { loadExperiment(data.items[0].experimentId); } else if (labState.selectedExperimentId && !document.querySelector("[data-selected-experiment]")) { const exists = data.items.some(i => i.experimentId === labState.selectedExperimentId); if (!exists && data.items[0]) loadExperiment(data.items[0].experimentId); }
 }
 
 function provenanceItem(label, value) { const item = document.createElement("article"); item.className = "provenance-item"; const name = document.createElement("span"); name.textContent = label; const data = document.createElement("strong"); data.textContent = value ?? "—"; item.append(name,data); return item; }
 async function loadExperiment(experimentId) {
+    labState.selectedExperimentId = experimentId;
     document.querySelectorAll("#leaderboard-body tr").forEach(row => { if (row.dataset.experimentId === experimentId) row.dataset.selectedExperiment = "true"; else delete row.dataset.selectedExperiment; });
     byId("experiment-message").textContent = "Loading immutable result…";
     try {
