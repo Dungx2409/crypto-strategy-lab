@@ -177,6 +177,11 @@ public final class NewsCollector {
         return health;
     }
 
+    public String providerName() {
+        String name = provider.name();
+        return name == null || name.isBlank() ? "Configured news provider" : name;
+    }
+
     private SentimentResult analyzeWithBoundedRetry(NewsItem item) {
         RuntimeException lastFailure = null;
         for (int attempt = 1; attempt <= maximumInferenceAttempts; attempt++) {

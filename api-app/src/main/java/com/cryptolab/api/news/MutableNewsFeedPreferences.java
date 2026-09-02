@@ -6,6 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -16,6 +18,17 @@ public final class MutableNewsFeedPreferences implements NewsFeedPreferences {
 
     private volatile String interval = "5m";
     private volatile String coin = "ALL";
+    private volatile String provider;
+
+    MutableNewsFeedPreferences() {
+        this("all");
+    }
+
+    @Autowired
+    public MutableNewsFeedPreferences(
+            @Value("${crypto.news.provider:all}") String provider) {
+        this.provider = normalizeProvider(provider);
+    }
 
     @Override
     public String categoriesCsv() {
@@ -26,13 +39,22 @@ public final class MutableNewsFeedPreferences implements NewsFeedPreferences {
         return selected;
     }
 
-    public synchronized NewsPreferencesResponse snapshot() {
-        return new NewsPreferencesResponse(interval, coin, categoriesCsv());
+    @Override
+    public String providerCode() {
+        return provider;
     }
 
-    public synchronized NewsPreferencesResponse update(String intervalCode, String coinOrPair) {
+    public synchronized NewsPreferencesResponse snapshot() {
+        return new NewsPreferencesResponse(
+                interval, coin, categoriesCsv(), provider,
+                java.util.List.of("CRYPTOCOMPARE", "RSS", "ALL"));
+    }
+
+    public synchronized NewsPreferencesResponse update(
+            String intervalCode, String coinOrPair, String providerCode) {
         this.interval = normalizeInterval(intervalCode);
         this.coin = normalizeCoin(coinOrPair);
+        this.provider = normalizeProvider(providerCode);
         return snapshot();
     }
 
@@ -76,6 +98,17 @@ public final class MutableNewsFeedPreferences implements NewsFeedPreferences {
                     "coin must be ALL or a CryptoCompare category like BTC, ETH, SOL");
         }
         return mapped;
+    }
+
+    private static String normalizeProvider(String providerCode) {
+        if (providerCode == null || providerCode.isBlank()) return "ALL";
+        return switch (providerCode.trim().toUpperCase(Locale.ROOT)) {
+            case "CRYPTOCOMPARE" -> "CRYPTOCOMPARE";
+            case "RSS" -> "RSS";
+            case "ALL", "COMPOSITE" -> "ALL";
+            default -> throw new IllegalArgumentException(
+                    "provider must be CryptoCompare, RSS, or All providers");
+        };
     }
 
     private static Map<String, String> coinAliases() {

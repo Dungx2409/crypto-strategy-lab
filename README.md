@@ -57,8 +57,10 @@ backtest worker, PostgreSQL, RabbitMQ, and a browser dashboard.
   and deletion.
 - Account-owned continuous Genetic Search schedules with start, stop, recovery,
   and immutable configuration versions. The default interval is 24 hours.
-- News collection with deterministic keyword sentiment by default and optional
-  Gemini semantic sentiment with versioned model/preprocessing metadata.
+- News collection from CryptoCompare, RSS or Atom feeds, and HTML websites.
+  Composite mode merges CryptoCompare and RSS while tolerating one provider
+  failure. Sentiment uses the local keyword model by default or Gemini when
+  selected.
 - Versioned crawler selector templates, scheduled live-page selector checks, and
   Gemini-assisted replacement selectors that remain `NEEDS_REVIEW` until the
   account owner confirms them. Active selectors also extract, store, and analyze
@@ -110,6 +112,8 @@ DEFAULT_ACCOUNT_PASSWORD=crypto-demo
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
 NEWS_API_KEY=
+NEWS_PROVIDER=all
+NEWS_RSS_URLS=https://www.coindesk.com/arc/outboundfeeds/rss/,https://cointelegraph.com/rss
 SENTIMENT_PROVIDER=keyword
 CRAWLER_CHECK_INTERVAL=15m
 ```
@@ -117,6 +121,25 @@ CRAWLER_CHECK_INTERVAL=15m
 Set `SENTIMENT_PROVIDER=gemini` to use Gemini semantic sentiment. Selector checks
 run every 15 minutes by default; a failed check never activates an AI proposal
 without user confirmation.
+
+Choose the provider from the News screen and click **Apply**. The choice affects
+manual and scheduled collection immediately. `NEWS_PROVIDER` sets the initial
+dropdown value:
+
+```dotenv
+# CryptoCompare only
+NEWS_PROVIDER=cryptocompare
+
+# RSS and Atom feeds only
+NEWS_PROVIDER=rss
+
+# CryptoCompare and RSS together
+NEWS_PROVIDER=all
+```
+
+`rss` and `all` require at least one comma-separated URL in `NEWS_RSS_URLS`.
+The older value `composite` is accepted as an alias for `all`. HTML website
+templates are managed from the News screen and can run alongside any mode.
 
 Build and start the complete application:
 

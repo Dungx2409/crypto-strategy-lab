@@ -95,6 +95,7 @@ class NewsControllerTest {
 
         mockMvc.perform(get("/api/v1/news").param("limit", "10"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.provider").value("Configured news provider"))
                 .andExpect(jsonPath("$.items[0].title").value("Bitcoin adoption gains"))
                 .andExpect(jsonPath("$.items[0].sentiment").value("POSITIVE"))
                 .andExpect(jsonPath("$.items[0].score").value(1.0))
@@ -116,11 +117,12 @@ class NewsControllerTest {
     void updatesCoinAndIntervalPreferences() throws Exception {
         mockMvc.perform(put("/api/v1/news/preferences")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"interval\":\"1m\",\"coin\":\"ETHUSDT\"}"))
+                        .content("{\"interval\":\"1m\",\"coin\":\"ETHUSDT\",\"provider\":\"RSS\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.interval").value("1m"))
                 .andExpect(jsonPath("$.coin").value("ETH"))
-                .andExpect(jsonPath("$.categories").value("ETH"));
+                .andExpect(jsonPath("$.categories").value("ETH"))
+                .andExpect(jsonPath("$.provider").value("RSS"));
 
         mockMvc.perform(get("/api/v1/news/preferences"))
                 .andExpect(status().isOk())

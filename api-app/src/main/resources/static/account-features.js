@@ -19,6 +19,10 @@ function setAccount(account) {
     byId("account-state").textContent = account ? "Session account" : "Sign in for saved work";
     byId("auth-status").textContent = account ? "SIGNED IN" : "SIGNED OUT";
     byId("auth-status").className = `status ${account ? "status-online" : "status-offline"}`;
+    byId("auth-credentials").hidden = Boolean(account);
+    byId("register-account").hidden = Boolean(account);
+    byId("login-account").hidden = Boolean(account);
+    byId("logout-account").hidden = !account;
     byId("logout-account").disabled = !account;
     byId("authoring-status").textContent = account ? "READY" : "SIGN IN";
     byId("authoring-status").className = `status ${account ? "status-online" : "status-offline"}`;

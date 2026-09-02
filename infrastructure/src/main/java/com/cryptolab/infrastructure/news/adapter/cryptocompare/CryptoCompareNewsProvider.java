@@ -52,6 +52,11 @@ public final class CryptoCompareNewsProvider implements NewsProvider {
     }
 
     @Override
+    public String name() {
+        return "CryptoCompare";
+    }
+
+    @Override
     public List<NewsItem> fetchSince(Instant since) {
         return fetchSince(since, "");
     }

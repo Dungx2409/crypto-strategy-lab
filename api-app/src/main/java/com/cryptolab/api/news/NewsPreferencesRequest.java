@@ -1,3 +1,3 @@
 package com.cryptolab.api.news;
 
-public record NewsPreferencesRequest(String interval, String coin) {}
+public record NewsPreferencesRequest(String interval, String coin, String provider) {}

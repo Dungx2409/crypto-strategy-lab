@@ -8,6 +8,10 @@ public interface NewsFeedPreferences {
 
     String categoriesCsv();
 
+    default String providerCode() {
+        return "ALL";
+    }
+
     static NewsFeedPreferences allCoins() {
         return () -> "";
     }

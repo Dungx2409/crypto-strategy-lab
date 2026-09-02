@@ -2,6 +2,8 @@ package com.cryptolab.api.news;
 
 import com.cryptolab.infrastructure.news.adapter.DeterministicKeywordSentimentAnalyzer;
 import com.cryptolab.infrastructure.news.adapter.GeminiSentimentAnalyzer;
+import com.cryptolab.infrastructure.news.adapter.RssNewsProvider;
+import com.cryptolab.infrastructure.news.adapter.SelectableNewsProvider;
 import com.cryptolab.infrastructure.strategy.adapter.GeminiStrategyAuthoringModel;
 import com.cryptolab.infrastructure.news.adapter.cryptocompare.CryptoCompareNewsProvider;
 import com.cryptolab.news.application.NewsCollector;
@@ -21,6 +23,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.UUID;
@@ -76,20 +80,23 @@ class NewsRuntimeConfiguration {
     }
 
     @Bean
-    @ConditionalOnProperty(
-            name = "crypto.news.provider",
-            havingValue = "cryptocompare",
-            matchIfMissing = true)
-    NewsProvider cryptoCompareNewsProvider(
+    NewsProvider newsProvider(
             ObjectMapper objectMapper,
+            NewsFeedPreferences preferences,
             @Value("${crypto.news.cryptocompare.url:https://min-api.cryptocompare.com/data/v2/news/}")
                     URI endpoint,
             @Value("${crypto.news.cryptocompare.api-key:}") String apiKey,
+            @Value("${crypto.news.rss.urls:}") String rssUrls,
             @Value("${crypto.news.connect-timeout:5s}") Duration connectTimeout,
             @Value("${crypto.news.request-timeout:10s}") Duration requestTimeout,
             @Value("${crypto.news.maximum-items:50}") int maximumItems) {
-        return new CryptoCompareNewsProvider(
+        NewsProvider cryptoCompare = new CryptoCompareNewsProvider(
                 objectMapper, endpoint, apiKey, connectTimeout, requestTimeout, maximumItems);
+        List<URI> feeds = rssFeeds(rssUrls);
+        NewsProvider rss = new RssNewsProvider(
+                feeds, connectTimeout, requestTimeout, maximumItems);
+        return new SelectableNewsProvider(
+                preferences, cryptoCompare, rss, maximumItems);
     }
 
     @Bean
@@ -130,5 +137,18 @@ class NewsRuntimeConfiguration {
                 marketDataClock,
                 initialLookback,
                 maximumInferenceAttempts);
+    }
+
+    private static List<URI> rssFeeds(String csv) {
+        List<URI> feeds = Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .map(URI::create)
+                .toList();
+        if (feeds.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "NEWS_RSS_URLS must contain at least one feed for RSS or composite mode");
+        }
+        return feeds;
     }
 }

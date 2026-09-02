@@ -24,7 +24,7 @@ Dashboard inside api-app
   +----> Binance or OKX
   |       candles and realtime updates
   |
-  +----> CryptoCompare or HTML websites
+  +----> CryptoCompare, RSS feeds, or HTML websites
   |       news articles
   |
   +----> Gemini
@@ -40,7 +40,7 @@ domain events. API and worker processes share the same domain rules from
 | Module | Responsibility |
 |---|---|
 | `core` | Domain types, application services, ports, strategy rules, search, backtesting, evaluation, and ranking |
-| `infrastructure` | JDBC, RabbitMQ, Binance, OKX, CryptoCompare, HTML extraction, Gemini, BCrypt, and runtime strategy compilation |
+| `infrastructure` | JDBC, RabbitMQ, Binance, OKX, CryptoCompare, RSS and Atom, HTML extraction, Gemini, BCrypt, and runtime strategy compilation |
 | `api-app` | REST endpoints, sessions, STOMP topics, scheduled work, health checks, and the browser dashboard |
 | `worker-app` | Claims queued jobs and runs deterministic backtests outside the API process |
 | `integration-tests` | Tests PostgreSQL, RabbitMQ, migrations, worker behavior, failure recovery, and architecture proofs |
@@ -100,9 +100,13 @@ ranking.
 ### News and sentiment
 
 `NewsProvider` hides the source behind one normalized `NewsItem` contract.
-CryptoCompare is the API provider. Account-owned HTML templates can also fetch
-pages and extract articles with Jsoup selectors. Gemini may propose replacement
-selectors, but a user must confirm a `NEEDS_REVIEW` version before activation.
+The selected provider can be CryptoCompare, RSS or Atom, or a composite that
+merges CryptoCompare and RSS. Composite mode keeps results from working
+providers and deduplicates articles by URL. Users can change this selection
+from the News screen without restarting the API. Account-owned HTML templates can
+also fetch pages and extract articles with Jsoup selectors. Gemini may propose
+replacement selectors, but a user must confirm a `NEEDS_REVIEW` version before
+activation.
 
 The sentiment analyzer is replaceable. Stored predictions include model,
 model version, input version, and preprocessing version. News and sentiment

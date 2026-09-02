@@ -6,6 +6,7 @@ const analyzeNewsButton = document.querySelector("#analyze-news");
 const saveNewsPreferencesButton = document.querySelector("#save-news-preferences");
 const newsInterval = document.querySelector("#news-interval");
 const newsCoin = document.querySelector("#news-coin");
+const newsProvider = document.querySelector("#news-provider");
 let latestNewsItems = [];
 
 function setNewsStatus(status, sentimentStatus) {
@@ -105,6 +106,7 @@ async function loadNewsPreferences() {
     if (!response.ok) throw new Error(body.message || "News preferences request failed");
     if (newsInterval) newsInterval.value = body.interval || "5m";
     if (newsCoin) newsCoin.value = body.coin || "ALL";
+    if (newsProvider) newsProvider.value = body.provider || "ALL";
     return body;
 }
 
@@ -117,17 +119,20 @@ async function saveNewsPreferences() {
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({
                 interval: newsInterval.value,
-                coin: newsCoin.value
+                coin: newsCoin.value,
+                provider: newsProvider.value
             })
         });
         const body = await response.json();
         if (!response.ok) throw new Error(body.message || "Could not save news preferences");
         newsInterval.value = body.interval;
         newsCoin.value = body.coin;
+        newsProvider.value = body.provider;
         newsMessage.dataset.keep = "true";
+        const providerLabel = newsProvider.options[newsProvider.selectedIndex].text;
         newsMessage.textContent = body.categories
-            ? `Auto-crawl every ${body.interval} for ${body.coin} (categories ${body.categories})`
-            : `Auto-crawl every ${body.interval} for all coins`;
+            ? `${providerLabel} every ${body.interval} for ${body.coin}`
+            : `${providerLabel} every ${body.interval} for all coins`;
     } catch (error) {
         newsMessage.textContent = error.message;
     } finally {
@@ -199,6 +204,9 @@ saveNewsPreferencesButton.addEventListener("click", saveNewsPreferences);
     });
     newsCoin.addEventListener(eventName, () => {
         newsMessage.textContent = "Click Apply to filter Collect & auto-crawl by this coin.";
+    });
+    newsProvider.addEventListener(eventName, () => {
+        newsMessage.textContent = "Click Apply to use this news provider.";
     });
 });
 

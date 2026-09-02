@@ -1,3 +1,8 @@
 package com.cryptolab.api.news;
 
-public record NewsPreferencesResponse(String interval, String coin, String categories) {}
+public record NewsPreferencesResponse(
+        String interval,
+        String coin,
+        String categories,
+        String provider,
+        java.util.List<String> availableProviders) {}

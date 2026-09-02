@@ -5,6 +5,10 @@ import java.time.Instant;
 import java.util.List;
 
 public interface NewsProvider {
+    default String name() {
+        return "Configured news provider";
+    }
+
     List<NewsItem> fetchSince(Instant since);
 
     /**

@@ -96,7 +96,7 @@ crypto:
       concurrency: ${REALTIME_EVENT_CONCURRENCY:1}
       prefetch: ${REALTIME_EVENT_PREFETCH:10}
   news:
-    provider: ${NEWS_PROVIDER:cryptocompare}
+    provider: ${NEWS_PROVIDER:all}
     connect-timeout: 5s
     request-timeout: 10s
     maximum-items: 50
@@ -104,6 +104,8 @@ crypto:
     cryptocompare:
       url: ${NEWS_API_URL:https://min-api.cryptocompare.com/data/v2/news/}
       api-key: ${NEWS_API_KEY:}
+    rss:
+      urls: ${NEWS_RSS_URLS:https://www.coindesk.com/arc/outboundfeeds/rss/,https://cointelegraph.com/rss}
     collection:
       initial-delay: 30s
       interval: 5m

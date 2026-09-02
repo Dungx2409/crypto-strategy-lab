@@ -16,8 +16,8 @@ class M7DashboardTest {
         assertThat(html).contains(
                 "System status",
                 "Realtime Chart",
-                "Strategy configuration",
-                "Search run",
+                "Choose strategies",
+                "Find strong strategies",
                 "Leaderboard",
                 "Top #1 / Experiment details",
                 "News + Sentiment",

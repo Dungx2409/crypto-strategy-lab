@@ -33,7 +33,7 @@ public final class NewsController {
         List<NewsItemResponse> items = collector.latest(limit).stream()
                 .map(NewsItemResponse::from)
                 .toList();
-        return NewsResponse.from(collector.health(), items);
+        return NewsResponse.from(collector.providerName(), collector.health(), items);
     }
 
     @GetMapping("/preferences")
@@ -45,7 +45,8 @@ public final class NewsController {
     public NewsPreferencesResponse updatePreferences(@RequestBody NewsPreferencesRequest body) {
         NewsPreferencesResponse updated = preferences.update(
                 body == null ? null : body.interval(),
-                body == null ? null : body.coin());
+                body == null ? null : body.coin(),
+                body == null ? null : body.provider());
         scheduler.reschedule(preferences.intervalDuration());
         return updated;
     }

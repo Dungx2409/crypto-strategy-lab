@@ -40,6 +40,12 @@ class ReferenceDashboardTest {
                 "ETHUSDT",
                 "SOLUSDT",
                 "BNBUSDT",
+                "data-symbol-picker",
+                "coin-icon",
+                "https://www.cryptocompare.com/media/37746251/btc.png",
+                "https://www.cryptocompare.com/media/37746238/eth.png",
+                "https://www.cryptocompare.com/media/37747734/sol.png",
+                "https://www.cryptocompare.com/media/37746880/bnb.png",
                 "data-primary-timeframe=\"30m\"",
                 "data-primary-timeframe=\"2h\"",
                 "data-primary-timeframe=\"1d\"");
@@ -47,6 +53,9 @@ class ReferenceDashboardTest {
                 "chartStates",
                 "reloadChart",
                 "unsubscribeChart",
+                "initSymbolPicker",
+                "formatPrice",
+                "toFixed(2)",
                 "/api/v1/market/candles",
                 "/topic/market/")
                 .doesNotContain("location.reload");
@@ -86,10 +95,14 @@ class ReferenceDashboardTest {
                 "schedule-lookback-preset",
                 "schedule-frequency-preset",
                 "account-features.js");
+        assertThat(html)
+                .contains("id=\"auth-credentials\"", "id=\"logout-account\"")
+                .doesNotContain("Sessions use an HTTP-only cookie.");
         assertThat(features).contains(
                 "/api/v1/auth/",
                 "byId(\"auth-gate\").hidden = Boolean(account)",
                 "byId(\"app-shell\").hidden = !account",
+                "auth-credentials",
                 "/api/v1/user-strategies",
                 "/api/v1/discovery-schedules",
                 "/api/v1/experiments",

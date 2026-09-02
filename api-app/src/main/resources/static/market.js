@@ -206,7 +206,7 @@ function drawMarketChart(canvas, candles, options = {}) {
         const value = maximum - range * line / 4;
         const lineY = y(value);
         context.beginPath(); context.moveTo(left, lineY); context.lineTo(canvas.width - right, lineY); context.stroke();
-        context.fillText(value.toLocaleString(undefined, {maximumFractionDigits: 2}), canvas.width - right + 7, lineY + 4);
+        context.fillText(formatPrice(value), canvas.width - right + 7, lineY + 4);
     }
 
     const maxVolume = Math.max(...candles.map(candle => Number(candle.volume)), 1);
@@ -268,9 +268,14 @@ function drawMarketChart(canvas, candles, options = {}) {
         const candle=candles[options.hoverIndex], hoverX=x(options.hoverIndex);
         context.strokeStyle="#64748b";context.setLineDash([3,3]);context.beginPath();context.moveTo(hoverX,top);context.lineTo(hoverX,canvas.height-bottom);context.stroke();context.setLineDash([]);
         context.fillStyle="rgba(15,23,42,.88)";context.fillRect(left+8,top+8,270,42);context.fillStyle="#fff";context.font="11px system-ui";
-        context.fillText(`${new Date(candle.openTime).toLocaleString()}  O ${candle.open}  H ${candle.high}`,left+16,top+25);
-        context.fillText(`L ${candle.low}  C ${candle.close}  V ${candle.volume}`,left+16,top+42);
+        context.fillText(`${new Date(candle.openTime).toLocaleString()}  O ${formatPrice(candle.open)}  H ${formatPrice(candle.high)}`,left+16,top+25);
+        context.fillText(`L ${formatPrice(candle.low)}  C ${formatPrice(candle.close)}  V ${formatPrice(candle.volume)}`,left+16,top+42);
     }
+}
+
+function formatPrice(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number.toFixed(2) : "—";
 }
 
 function drawSignalMarker(context,x,y,type){context.fillStyle=type==="BUY"?"#16a064":"#df4052";context.font="bold 10px system-ui";context.fillText(type==="BUY"?"▲ BUY":"▼ SELL",x-18,y+(type==="BUY"?18:-10));}
@@ -299,11 +304,11 @@ function renderChart(index) {
     const close = Number(latest.close), change = first ? (close - Number(first.close)) / Number(first.close) * 100 : 0;
     const maValues = movingAverage(state.candles, 20), ma = maValues.at(-1);
     const signal = ma === null ? "HOLD" : close > ma ? "BUY" : close < ma ? "SELL" : "HOLD";
-    state.card.querySelector(".chart-price").textContent = close.toLocaleString(undefined, {maximumFractionDigits: 2});
+    state.card.querySelector(".chart-price").textContent = formatPrice(close);
     const changeNode = state.card.querySelector(".chart-change"); changeNode.textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`; changeNode.className = `chart-change ${change < 0 ? "negative" : "positive"}`;
-    state.card.querySelector(".chart-ma").textContent = ma === null ? "MA(20) calculating" : `MA(20) ${ma.toLocaleString(undefined, {maximumFractionDigits: 2})}`;
+    state.card.querySelector(".chart-ma").textContent = ma === null ? "MA(20) calculating" : `MA(20) ${formatPrice(ma)}`;
     const signalNode = state.card.querySelector(".chart-signal"); signalNode.textContent = signal; signalNode.className = `chart-signal ${signal.toLowerCase()}`;
-    state.card.querySelector(".chart-volume").textContent = `Volume ${Number(latest.volume).toLocaleString(undefined, {maximumFractionDigits: 2})}`;
+    state.card.querySelector(".chart-volume").textContent = `Volume ${formatPrice(latest.volume)}`;
 }
 
 function renderBacktestResult(details, highlight = null) {
@@ -347,6 +352,65 @@ symbolSelect.addEventListener("change", () => chartStates.forEach(state => {
     state.card.querySelector("strong").firstChild.textContent = `${symbolSelect.value} · `;
     reloadChart(state.index);
 }));
+
+function syncSymbolPicker(value) {
+    const picker = document.querySelector("[data-symbol-picker]");
+    if (!picker) return;
+    const trigger = picker.querySelector(".symbol-picker-trigger");
+    const triggerIcon = trigger.querySelector(".coin-icon");
+    const triggerText = trigger.querySelector(".symbol-picker-text");
+    const options = [...picker.querySelectorAll('[role="option"]')];
+    const selected = options.find(option => option.dataset.value === value) || options[0];
+    if (!selected) return;
+    options.forEach(option => option.setAttribute("aria-selected", option === selected ? "true" : "false"));
+    triggerIcon.src = selected.dataset.icon;
+    triggerText.textContent = selected.dataset.value;
+}
+
+function setSymbolPickerOpen(open) {
+    const picker = document.querySelector("[data-symbol-picker]");
+    if (!picker) return;
+    const trigger = picker.querySelector(".symbol-picker-trigger");
+    const menu = picker.querySelector(".symbol-picker-menu");
+    trigger.setAttribute("aria-expanded", open ? "true" : "false");
+    menu.hidden = !open;
+}
+
+function initSymbolPicker() {
+    const picker = document.querySelector("[data-symbol-picker]");
+    if (!picker || !symbolSelect) return;
+    const trigger = picker.querySelector(".symbol-picker-trigger");
+    const menu = picker.querySelector(".symbol-picker-menu");
+    syncSymbolPicker(symbolSelect.value);
+    trigger.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        setSymbolPickerOpen(menu.hidden);
+    });
+    menu.querySelectorAll('[role="option"]').forEach(option => {
+        option.addEventListener("click", event => {
+            event.preventDefault();
+            event.stopPropagation();
+            const value = option.dataset.value;
+            if (!value || symbolSelect.value === value) {
+                setSymbolPickerOpen(false);
+                return;
+            }
+            symbolSelect.value = value;
+            syncSymbolPicker(value);
+            setSymbolPickerOpen(false);
+            symbolSelect.dispatchEvent(new Event("change", {bubbles: true}));
+        });
+    });
+    document.addEventListener("click", event => {
+        if (!picker.contains(event.target)) setSymbolPickerOpen(false);
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") setSymbolPickerOpen(false);
+    });
+}
+
+initSymbolPicker();
 chartStates.forEach(state => state.timeframeSelect.addEventListener("change", () => reloadChart(state.index)));
 chartStates.forEach(state=>{
     let dragStart=null;
