@@ -809,7 +809,7 @@ flowchart TB
     %% 6. INFRASTRUCTURE & STORAGE
     subgraph Infra ["🟪 Infrastructure & Storage (Hạ tầng lưu trữ)"]
         direction LR
-        RabbitMQ[("🐇 RabbitMQ\n(crypto.backtest.jobs + DLQ)") ]
+        RabbitMQ[("🐇 RabbitMQ\n(crypto.backtest.jobs + DLQ)")]
         PostgreSQL[("🐘 PostgreSQL\n(1 Transaction / Bảng chiếu / Truy vết)")]
     end
 

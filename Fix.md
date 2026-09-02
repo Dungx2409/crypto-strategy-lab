@@ -92,13 +92,146 @@ Xây dựng **Kiến trúc Scripting động (Dynamic Scripting Architecture)**,
 ## Lỗi #5: Thiếu các tính năng điều khiển và phân tích trên giao diện Backtest (Frontend Module 6-8)
 
 ### 1. Phân tích lỗi
-Dù Backend (Core/API) đã xử lý hoàn chỉnh các luồng dữ liệu theo đúng yêu cầu đề bài, nhưng giao diện Frontend (file HTML và JS) hiện đang bỏ sót 3 tính năng quan trọng khiến người dùng không thể thao tác đầy đủ với quá trình Backtest & Leaderboard:
-*   **Thiếu 2 ô nhập liệu cho "Điều kiện dừng" (Stop Condition):** Giao diện chỉ có ô nhập số lượng ứng viên tối đa (Max candidates) nhưng lại thiếu ô nhập thời gian chạy tối đa (maxDuration) và số vòng lặp không cải thiện (noImprovementIterations). Điều này khiến vòng lặp có nguy cơ chạy không kiểm soát nếu người dùng muốn giới hạn theo thời gian.
-*   **Thiếu tính năng Sắp xếp (Sort) trên Bảng Leaderboard:** Dữ liệu Leaderboard trả về được hiển thị cố định theo Điểm (Score). Tuy nhiên, người dùng không thể click vào các tiêu đề cột (Return, Win Rate, Max Drawdown) để sắp xếp lại (Sort client-side) nhằm so sánh các chiến lược theo tiêu chí an toàn hoặc lợi nhuận.
-*   **Thiếu nút bấm "Chạy lại" (Rerun) trên UI:** Hệ thống Backend thiết kế theo chuẩn Immutable Provenance (thí nghiệm không thể ghi đè) và đã cung cấp API để Rerun (chạy lại cấu hình cũ trên dữ liệu mới). Tuy nhiên, trên giao diện chi tiết của một Leaderboard Entry lại không có nút bấm "Rerun" để kích hoạt API này.
+Dù Backend (Core/API) đã xử lý hoàn chỉnh các luồng dữ liệu theo đúng yêu cầu đề bài, nhưng giao diện Frontend (file HTML và JS) hiện đang bỏ sót các tính năng quan trọng khiến người dùng không thể thao tác đầy đủ với quá trình Backtest & Leaderboard:
+*   **Thiếu Thư viện Biểu đồ Chuyên nghiệp (TradingView):** Đề bài yêu cầu "Biểu đồ cần giống Trading View... nến cuối cùng phải liên tục nhảy lên xuống realtime" và "Bật MA, RSI". Frontend hiện tại không đáp ứng được nếu chỉ vẽ DOM thuần. Nó bắt buộc phải dùng thư viện như `lightweight-charts` và xử lý bản tin WebSocket để nháy cây nến cuối (tick) trực tiếp trên trình duyệt.
+*   **Thiếu 2 ô nhập liệu cho vòng lặp AI (Stop Condition):** Giao diện chỉ có ô nhập số lượng ứng viên tối đa (Max candidates) nhưng lại thiếu ô nhập thời gian chạy tối đa (`maxDuration`) và số vòng lặp không cải thiện (`noImprovementIterations`), khiến vòng lặp Genetic Search có nguy cơ chạy vô hạn.
+*   **Thiếu Tham số cấu hình Backtest thủ công:** Khi người dùng chọn chạy backtest một chiến lược, form giao diện đang thiếu ô nhập "Vốn ban đầu" (Initial Capital) và "Khung thời gian" (Date Range - VD: 1 năm qua).
+*   **Thiếu tính năng Sắp xếp (Sort) trên Bảng Leaderboard:** Dữ liệu Leaderboard trả về được hiển thị cố định theo Điểm (Score). Tuy nhiên, người dùng không thể click vào các tiêu đề cột (Return, Win Rate, Max Drawdown) để sắp xếp lại (Sort client-side).
+*   **Thiếu nút bấm "Chạy lại" (Rerun) trên UI:** Giao diện chi tiết của một Leaderboard Entry thiếu nút bấm "Rerun" để kích hoạt API tái lập thí nghiệm.
 
 ### 2. Hướng giải quyết (Kế hoạch Refactor)
 Bổ sung code thuần túy trên Frontend (HTML/JS) mà không cần can thiệp Backend:
-1.  **Thêm các ô Input Điều kiện dừng:** Bổ sung thẻ `<input>` cho `maxDuration` và `noImprovementIterations` vào form Search (file `index.html`). Cập nhật file `lab.js` để đọc giá trị từ 2 ô này và truyền vào object `stopConditions` trong JSON request gửi lên API.
-2.  **Gắn Event Listener Sắp xếp Leaderboard:** Gắn sự kiện `onclick` vào các thẻ `<th>` của bảng Leaderboard. Khi click, dùng hàm `sort()` của JavaScript để đảo lại thứ tự mảng dữ liệu `data.items` theo trường (field) tương ứng và gọi hàm render lại bảng.
-3.  **Thêm nút "Rerun this experiment":** Tại giao diện `Experiment details` (sau khi người dùng click vào một dòng Leaderboard), thêm một nút "Rerun". Khi bấm nút này, file JS sẽ gọi API `POST /api/v1/experiments/{experimentId}/rerun` và hiển thị kết quả so sánh trực quan kiểm chứng tính Tái lập (Reproducibility).
+1.  **Tích hợp TradingView Lightweight Charts:** Thêm thư viện này vào HTML, hứng sự kiện WebSocket để cập nhật Realtime cây nến cuối cùng và bổ sung các nút bật/tắt đường chỉ báo (MA, RSI).
+2.  **Thêm các ô Input Tham số:** Bổ sung thẻ `<input>` cho `maxDuration`, `noImprovementIterations` (cho AI Search) và `<input>` cho `capital`, `dateRange` (cho Backtest thủ công) vào file `index.html`.
+3.  **Gắn Event Listener Sắp xếp Leaderboard:** Gắn sự kiện `onclick` vào các thẻ `<th>` của bảng Leaderboard. Khi click, dùng hàm `sort()` của JavaScript để đảo lại thứ tự mảng dữ liệu.
+4.  **Thêm nút "Rerun this experiment":** Tại giao diện `Experiment details`, thêm nút "Rerun". Khi bấm, file JS gọi API `POST /api/v1/experiments/{experimentId}/rerun` để so sánh tính tái lập.
+
+---
+
+## Lỗi #6: Chưa kiểm soát đầy đủ thứ tự dữ liệu realtime (Module 1)
+
+### 1. Phân tích lỗi
+
+Hệ thống hiện tại dựa vào việc WebSocket của sàn thường truyền message theo thứ tự trên cùng một connection. Điều này thường đúng nhờ TCP, nhưng không đủ để bảo đảm thứ tự trong toàn bộ pipeline của ứng dụng. Dữ liệu có thể bị xử lý lệch thứ tự khi:
+
+*   connection cũ gửi callback sau khi connection mới đã reconnect;
+*   REST gap recovery lấy snapshot trong khi WebSocket vẫn gửi update;
+*   client đang tải historical data nhưng nhận realtime update trước khi request REST hoàn tất;
+*   một update cũ của cùng một candle đến sau update mới.
+
+Trong code hiện tại:
+
+*   `MarketDataStreamService` có `generation` để loại callback từ stream cũ, nhưng chưa có sequence/version cho từng update;
+*   `CandleUpdate` chỉ chứa `Candle` và `closed`, chưa chứa event time hoặc sequence;
+*   `market.js` nhận candle cùng `openTime` rồi ghi đè, nên một update cũ đến trễ có thể ghi đè update mới;
+*   `JdbcCandleStore.saveIfAbsent()` chỉ chống insert duplicate của candle đã đóng, không giải quyết thứ tự các update đang mở;
+*   khi REST history hoàn tất sau realtime update, `state.candles = body.candles` có thể ghi đè state mới hơn nếu không merge.
+
+Vì vậy, kết luận chính xác là: hệ thống đã có stale-connection protection và duplicate protection, nhưng chưa đảm bảo tuyệt đối out-of-order message protection.
+
+### 2. Hướng giải quyết (Kế hoạch Refactor)
+
+Xây dựng cơ chế kiểm soát thứ tự theo từng stream và từng candle:
+
+1.  **Bổ sung metadata cho update:** Mở rộng `CandleUpdate` bằng `eventTime`, `sequence` hoặc `updateVersion` nếu provider cung cấp. Binance có event time, nhưng nếu không có sequence cho kline update thì phải kết hợp event time với `openTime` và trạng thái đóng.
+2.  **Lưu watermark theo stream:** Trong `MarketDataStreamService`, mỗi `StreamState` lưu `lastClosedOpenTime` và metadata update cuối cùng cho candle đang mở.
+3.  **Từ chối update cũ:** Nếu update có version/event time cũ hơn update đã chấp nhận thì bỏ qua. Candle đã đóng có `openTime` nhỏ hơn watermark cũng không được publish như dữ liệu mới.
+4.  **Merge REST và WebSocket:** Khi historical response về client, không gán đè mù lên `state.candles`. Cần merge theo `openTime` và giữ bản update mới hơn.
+5.  **Giữ cơ chế recovery:** Khi không đủ metadata để xác định thứ tự, đánh dấu stream cần reconciliation và tải lại candle liên quan từ REST API. REST là nguồn xác minh, còn WebSocket tiếp tục cung cấp realtime.
+6.  **Bổ sung test:** Test update cùng `openTime` đến ngược thứ tự, candle cũ đến sau candle mới, REST response đến sau WebSocket update, reconnect với listener cũ và recovery không tạo duplicate.
+
+### 3. Các file cần rà soát
+
+*   `core/src/main/java/com/cryptolab/marketdata/domain/CandleUpdate.java`
+*   `core/src/main/java/com/cryptolab/marketdata/application/MarketDataStreamService.java`
+*   `infrastructure/src/main/java/com/cryptolab/infrastructure/marketdata/adapter/binance/BinancePayloadMapper.java`
+*   `api-app/src/main/resources/static/market.js`
+*   `infrastructure/src/main/java/com/cryptolab/infrastructure/marketdata/adapter/persistence/JdbcCandleStore.java`
+*   `core/src/test/java/com/cryptolab/marketdata/application/MarketDataStreamServiceTest.java`
+
+### 4. Giới hạn cần ghi rõ
+
+Sàn thường bảo đảm thứ tự message trên một WebSocket connection, nhưng ứng dụng vẫn phải kiểm soát thứ tự sau khi kết hợp nhiều nguồn và nhiều vòng đời connection. Không nên nói rằng sàn tự giải quyết toàn bộ ordering cho hệ thống.
+
+
+
+
+---
+
+## Lỗi #7: Zoom biểu đồ không giữ vị trí con trỏ (Module 2)
+
+### 1. Phân tích lỗi
+
+Chức năng zoom hiện tại mới thay đổi số lượng candle nhìn thấy quanh vùng nến mới nhất. Vì vậy khi người dùng đặt con trỏ ở một candle cũ rồi cuộn chuột, biểu đồ không lấy candle dưới con trỏ làm tâm zoom; vùng hiển thị bị kéo về phía cuối dữ liệu.
+
+Lỗi này thuộc **Frontend/Module 2**, không phải lỗi của Binance hay WebSocket:
+
+*   Backend vẫn có thể trả đúng lịch sử candle;
+*   WebSocket vẫn có thể gửi đúng candle realtime;
+*   vấn đề nằm ở cách `market.js` tính vùng candle visible sau thao tác wheel;
+*   state hiện có `visibleCount` và `offset`, nhưng chưa quy đổi vị trí con trỏ thành index candle để giữ cố định candle đang được trỏ tới.
+
+### 2. Hướng giải quyết (Kế hoạch Refactor)
+
+Điều chỉnh zoom theo vị trí con trỏ trên từng canvas:
+
+1.  **Xác định chart đang thao tác:** Gắn `wheel` listener cho từng canvas trong `chartStates`, không dùng một vùng zoom chung cho cả bốn chart.
+2.  **Đổi tọa độ chuột thành candle index:** Dùng `offsetX`, vùng plot bên trong chart và số candle hiện tại để xác định candle đang nằm dưới con trỏ.
+3.  **Thay đổi mức zoom:** Cuộn lên giảm `visibleCount`; cuộn xuống tăng `visibleCount`, trong giới hạn tối thiểu và tối đa.
+4.  **Tính lại offset:** Sau khi đổi `visibleCount`, tính `offset` sao cho candle index dưới con trỏ vẫn nằm dưới cùng vị trí tương đối trên canvas.
+5.  **Giữ ổn định khi tải realtime:** Nếu nến mới đến trong lúc đang zoom vào vùng cũ, không tự động kéo view về nến mới trừ khi người dùng đang ở chế độ follow latest.
+6.  **Áp dụng độc lập cho 4 chart:** Mỗi chart giữ `visibleCount`, `offset` và viewport riêng; zoom chart này không làm thay đổi ba chart còn lại.
+7.  **Bổ sung test UI:** Kiểm tra zoom tại candle đầu, giữa và cuối; kiểm tra zoom từng chart độc lập; kiểm tra tải candle mới không làm mất viewport đang chọn.
+
+### 3. Các file cần rà soát
+
+*   `api-app/src/main/resources/static/market.js`
+*   `api-app/src/main/resources/static/index.html`
+*   `api-app/src/test/java/com/cryptolab/api/ReferenceDashboardTest.java`
+*   `api-app/src/test/java/com/cryptolab/api/marketdata/MarketDashboardIsolationTest.java`
+
+### 4. Kết luận cần ghi rõ
+
+Đây là lỗi về **viewport interaction** của Frontend: zoom chưa anchored theo con trỏ chuột. Nó không làm sai dữ liệu candle, nhưng làm người dùng không thể phóng to đúng vùng lịch sử cần quan sát. Cách sửa là zoom quanh candle index tương ứng với vị trí con trỏ, thay vì luôn zoom quanh candle mới nhất.
+
+---
+
+## Lỗi #8: Chưa phân định rõ các lớp hiển thị giữa realtime và backtest (Module 2)
+
+### 1. Phân tích lỗi
+
+Module 2 yêu cầu hệ thống có khả năng visualize nhiều loại thông tin, nhưng không có nghĩa một realtime chart phải đồng thời vẽ tất cả thông tin của backtest. Cần phân biệt hai ngữ cảnh:
+
+*   **Realtime chart:** cần hiển thị Candlestick, Volume, MA và trạng thái/cập nhật thị trường hiện tại. Không cần vẽ Entry, Exit, Stop Loss hoặc Take Profit của một experiment chưa chạy.
+*   **Backtest chart:** mới là nơi hiển thị Buy/Sell signal, Entry, Exit, Stop Loss, Take Profit và các indicator/zone được chọn cho kết quả experiment.
+*   `drawMarketChart()` đã vẽ Candlestick, Volume và MA20; Bollinger, RSI, Support/Resistance được vẽ khi có `strategyTypes` phù hợp.
+*   `renderBacktestResult()` truyền `strategyTypes`, `signals` và `trades`, nên backtest có signal và entry/exit marker.
+*   `drawTradeMarker()` hiện chỉ vẽ entry/exit; mức Stop Loss/Take Profit chưa được vẽ thành overlay riêng.
+
+Vì vậy lỗi đúng không phải là “realtime chart phải vẽ mọi thứ”. Lỗi là hệ thống chưa hoàn thiện việc phân định và chứng minh lớp hiển thị theo từng ngữ cảnh; riêng SL/TP overlay của backtest hiện còn thiếu.
+
+### 2. Hướng giải quyết (Kế hoạch Refactor)
+
+1.  **Tách context hiển thị:** Realtime chỉ render market state; backtest render artifacts của experiment.
+2.  **Giữ overlay theo ngữ cảnh:** Không đưa Entry/SL/TP của experiment vào realtime chart nếu chưa có experiment tương ứng.
+3.  **Bổ sung SL/TP overlay cho backtest:** Vẽ line/marker theo đúng thời gian vị thế và execution configuration.
+4.  **Bổ sung test hiển thị:** Kiểm tra realtime candle/volume/MA, backtest signal/entry/exit/SL/TP và bốn chart giữ state độc lập.
+
+### 3. Các file cần rà soát
+
+*   `api-app/src/main/resources/static/market.js`
+*   `api-app/src/main/resources/static/lab.js`
+*   `api-app/src/main/resources/static/index.html`
+*   `api-app/src/main/resources/static/styles.css`
+*   `api-app/src/main/java/com/cryptolab/api/experiment/ExperimentDetailsResponse.java`
+*   `core/src/main/java/com/cryptolab/experiment/domain/ExecutionConfig.java`
+*   `core/src/main/java/com/cryptolab/experiment/domain/Trade.java`
+
+### 4. Kết luận cần ghi rõ
+
+Đây là lỗi về **visualization mapping** của Frontend Module 2, không phải lỗi lấy dữ liệu từ Binance. Realtime chart không cần vẽ các artifact của backtest; tuy nhiên backtest chart cần hiển thị đầy đủ những artifact mà đề yêu cầu, trong đó SL/TP hiện chưa có overlay riêng.
+
+# câu hỏi vu vơ
+Loại coin trên 4 biểu đồ là cùng loại hay khác loại?
+
+zoom 4 chart có vấn đề, chỉ zoom được vào nến mới nhất chưa zoom theo trỏ chuột
