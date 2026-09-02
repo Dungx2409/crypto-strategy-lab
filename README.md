@@ -81,28 +81,6 @@ PostgreSQL, RabbitMQ, and a browser dashboard.
   owner confirms them.
 - Flyway migrations V1 through V22.
 
-## Deliberate limits and not fully verified
-
-- Automatic runtime failover from Binance to OKX. Pick one provider at startup.
-  The realtime UI label stays on Binance even if OKX is configured.
-- Arbitrary generated Java source is not compiled or executed. Authoring creates
-  logic only through bounded `AI_DSL` or registered plugins.
-- Each experiment uses one timeframe. Multi-timeframe signal sync inside one
-  experiment is not implemented.
-- Real trading and exchange order execution. This app is a backtester.
-- Automatic discovery runs are account-owned and tracked, but their results do not
-  replace the main Discovery leaderboard until you press Open result on that
-  schedule.
-- A literal 24-hour soak test. Schedule recovery and repeated execution have
-  automated coverage. A full-day run has not been recorded.
-- Automated browser coverage for navigation, chart updates, and trade selection.
-- Tablet and mobile visual QA.
-
-Gemini strategy authoring, semantic sentiment, and selector repair need
-`GEMINI_API_KEY`. Live CryptoCompare collection needs `NEWS_API_KEY`. Keyword
-sentiment does not need an external key. The checked-in example leaves both keys
-blank.
-
 ## Run with Docker
 
 Requirements:
