@@ -7,10 +7,12 @@ import com.cryptolab.marketdata.domain.Candle;
 import com.cryptolab.marketdata.domain.Timeframe;
 import com.cryptolab.marketdata.domain.TradingPair;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -29,7 +31,8 @@ class CandleStoreIT {
             .withUsername("crypto_lab")
             .withPassword("crypto_lab_test");
 
-    private static JdbcCandleStore store;
+    private static JdbcCandleStore binanceStore;
+    private static JdbcCandleStore okxStore;
     private static JdbcTemplate jdbcTemplate;
 
     @BeforeAll
@@ -38,7 +41,13 @@ class CandleStoreIT {
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
         jdbcTemplate = new JdbcTemplate(dataSource);
-        store = new JdbcCandleStore(jdbcTemplate);
+        binanceStore = new JdbcCandleStore(jdbcTemplate, Clock.systemUTC(), "binance");
+        okxStore = new JdbcCandleStore(jdbcTemplate, Clock.systemUTC(), "okx");
+    }
+
+    @BeforeEach
+    void clearCandles() {
+        jdbcTemplate.update("DELETE FROM candles");
     }
 
     @Test
@@ -47,22 +56,43 @@ class CandleStoreIT {
         Candle repeatedWithDifferentClose = candle("2026-08-18T01:00:00Z", "106");
         Candle second = candle("2026-08-18T01:05:00Z", "107");
 
-        assertThat(store.saveIfAbsent(first)).isTrue();
-        assertThat(store.saveIfAbsent(repeatedWithDifferentClose)).isFalse();
-        assertThat(store.saveIfAbsent(second)).isTrue();
+        assertThat(binanceStore.saveIfAbsent(first)).isTrue();
+        assertThat(binanceStore.saveIfAbsent(repeatedWithDifferentClose)).isFalse();
+        assertThat(binanceStore.saveIfAbsent(second)).isTrue();
 
         Integer count = jdbcTemplate.queryForObject("SELECT count(*) FROM candles", Integer.class);
         assertThat(count).isEqualTo(2);
-        assertThat(store.findLatest(new TradingPair("BTCUSDT"), Timeframe.M5, 10))
+        assertThat(binanceStore.findLatest(new TradingPair("BTCUSDT"), Timeframe.M5, 10))
                 .extracting(Candle::openTime)
                 .containsExactly(first.openTime(), second.openTime());
-        assertThat(store.findLastOpenTime(new TradingPair("BTCUSDT"), Timeframe.M5))
+        assertThat(binanceStore.findLastOpenTime(new TradingPair("BTCUSDT"), Timeframe.M5))
                 .contains(second.openTime());
-        assertThat(store.findBetween(
+        assertThat(binanceStore.findBetween(
                         new TradingPair("BTCUSDT"), Timeframe.M5,
                         first.openTime(), second.openTime(), 10))
                 .extracting(Candle::openTime)
                 .containsExactly(first.openTime());
+    }
+
+    @Test
+    void isolatesCandlesByConfiguredProvider() {
+        Candle binanceCandle = candle("2026-08-18T02:00:00Z", "108");
+        Candle okxCandle = candle("2026-08-18T02:00:00Z", "109");
+
+        assertThat(binanceStore.saveIfAbsent(binanceCandle)).isTrue();
+        assertThat(okxStore.saveIfAbsent(okxCandle)).isTrue();
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM candles WHERE open_time = ?",
+                Integer.class,
+                java.time.OffsetDateTime.parse("2026-08-18T02:00:00Z")))
+                .isEqualTo(2);
+        assertThat(binanceStore.findLatest(new TradingPair("BTCUSDT"), Timeframe.M5, 1))
+                .extracting(Candle::close)
+                .containsExactly(new BigDecimal("108"));
+        assertThat(okxStore.findLatest(new TradingPair("BTCUSDT"), Timeframe.M5, 1))
+                .extracting(Candle::close)
+                .containsExactly(new BigDecimal("109"));
     }
 
     private static Candle candle(String openTime, String close) {

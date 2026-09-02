@@ -149,10 +149,12 @@
                 </div>
                 <div class="button-row">
                     <button id="propose-strategy" type="button"><span class="btn-icon" aria-hidden="true">✦</span>Generate idea</button>
-                    <button id="confirm-strategy" class="secondary" type="button" disabled><span class="btn-icon" aria-hidden="true">✓</span>Confirm and build JSON</button>
+                    <button id="confirm-strategy" class="secondary" type="button" disabled><span class="btn-icon" aria-hidden="true">✓</span>Confirm and build code</button>
+                    <button id="save-strategy" type="button" disabled><span class="btn-icon" aria-hidden="true">⬇</span>Save tested strategy</button>
                 </div>
                 <p id="authoring-message" class="message">Gemini calls stay disabled until GEMINI_API_KEY is configured.</p>
                 <article id="strategy-idea" class="idea-card" hidden></article>
+                <pre id="strategy-source-preview" hidden></pre>
                 <div id="saved-strategies" class="saved-list"></div>
             </section>
         </section>
@@ -166,7 +168,7 @@
                         <label>Method<select id="generator"></select></label>
                         <label>Search size<select id="search-size"><option value="25">Quick · 25 tests</option><option value="125" selected>Balanced · 125 tests</option><option value="500">Deep · 500 tests</option></select></label>
                     </div>
-                    <details class="advanced-panel"><summary>Advanced search settings</summary><div class="controls compact"><label>Exact test count<input id="max-candidates" type="number" value="125" min="1" max="100000"></label><label>Repeatable seed<input id="random-seed" type="number" value="20260818"></label><label>Queue batch<input id="batch-size" type="number" value="25" min="1" max="1000"></label></div></details>
+                    <details class="advanced-panel"><summary>Advanced search settings</summary><div class="controls compact"><label>Exact test count<input id="max-candidates" type="number" value="125" min="1" max="100000"></label><label>Max time (seconds)<input id="max-duration-seconds" type="number" value="" min="1" step="1" placeholder="optional"></label><label>No improvement iterations<input id="no-improvement-iterations" type="number" value="" min="1" step="1" placeholder="optional"></label><label>Repeatable seed<input id="random-seed" type="number" value="20260818"></label><label>Queue batch<input id="batch-size" type="number" value="25" min="1" max="1000"></label></div></details>
                     <div class="button-row">
                         <button id="start-search" type="button"><span class="btn-icon" aria-hidden="true">▶</span>Start discovery</button>
                         <button id="cancel-search" class="secondary" type="button" disabled><span class="btn-icon" aria-hidden="true">■</span>Stop</button>

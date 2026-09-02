@@ -78,6 +78,8 @@ class ReferenceDashboardTest {
                 "data-authoring-mode=\"article\"",
                 "Generate from URL",
                 "confirm-strategy",
+                "save-strategy",
+                "strategy-source-preview",
                 "schedule-list",
                 "manual-strategy",
                 "manual-period",
@@ -104,6 +106,8 @@ class ReferenceDashboardTest {
                 "byId(\"app-shell\").hidden = !account",
                 "auth-credentials",
                 "/api/v1/user-strategies",
+                "/build",
+                "/confirm",
                 "/api/v1/discovery-schedules",
                 "/api/v1/experiments",
                 "/api/v1/crawler-templates",
@@ -113,6 +117,21 @@ class ReferenceDashboardTest {
                 "applyBacktestPeriod",
                 "applyRiskProfile",
                 "Confirm");
+    }
+
+    @Test
+    void discoveryExposesEveryAutomaticStopCondition() throws IOException {
+        String html = resource("/static/index.html");
+        String lab = resource("/static/lab.js");
+
+        assertThat(html).contains(
+                "max-candidates",
+                "max-duration-seconds",
+                "no-improvement-iterations");
+        assertThat(lab).contains(
+                "selectedStopConditions",
+                "maxDuration: maxDurationSeconds === null ? null : `PT${maxDurationSeconds}S`",
+                "Configure at least one automatic stop condition");
     }
 
     private static String resource(String path) throws IOException {

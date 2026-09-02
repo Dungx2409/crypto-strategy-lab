@@ -50,6 +50,8 @@ async function logout() {
     byId("manual-history-count").textContent = "";
     renderManualHistory([]);
     byId("strategy-idea").hidden = true;
+    byId("strategy-source-preview").hidden = true;
+    byId("save-strategy").disabled = true;
 }
 
 function setAuthoringMode(mode) {
@@ -84,6 +86,7 @@ async function proposeStrategy() {
     try {
         byId("propose-strategy").disabled = true;
         byId("confirm-strategy").disabled = true;
+        byId("save-strategy").disabled = true;
         byId("authoring-message").textContent = article
             ? "Reading the article URL and asking Gemini…"
             : "Asking Gemini for an idea…";
@@ -95,8 +98,9 @@ async function proposeStrategy() {
         accountFeatureState.draftId = draft.id;
         byId("strategy-idea").hidden = false;
         byId("strategy-idea").textContent = draft.idea;
+        byId("strategy-source-preview").hidden = true;
         byId("confirm-strategy").disabled = false;
-        byId("authoring-message").textContent = "Review the idea, then confirm it.";
+        byId("authoring-message").textContent = "Review the idea, then build and test its code.";
     } catch (error) {
         byId("authoring-message").textContent = error.message;
     } finally {
@@ -106,11 +110,23 @@ async function proposeStrategy() {
 
 async function confirmStrategy() {
     try {
-        byId("confirm-strategy").disabled = true; byId("authoring-message").textContent = "Building, validating, and smoke-testing JSON…";
+        byId("confirm-strategy").disabled = true; byId("authoring-message").textContent = "Building, validating, and smoke-testing Trading DSL…";
+        const draft = await api(`/api/v1/user-strategies/drafts/${accountFeatureState.draftId}/build`, {method:"POST"});
+        const sources = draft.preview.strategies.filter(item=>item.type==="AI_DSL").map(item=>item.parameters.source);
+        byId("strategy-source-preview").textContent = sources.length?sources.join("\n\n"):JSON.stringify(draft.preview,null,2);
+        byId("strategy-source-preview").hidden = false; byId("save-strategy").disabled = false;
+        byId("authoring-message").textContent = "The code passed the 250-candle smoke test. Review it before saving.";
+    } catch (error) { byId("authoring-message").textContent = error.message; byId("confirm-strategy").disabled = false; }
+}
+
+async function saveStrategy() {
+    try {
+        byId("save-strategy").disabled = true;
         const saved = await api(`/api/v1/user-strategies/drafts/${accountFeatureState.draftId}/confirm`, {method:"POST"});
         byId("authoring-message").textContent = `${saved.document.name} version ${saved.version} is ready.`;
+        byId("strategy-source-preview").hidden = true; accountFeatureState.draftId = null;
         await loadSavedStrategies();
-    } catch (error) { byId("authoring-message").textContent = error.message; }
+    } catch (error) { byId("authoring-message").textContent = error.message; byId("save-strategy").disabled = false; }
 }
 
 async function loadSavedStrategies() {
@@ -290,6 +306,7 @@ document.querySelectorAll("[data-authoring-mode]").forEach(button => {
 byId("authoring-source").addEventListener("change", event => setAuthoringMode(event.target.value));
 byId("propose-strategy").addEventListener("click", proposeStrategy);
 byId("confirm-strategy").addEventListener("click", confirmStrategy);
+byId("save-strategy").addEventListener("click", saveStrategy);
 setAuthoringMode(byId("authoring-source").value || "prompt");
 byId("create-schedule").addEventListener("click",saveSchedule);byId("run-manual-backtest").addEventListener("click",runManualBacktest);byId("apply-trade-filters").addEventListener("click",applyTradeFilters);byId("create-crawler-template").addEventListener("click",createCrawlerTemplate);
 byId("schedule-lookback-preset").addEventListener("change",applySchedulePresets);byId("schedule-frequency-preset").addEventListener("change",applySchedulePresets);

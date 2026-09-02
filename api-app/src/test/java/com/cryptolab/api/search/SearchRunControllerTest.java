@@ -159,7 +159,7 @@ class SearchRunControllerTest {
                   "parameterSpace":{"MA":{"fastPeriod":[10,20],"slowPeriod":[50,100]}},
                   "combinationPolicy":{"type":"MAJORITY","version":"1.0","weights":{},"threshold":0},
                   "randomSeed": 12345,
-                  "stopConditions":{"maxCandidates":5},
+                  "stopConditions":{"maxCandidates":5,"maxDuration":"PT3600S","noImprovementIterations":50},
                   "batchSize":2
                 }
                 """;

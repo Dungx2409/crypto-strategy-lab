@@ -20,17 +20,12 @@ import com.cryptolab.experiment.domain.MarketDatasetRef;
 import com.cryptolab.experiment.domain.RerunResult;
 import com.cryptolab.infrastructure.experiment.adapter.DefaultCombinationPolicyResolver;
 import com.cryptolab.infrastructure.experiment.adapter.JdbcExperimentRepository;
+import com.cryptolab.infrastructure.strategy.adapter.AiDslStrategyFactory;
 import com.cryptolab.infrastructure.strategy.adapter.SpringStrategyRegistry;
 import com.cryptolab.marketdata.domain.Candle;
 import com.cryptolab.marketdata.domain.Timeframe;
 import com.cryptolab.strategy.domain.CombinationPolicyDefinition;
-import com.cryptolab.strategy.domain.Signal;
-import com.cryptolab.strategy.domain.SignalType;
-import com.cryptolab.strategy.domain.Strategy;
-import com.cryptolab.strategy.domain.StrategyContext;
 import com.cryptolab.strategy.domain.StrategyDefinition;
-import com.cryptolab.strategy.domain.StrategyDescriptor;
-import com.cryptolab.strategy.port.StrategyFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -79,7 +74,7 @@ class ExperimentPipelineIT {
         jdbc = new JdbcTemplate(dataSource);
         repository = new JdbcExperimentRepository(
                 jdbc, new ObjectMapper().findAndRegisterModules());
-        var registry = new SpringStrategyRegistry(List.of(new TestSignalStrategyFactory()));
+        var registry = new SpringStrategyRegistry(List.of(new AiDslStrategyFactory()));
         var engine = new DeterministicBacktestEngine(
                 repository,
                 repository,
@@ -131,6 +126,8 @@ class ExperimentPipelineIT {
         assertThat(topProvenance.experimentId()).isEqualTo(EXPERIMENT_ID);
         assertThat(topProvenance.candidateHash()).isEqualTo(plan.candidate().candidateHash());
         assertThat(topProvenance.strategies()).isEqualTo(plan.candidate().strategies());
+        assertThat(topProvenance.strategies().getFirst().parameters().get("source"))
+                .isEqualTo("BUY WHEN CLOSE == 105 SELL WHEN CLOSE == 115");
         assertThat(topProvenance.combinationPolicy()).isEqualTo(plan.candidate().combinationPolicy());
         assertThat(topProvenance.dataset()).isEqualTo(plan.dataset().reference());
         assertThat(topProvenance.executionConfig()).isEqualTo(plan.executionConfig());
@@ -191,7 +188,10 @@ class ExperimentPipelineIT {
                 "integration-v1",
                 MarketDatasetChecksum.calculate(candles));
         MarketDataset dataset = new MarketDataset(DATASET_ID, reference, candles);
-        List<StrategyDefinition> strategies = List.of(new StrategyDefinition("TEST", "1.0", Map.of()));
+        List<StrategyDefinition> strategies = List.of(new StrategyDefinition(
+                "AI_DSL",
+                "1.0",
+                Map.of("source", "BUY WHEN CLOSE == 105 SELL WHEN CLOSE == 115")));
         CombinationPolicyDefinition policy = new CombinationPolicyDefinition(
                 "MAJORITY", "1.0", Map.of(), BigDecimal.ZERO);
         CandidateStrategy candidate = new CandidateStrategy(
@@ -213,7 +213,7 @@ class ExperimentPipelineIT {
                 new GeneratorSnapshot(
                         "manual",
                         "1.0",
-                        Map.of("mode", "single", "selection", Map.of("strategy", "TEST")),
+                        Map.of("mode", "single", "selection", Map.of("strategy", "AI_DSL")),
                         null),
                 DefaultExperimentEvaluator.VERSION,
                 "abc123",
@@ -241,42 +241,4 @@ class ExperimentPipelineIT {
                 .isEqualTo(expected);
     }
 
-    private static final class TestSignalStrategyFactory implements StrategyFactory {
-
-        @Override
-        public String type() {
-            return "TEST";
-        }
-
-        @Override
-        public String version() {
-            return "1.0";
-        }
-
-        @Override
-        public Map<String, Object> parameterSchema() {
-            return Map.of();
-        }
-
-        @Override
-        public Strategy create(StrategyDefinition definition) {
-            return new Strategy() {
-                @Override
-                public StrategyDescriptor descriptor() {
-                    return new StrategyDescriptor("TEST", "1.0", Map.of());
-                }
-
-                @Override
-                public Signal analyze(StrategyContext context) {
-                    SignalType type = context.candles().size() == 1
-                            ? SignalType.BUY
-                            : context.candles().size() == 2 ? SignalType.SELL : SignalType.HOLD;
-                    BigDecimal strength = type == SignalType.BUY
-                            ? BigDecimal.ONE
-                            : type == SignalType.SELL ? BigDecimal.ONE.negate() : BigDecimal.ZERO;
-                    return new Signal(type, strength, context.evaluatedAt(), "integration signal");
-                }
-            };
-        }
-    }
 }

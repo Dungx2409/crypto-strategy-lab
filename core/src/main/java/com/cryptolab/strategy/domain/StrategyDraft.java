@@ -10,6 +10,7 @@ public record StrategyDraft(
         String prompt,
         String idea,
         StrategyDraftStatus status,
+        UserStrategyDocument preview,
         String failureMessage,
         Instant createdAt,
         Instant updatedAt) {
@@ -26,6 +27,9 @@ public record StrategyDraft(
         }
         idea = idea.trim();
         Objects.requireNonNull(status, "status must not be null");
+        if (status == StrategyDraftStatus.CODE_READY_FOR_CONFIRMATION && preview == null) {
+            throw new IllegalArgumentException("preview is required when generated code is ready");
+        }
         Objects.requireNonNull(createdAt, "createdAt must not be null");
         Objects.requireNonNull(updatedAt, "updatedAt must not be null");
     }

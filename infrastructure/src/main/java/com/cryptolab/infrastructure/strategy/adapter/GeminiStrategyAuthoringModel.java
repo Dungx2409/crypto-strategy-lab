@@ -75,11 +75,15 @@ public final class GeminiStrategyAuthoringModel implements StrategyAuthoringMode
                 Convert the confirmed idea into one restricted JSON object. Output JSON only, without Markdown.
                 The exact shape is:
                 {"name":"...","description":"...","strategies":[{"type":"...","version":"...","parameters":{}}],"combinationPolicy":{"type":"MAJORITY","version":"1.0","weights":{},"threshold":0}}
-                Use only registered type, version, and parameter names. Never output source code.
-                Prefer the RULE plugin when the request describes original conditions rather than
-                merely configuring a named built-in indicator. The application converts a valid
-                RULE into deterministic Java, compiles it, and rejects any edited source. RULE
-                metric and operator values must come from its schema enums.
+                Use only registered type, version, and parameter names.
+                The strategies array must include AI_DSL@1.0 with executable Trading DSL source in
+                parameters.source. The source must contain exactly these two rules in this order:
+                BUY WHEN <boolean expression>
+                SELL WHEN <boolean expression>
+                Boolean operators are AND, OR, NOT, and parentheses. Comparisons are <, <=, >, >=, ==, !=.
+                Numeric values are OPEN, HIGH, LOW, CLOSE, VOLUME, SMA(field, 2..500), RSI(2..500),
+                and CHANGE_PCT(field, 2..500). Do not output Java, JavaScript, Groovy, imports, loops,
+                assignments, file access, network access, or any function outside this grammar.
 
                 User request: %s
                 Confirmed idea: %s

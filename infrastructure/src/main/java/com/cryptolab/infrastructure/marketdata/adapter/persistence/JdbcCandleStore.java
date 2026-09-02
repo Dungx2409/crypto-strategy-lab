@@ -13,27 +13,42 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class JdbcCandleStore implements CandleStore {
 
-    private static final String PROVIDER = "BINANCE";
-
     private final JdbcTemplate jdbcTemplate;
     private final Clock clock;
+    private final String provider;
 
     @Autowired
-    public JdbcCandleStore(JdbcTemplate jdbcTemplate) {
-        this(jdbcTemplate, Clock.systemUTC());
+    public JdbcCandleStore(
+            JdbcTemplate jdbcTemplate,
+            @Value("${crypto.market.provider:binance}") String provider) {
+        this(jdbcTemplate, Clock.systemUTC(), provider);
     }
 
-    JdbcCandleStore(JdbcTemplate jdbcTemplate, Clock clock) {
+    public JdbcCandleStore(JdbcTemplate jdbcTemplate) {
+        this(jdbcTemplate, Clock.systemUTC(), "binance");
+    }
+
+    public JdbcCandleStore(JdbcTemplate jdbcTemplate, Clock clock, String provider) {
         this.jdbcTemplate = jdbcTemplate;
         this.clock = clock;
+        if (provider == null || provider.isBlank()) {
+            throw new IllegalArgumentException("provider must not be blank");
+        }
+        String normalized = provider.trim().toUpperCase(Locale.ROOT);
+        if (!normalized.equals("BINANCE") && !normalized.equals("OKX")) {
+            throw new IllegalArgumentException("provider must be BINANCE or OKX");
+        }
+        this.provider = normalized;
     }
 
     @Override
@@ -43,7 +58,7 @@ public class JdbcCandleStore implements CandleStore {
                 INSERT INTO candles (
                     symbol, timeframe, open_time, open, high, low, close, volume, provider, received_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT (symbol, timeframe, open_time) DO NOTHING
+                ON CONFLICT (provider, symbol, timeframe, open_time) DO NOTHING
                 """,
                 candle.symbol(),
                 candle.timeframe().exchangeCode(),
@@ -53,7 +68,7 @@ public class JdbcCandleStore implements CandleStore {
                 candle.low(),
                 candle.close(),
                 candle.volume(),
-                PROVIDER,
+                provider,
                 OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC));
         return rows == 1;
     }
@@ -64,11 +79,12 @@ public class JdbcCandleStore implements CandleStore {
                 """
                 SELECT symbol, timeframe, open_time, open, high, low, close, volume
                 FROM candles
-                WHERE symbol = ? AND timeframe = ?
+                WHERE provider = ? AND symbol = ? AND timeframe = ?
                 ORDER BY open_time DESC
                 LIMIT ?
                 """,
                 this::mapCandle,
+                provider,
                 pair.symbol(),
                 timeframe.exchangeCode(),
                 limit);
@@ -84,11 +100,13 @@ public class JdbcCandleStore implements CandleStore {
                 """
                 SELECT symbol, timeframe, open_time, open, high, low, close, volume
                 FROM candles
-                WHERE symbol = ? AND timeframe = ? AND open_time >= ? AND open_time < ?
+                WHERE provider = ? AND symbol = ? AND timeframe = ?
+                  AND open_time >= ? AND open_time < ?
                 ORDER BY open_time ASC
                 LIMIT ?
                 """,
                 this::mapCandle,
+                provider,
                 pair.symbol(),
                 timeframe.exchangeCode(),
                 OffsetDateTime.ofInstant(from, ZoneOffset.UTC),
@@ -102,13 +120,14 @@ public class JdbcCandleStore implements CandleStore {
                 """
                 SELECT open_time
                 FROM candles
-                WHERE symbol = ? AND timeframe = ?
+                WHERE provider = ? AND symbol = ? AND timeframe = ?
                 ORDER BY open_time DESC
                 LIMIT 1
                 """,
                 (resultSet, rowNumber) -> resultSet
                         .getObject("open_time", OffsetDateTime.class)
                         .toInstant(),
+                provider,
                 pair.symbol(),
                 timeframe.exchangeCode());
         return values.stream().findFirst();

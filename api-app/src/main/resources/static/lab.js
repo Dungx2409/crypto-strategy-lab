@@ -1,4 +1,4 @@
-const labState = { catalog: [], capabilities: null, searchRunId: null, searchStartedAt: null, socket: null, connected: false, subscriptions: new Map(), poll: null };
+const labState = { catalog: [], capabilities: null, searchRunId: null, searchStartedAt: null, stopConditions: null, socket: null, connected: false, subscriptions: new Map(), poll: null };
 const byId = id => document.getElementById(id);
 
 async function api(url, options) {
@@ -123,6 +123,33 @@ async function materializeDataset() {
     return api("/api/v1/datasets", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ symbol: snapshot.symbol, timeframe: snapshot.timeframe, datasetVersion: `dashboard-${snapshot.timeframe}-v2`, candles: snapshot.candles, sentimentObservations }) });
 }
 
+function selectedStopConditions() {
+    const positiveInteger = (id, label) => {
+        const node = byId(id);
+        if (!node) return null;
+        const raw = node.value.trim();
+        if (raw === "") return null;
+        const value = Number(raw);
+        if (!Number.isInteger(value) || value <= 0) throw new Error(`${label} must be a positive integer.`);
+        return value;
+    };
+    const maxCandidates = positiveInteger("max-candidates", "Max candidates");
+    const maxDurationSeconds = positiveInteger("max-duration-seconds", "Max time");
+    const noImprovementIterations = positiveInteger("no-improvement-iterations", "No improvement iterations");
+    if (maxCandidates === null && maxDurationSeconds === null && noImprovementIterations === null) {
+        throw new Error("Configure at least one automatic stop condition.");
+    }
+    return {
+        request: {
+            maxCandidates,
+            maxDuration: maxDurationSeconds === null ? null : `PT${maxDurationSeconds}S`,
+            noImprovementIterations
+        },
+        maxCandidates,
+        maxDurationSeconds
+    };
+}
+
 async function startSearch() {
     byId("start-search").disabled = true;
     byId("search-message").textContent = "Materializing immutable market dataset…";
@@ -132,12 +159,13 @@ async function startSearch() {
         const dataset = await materializeDataset();
         byId("search-message").textContent = "Submitting discovery run…";
         const config = selectedSearchConfiguration();
+        const stops = selectedStopConditions();
         const optionalNumber = id => byId(id).value === "" ? null : Number(byId(id).value);
         const executionConfig = { initialCapital: Number(byId("initial-capital").value), feeRate: Number(byId("fee-rate").value), allowShort: byId("allow-short").checked, fillPolicy: labState.capabilities.fillPolicy, engineVersion: labState.capabilities.engineVersion, positionSizePct: Number(byId("position-size-pct").value), stopLossPct: optionalNumber("stop-loss-pct"), takeProfitPct: optionalNumber("take-profit-pct"), trailingStopPct: optionalNumber("trailing-stop-pct") };
         const generator = byId("generator").value;
-        const request = { symbol: dataset.symbol, timeframe: dataset.timeframe, from: dataset.from, to: dataset.to, datasetVersion: dataset.datasetVersion, datasetChecksum: dataset.checksum, ...config, randomSeed: Number(byId("random-seed").value), stopConditions: { maxCandidates: Number(byId("max-candidates").value), maxDuration: null, noImprovementIterations: null }, batchSize: Number(byId("batch-size").value), executionConfig };
+        const request = { symbol: dataset.symbol, timeframe: dataset.timeframe, from: dataset.from, to: dataset.to, datasetVersion: dataset.datasetVersion, datasetChecksum: dataset.checksum, ...config, randomSeed: Number(byId("random-seed").value), stopConditions: stops.request, batchSize: Number(byId("batch-size").value), executionConfig };
         const run = await api(`/api/v1/search-runs?generator=${encodeURIComponent(generator)}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(request) });
-        labState.searchRunId = run.searchRunId; labState.searchStartedAt = Date.now(); byId("cancel-search").disabled = false;
+        labState.searchRunId = run.searchRunId; labState.searchStartedAt = Date.now(); labState.stopConditions = stops; byId("cancel-search").disabled = false;
         byId("search-message").textContent = generator === "genetic"
             ? `Search ${run.searchRunId} · genetic generations wait for worker fitness between rounds`
             : `Search ${run.searchRunId}`;
@@ -149,8 +177,10 @@ async function cancelSearch() { if (!labState.searchRunId) return; try { renderS
 function renderSearch(run) {
     const terminal = ["COMPLETED","FAILED","CANCELLED"].includes(run.status); const badge = byId("search-status"); badge.textContent = `${run.status} · ${run.generatorType}`; badge.className = `status ${run.status === "FAILED" ? "status-offline" : terminal ? "status-online" : "status-degraded"}`;
     byId("generated-count").textContent = run.generatedCandidates; byId("pending-count").textContent = run.pendingDispatchJobs; byId("queued-count").textContent = run.queuedJobs; byId("running-count").textContent = run.runningJobs; byId("completed-count").textContent = run.completedJobs; byId("failed-count").textContent = run.failedJobs; byId("best-score").textContent = run.bestScore ?? "—";
-    const max = Number(byId("max-candidates").value) || 1; byId("search-progress-bar").style.width = `${Math.min(100, (run.generatedCandidates / max) * 100)}%`;
     const started = run.startedAt ? new Date(run.startedAt).getTime() : labState.searchStartedAt; const ended = run.endedAt ? new Date(run.endedAt).getTime() : Date.now(); byId("elapsed-time").textContent = started ? `${Math.max(0, Math.round((ended-started)/1000))}s` : "0s";
+    const progress = byId("search-progress-bar"), maxCandidates = labState.stopConditions?.maxCandidates, maxDurationSeconds = labState.stopConditions?.maxDurationSeconds;
+    const percent = maxCandidates ? run.generatedCandidates / maxCandidates * 100 : maxDurationSeconds && started ? (ended-started) / 1000 / maxDurationSeconds * 100 : null;
+    progress.classList.toggle("indeterminate", percent === null && !terminal); progress.style.width = percent === null ? (terminal ? "100%" : "35%") : `${Math.min(100, percent)}%`;
     byId("cancel-search").disabled = terminal; byId("start-search").disabled = !terminal;
     if (run.failureMessage) byId("search-message").textContent = run.failureMessage;
 }

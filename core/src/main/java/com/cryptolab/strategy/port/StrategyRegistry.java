@@ -15,4 +15,8 @@ public interface StrategyRegistry {
     Set<String> registeredTypes();
 
     List<StrategyPluginDescriptor> availableStrategies();
+
+    default List<StrategyPluginDescriptor> authoringStrategies() {
+        return availableStrategies();
+    }
 }
