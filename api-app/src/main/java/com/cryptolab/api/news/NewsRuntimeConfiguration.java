@@ -3,6 +3,7 @@ package com.cryptolab.api.news;
 import com.cryptolab.infrastructure.news.adapter.DeterministicKeywordSentimentAnalyzer;
 import com.cryptolab.infrastructure.news.adapter.GeminiSentimentAnalyzer;
 import com.cryptolab.infrastructure.news.adapter.RssNewsProvider;
+import com.cryptolab.infrastructure.news.adapter.HuggingFaceFinBERTSentimentAnalyzer;
 import com.cryptolab.infrastructure.news.adapter.SelectableNewsProvider;
 import com.cryptolab.infrastructure.strategy.adapter.GeminiStrategyAuthoringModel;
 import com.cryptolab.infrastructure.news.adapter.cryptocompare.CryptoCompareNewsProvider;
@@ -116,6 +117,16 @@ class NewsRuntimeConfiguration {
             Clock marketDataClock,
             @Value("${crypto.ai.gemini.model:gemini-2.5-flash}") String model) {
         return new GeminiSentimentAnalyzer(gemini, objectMapper, marketDataClock, model);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "crypto.sentiment.provider", havingValue = "finbert")
+    SentimentAnalyzer finbertSentimentAnalyzer(
+            ObjectMapper objectMapper,
+            Clock marketDataClock,
+            @Value("${crypto.ai.huggingface.url:https://api-inference.huggingface.co/models/ProsusAI/finbert}") String modelUrl,
+            @Value("${crypto.ai.huggingface.api-key:}") String apiKey) {
+        return new HuggingFaceFinBERTSentimentAnalyzer(objectMapper, marketDataClock, modelUrl, apiKey);
     }
 
     @Bean

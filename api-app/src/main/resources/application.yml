@@ -55,6 +55,9 @@ crypto:
       api-key: ${GEMINI_API_KEY:}
       model: ${GEMINI_MODEL:gemini-2.5-flash}
       timeout: 30s
+    huggingface:
+      api-key: ${HUGGINGFACE_API_KEY:}
+      url: ${HUGGINGFACE_URL:https://api-inference.huggingface.co/models/ProsusAI/finbert}
   market:
     provider: ${CRYPTO_MARKET_PROVIDER:binance}
     symbol-default: BTCUSDT
