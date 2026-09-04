@@ -1,12 +1,10 @@
 # Báo cáo toàn bộ project Crypto Strategy Lab
 
-> Tài liệu này được viết cho sinh viên năm nhất. Mục tiêu là giúp người đọc hiểu project giải quyết bài toán gì, từng module chịu trách nhiệm gì, dữ liệu đi qua hệ thống ra sao, vì sao kiến trúc được chọn như vậy, cách kiểm thử toàn bộ luồng, và những lỗi thực tế đã được tìm thấy rồi sửa trong session này.
-
 ## 1. Đọc phần nào trước?
 
 Nếu bạn mới học Java hoặc Software Architecture, hãy đọc theo thứ tự:
 
-1. Phần 2 để hiểu project làm gì.
+1. Phần 2 để hiểu project làm gì.   
 2. Phần 3 để biết các thuật ngữ quan trọng.
 3. Phần 4 và 5 để hiểu sơ đồ và các module.
 4. Phần 7 để theo dõi một luồng chạy hoàn chỉnh.
