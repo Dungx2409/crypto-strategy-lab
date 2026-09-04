@@ -1,5 +1,7 @@
 # Crypto Strategy Lab architecture
 
+For a shorter current summary, see `docs/architecture/overview.md`.
+
 ## Scope
 
 The written requirements define the product scope. The five supplied images guide layout and visual style. Prompt and article-link strategy authoring use Gemini, restricted JSON, and a bounded Trading DSL. Crawler selector repairs also use Gemini and require user review before activation.
@@ -505,6 +507,13 @@ NewsProvider -> NewsCollector -> NewsStore
                          |
                          -> SentimentAnalyzer -> versioned sentiment result
 ```
+
+## Current implementation updates
+
+- Continuous discovery schedules now keep `last_search_run_id` as well as `active_search_run_id`. The dashboard shows an "Open result" action on a schedule when a running or completed search exists.
+- Manual backtest history now includes symbol, timeframe, strategy names, start time, return, win rate, drawdown, trades, starting capital, dataset range, and a short experiment ID.
+- The News tab can collect from CryptoCompare, HTML crawler providers, or all configured providers. Example and test articles are filtered out of the article list.
+- HTML crawler selector versions stay in the database. Gemini can propose selector repairs, but the user must confirm a repaired version before it becomes active.
 
 ## Known limits
 

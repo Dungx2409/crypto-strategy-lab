@@ -48,4 +48,15 @@ class StrategyAuthoringAdaptersTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("public HTTP or HTTPS URL");
     }
+
+    @Test
+    void articleReaderRejectsJavascriptVerificationPages() {
+        assertThatThrownBy(() -> HttpArticleSourceReader.plainText("""
+                <html><body>
+                I cannot access the content of the article at the provided URL because it requires JavaScript verification.
+                </body></html>
+                """))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("requires JavaScript verification");
+    }
 }

@@ -1,4 +1,4 @@
-const labState = { catalog: [], capabilities: null, searchRunId: null, searchStartedAt: null, stopConditions: null, socket: null, connected: false, subscriptions: new Map(), poll: null };
+const labState = { catalog: [], userStrategies: [], capabilities: null, searchRunId: null, searchStartedAt: null, stopConditions: null, startingSearch: false, socket: null, connected: false, subscriptions: new Map(), poll: null };
 const byId = id => document.getElementById(id);
 
 async function api(url, options) {
@@ -44,13 +44,42 @@ function strategyIcon(type) {
     return strategyIcons[key] || "⌘";
 }
 
+function savedStrategyPlugins() {
+    return labState.userStrategies.flatMap(strategy => {
+        const definitions = strategy.document?.strategies || [];
+        if (definitions.length !== 1) return [];
+        const definition = definitions[0];
+        const catalogPlugin = labState.catalog.find(plugin => plugin.type === definition.type && plugin.version === definition.version);
+        const allowedParameters = new Set(Object.keys(catalogPlugin?.parameterSchema || {}));
+        const fixedParameters = catalogPlugin
+            ? Object.fromEntries(Object.entries(definition.parameters || {})
+                .filter(([name]) => allowedParameters.has(name)))
+            : definition.parameters || {};
+        return [{
+            type: definition.type,
+            version: definition.version,
+            parameterSchema: {},
+            fixedParameters,
+            displayName: strategy.document.name,
+            displayVersion: `saved v${strategy.version}`,
+            savedStrategyId: strategy.id
+        }];
+    });
+}
+
+function discoveryCatalog() {
+    return [...labState.catalog, ...savedStrategyPlugins()];
+}
+
 function renderStrategies() {
     const host = byId("strategy-list"); host.replaceChildren();
-    labState.catalog.forEach(plugin => {
+    discoveryCatalog().forEach(plugin => {
         const card = document.createElement("article"); card.className = "strategy-card"; card.dataset.type = plugin.type; card.dataset.version = plugin.version;
-        const header = document.createElement("header"); const label = document.createElement("label"); const check = document.createElement("input"); check.type = "checkbox"; check.checked = true; check.className = "strategy-enabled";
+        if (plugin.fixedParameters) card.dataset.fixedParameters = JSON.stringify(plugin.fixedParameters);
+        if (plugin.savedStrategyId) card.dataset.savedStrategyId = plugin.savedStrategyId;
+        const header = document.createElement("header"); const label = document.createElement("label"); const check = document.createElement("input"); check.type = "checkbox"; check.checked = !plugin.savedStrategyId; check.className = "strategy-enabled";
         const icon = document.createElement("span"); icon.className = "strategy-type-icon"; icon.setAttribute("aria-hidden", "true"); icon.textContent = strategyIcon(plugin.type);
-        label.append(check, icon, document.createTextNode(` ${plugin.type}`)); const version = document.createElement("span"); version.className = "muted"; version.textContent = plugin.version; header.append(label, version); card.append(header);
+        label.append(check, icon, document.createTextNode(` ${plugin.displayName || plugin.type}`)); const version = document.createElement("span"); version.className = "muted"; version.textContent = plugin.displayVersion || plugin.version; header.append(label, version); card.append(header);
         const grid = document.createElement("div"); grid.className = "parameter-grid";
         Object.entries(plugin.parameterSchema).forEach(([name, schema]) => { const field = document.createElement("label"); field.textContent = name; const input = document.createElement("input"); input.dataset.parameter = name; input.dataset.parameterType = schema.type; input.value = suggestedValues(name, schema); field.append(input); grid.append(field); });
         const weightField = document.createElement("label");
@@ -99,16 +128,21 @@ function renderSelectedStrategyChips() {
         icon.className = "icon";
         icon.setAttribute("aria-hidden", "true");
         icon.textContent = strategyIcon(card.dataset.type);
-        chip.append(icon, document.createTextNode(card.dataset.type));
+        chip.append(icon, document.createTextNode(card.dataset.savedStrategyId ? card.querySelector("label").textContent.trim() : card.dataset.type));
         host.append(chip);
     });
 }
 
 async function loadCapabilities() {
     const [catalog, capabilities] = await Promise.all([api("/api/v1/strategies"), api("/api/v1/search-runs/capabilities")]);
-    labState.catalog = catalog; labState.capabilities = capabilities; renderStrategies();
+    labState.catalog = catalog; labState.capabilities = capabilities; labState.userStrategies = window.cryptoLabUserStrategies || []; renderStrategies();
     byId("execution-version").value = `${capabilities.engineVersion} · ${capabilities.fillPolicy}`;
     const generator = byId("generator"); generator.replaceChildren(); capabilities.availableGenerators.forEach(type => { const option = document.createElement("option"); option.value = type; option.textContent = type.toUpperCase(); option.selected = type === capabilities.defaultGenerator; generator.append(option); });
+}
+
+function refreshDiscoveryUserStrategies(strategies) {
+    labState.userStrategies = strategies || [];
+    renderStrategies();
 }
 
 function selectedSearchConfiguration() {
@@ -116,6 +150,11 @@ function selectedSearchConfiguration() {
     document.querySelectorAll(".strategy-card").forEach(card => {
         if (!card.querySelector(".strategy-enabled").checked) return;
         const type = card.dataset.type; strategyTypes.push(type); strategyVersions[type] = card.dataset.version; weights[type] = Number(card.querySelector(".strategy-weight").value); parameterSpace[type] = {};
+        if (card.dataset.fixedParameters) {
+            Object.entries(JSON.parse(card.dataset.fixedParameters)).forEach(([name, value]) => {
+                parameterSpace[type][name] = [value];
+            });
+        }
         card.querySelectorAll("[data-parameter]").forEach(input => {
             parameterSpace[type][input.dataset.parameter] = input.value.split(",")
                 .map(raw => raw.trim()).filter(Boolean)
@@ -125,6 +164,9 @@ function selectedSearchConfiguration() {
         });
     });
     if (!strategyTypes.length) throw new Error("Select at least one strategy.");
+    if (new Set(strategyTypes).size !== strategyTypes.length) {
+        throw new Error("Discovery can use only one strategy of each type at a time. Select one saved AI strategy or one built-in strategy for the same type.");
+    }
     const policy = byId("combination-policy").value;
     return { strategyTypes, strategyVersions, parameterSpace, combinationPolicy: { type: policy, version: "1.0", weights: policy === "WEIGHTED" ? weights : {}, threshold: policy === "WEIGHTED" ? Number(byId("policy-threshold").value) : 0 } };
 }
@@ -164,6 +206,8 @@ function selectedStopConditions() {
 }
 
 async function startSearch() {
+    if (labState.startingSearch) return;
+    labState.startingSearch = true;
     byId("start-search").disabled = true;
     byId("search-message").textContent = "Materializing immutable market dataset…";
     byId("search-status").textContent = "STARTING";
@@ -178,12 +222,12 @@ async function startSearch() {
         const generator = byId("generator").value;
         const request = { symbol: dataset.symbol, timeframe: dataset.timeframe, from: dataset.from, to: dataset.to, datasetVersion: dataset.datasetVersion, datasetChecksum: dataset.checksum, ...config, randomSeed: Number(byId("random-seed").value), stopConditions: stops.request, batchSize: Number(byId("batch-size").value), executionConfig };
         const run = await api(`/api/v1/search-runs?generator=${encodeURIComponent(generator)}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(request) });
-        labState.searchRunId = run.searchRunId; labState.searchStartedAt = Date.now(); labState.stopConditions = stops; byId("cancel-search").disabled = false;
+        labState.searchRunId = run.searchRunId; labState.searchStartedAt = Date.now(); labState.stopConditions = stops; labState.startingSearch = false; byId("cancel-search").disabled = false; byId("start-search").disabled = false;
         byId("search-message").textContent = generator === "genetic"
             ? `Search ${run.searchRunId} · genetic generations wait for worker fitness between rounds`
             : `Search ${run.searchRunId}`;
         subscribeProofTopics(run.searchRunId); renderSearch(run); beginPolling();
-    } catch (error) { byId("search-message").textContent = error.message; byId("start-search").disabled = false; byId("search-status").textContent = "FAILED"; byId("search-status").className = "status status-offline"; }
+    } catch (error) { labState.startingSearch = false; byId("search-message").textContent = error.message; byId("start-search").disabled = false; byId("search-status").textContent = "FAILED"; byId("search-status").className = "status status-offline"; }
 }
 
 async function cancelSearch() { if (!labState.searchRunId) return; try { renderSearch(await api(`/api/v1/search-runs/${labState.searchRunId}/cancel`, {method:"POST"})); } catch (error) { byId("search-message").textContent = error.message; } }
@@ -194,7 +238,7 @@ function renderSearch(run) {
     const progress = byId("search-progress-bar"), maxCandidates = labState.stopConditions?.maxCandidates, maxDurationSeconds = labState.stopConditions?.maxDurationSeconds;
     const percent = maxCandidates ? run.generatedCandidates / maxCandidates * 100 : maxDurationSeconds && started ? (ended-started) / 1000 / maxDurationSeconds * 100 : null;
     progress.classList.toggle("indeterminate", percent === null && !terminal); progress.style.width = percent === null ? (terminal ? "100%" : "35%") : `${Math.min(100, percent)}%`;
-    byId("cancel-search").disabled = terminal; byId("start-search").disabled = !terminal;
+    byId("cancel-search").disabled = terminal; byId("start-search").disabled = labState.startingSearch;
     if (run.failureMessage) byId("search-message").textContent = run.failureMessage;
 }
 
@@ -230,7 +274,15 @@ function renderArtifacts(id, items, describe) { const host = byId(id); host.repl
 function connectProofSocket() { const protocol = location.protocol === "https:" ? "wss" : "ws"; labState.socket = new WebSocket(`${protocol}://${location.host}/ws`); labState.socket.addEventListener("open", () => labState.socket.send(`CONNECT\naccept-version:1.2\nhost:${location.host}\nheart-beat:10000,10000\n\n\u0000`)); labState.socket.addEventListener("message", event => event.data.split("\u0000").filter(Boolean).forEach(handleProofFrame)); labState.socket.addEventListener("close", () => { labState.connected=false; setTimeout(connectProofSocket,2000); }); }
 function handleProofFrame(frame) { if (frame.startsWith("CONNECTED")) { labState.connected=true; labState.subscriptions.forEach((handler,destination) => sendProofSubscription(destination)); return; } if (!frame.startsWith("MESSAGE")) return; const split=frame.indexOf("\n\n"); const destination=(frame.match(/\ndestination:([^\n]+)/)||[])[1]; if (split>=0 && destination && labState.subscriptions.has(destination)) labState.subscriptions.get(destination)(JSON.parse(frame.slice(split+2))); }
 function sendProofSubscription(destination) { if (!labState.connected) return; const id=`proof-${[...labState.subscriptions.keys()].indexOf(destination)}`; labState.socket.send(`SUBSCRIBE\nid:${id}\ndestination:${destination}\nack:auto\n\n\u0000`); }
-function subscribeProofTopics(searchRunId) { const search=`/topic/search/${searchRunId}`, leaderboard=`/topic/leaderboard/${searchRunId}`; labState.subscriptions.set(search, renderSearch); labState.subscriptions.set(leaderboard, loadLeaderboard); sendProofSubscription(search); sendProofSubscription(leaderboard); }
+function subscribeProofTopics(searchRunId) {
+    const search = `/topic/search/${searchRunId}`, leaderboard = `/topic/leaderboard/${searchRunId}`;
+    labState.subscriptions.set(search, run => {
+        if (run.searchRunId === labState.searchRunId) renderSearch(run);
+    });
+    labState.subscriptions.set(leaderboard, loadLeaderboard);
+    sendProofSubscription(search);
+    sendProofSubscription(leaderboard);
+}
 
 byId("start-search").addEventListener("click", startSearch); byId("cancel-search").addEventListener("click", cancelSearch);
 ["leaderboard-sort","leaderboard-direction"].forEach(id => byId(id).addEventListener("change", loadLeaderboard));
@@ -246,4 +298,5 @@ byId("combination-policy").addEventListener("change", event => {
     byId("policy-threshold-field").hidden = !weighted;
 });
 byId("policy-threshold").disabled = true;
+window.cryptoLabDiscovery = { refreshUserStrategies: refreshDiscoveryUserStrategies };
 loadCapabilities().catch(error => byId("search-message").textContent = error.message); refreshSystemStatus(); setInterval(refreshSystemStatus,5000); connectProofSocket();

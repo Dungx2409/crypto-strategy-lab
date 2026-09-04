@@ -146,6 +146,10 @@
                         <input id="article-url" type="url" placeholder="https://example.com/crypto-strategy-article">
                         <span class="field-hint">Gemini reads the page, extracts the trading idea, then asks you to confirm before building JSON.</span>
                     </label>
+                    <label id="article-text-field" class="wide-field" hidden>Article text fallback
+                        <textarea id="article-text" rows="8" placeholder="If the site blocks bots or asks for JavaScript verification, paste the article text here."></textarea>
+                        <span class="field-hint">Use this when the URL cannot be read directly.</span>
+                    </label>
                 </div>
                 <div class="button-row">
                     <button id="propose-strategy" type="button"><span class="btn-icon" aria-hidden="true">✦</span>Generate idea</button>

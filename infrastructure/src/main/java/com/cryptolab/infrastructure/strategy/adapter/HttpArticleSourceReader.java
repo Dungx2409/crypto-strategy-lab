@@ -85,7 +85,7 @@ public final class HttpArticleSourceReader implements ArticleSourceReader, Crawl
         return uri;
     }
 
-    private static String plainText(String html) {
+    static String plainText(String html) {
         String text = html.replaceAll("(?is)<script[^>]*>.*?</script>", " ")
                 .replaceAll("(?is)<style[^>]*>.*?</style>", " ")
                 .replaceAll("(?s)<[^>]+>", " ")
@@ -95,6 +95,15 @@ public final class HttpArticleSourceReader implements ArticleSourceReader, Crawl
                 .trim();
         if (text.isBlank()) {
             throw new IllegalArgumentException("Article contains no readable text");
+        }
+        String lower = text.toLowerCase(Locale.ROOT);
+        if (lower.contains("requires javascript verification")
+                || lower.contains("enable javascript")
+                || lower.contains("checking your browser")
+                || lower.contains("verify you are human")
+                || lower.contains("just a moment")) {
+            throw new IllegalArgumentException(
+                    "This article page requires JavaScript verification. Paste the article text into the fallback field instead.");
         }
         return text.length() > 20_000 ? text.substring(0, 20_000) : text;
     }

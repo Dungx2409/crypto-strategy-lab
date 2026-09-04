@@ -45,7 +45,8 @@ async function authenticate(path, usernameId = "auth-username", passwordId = "au
 
 async function logout() {
     await api("/api/v1/auth/logout", {method:"POST"}); setAccount(null);
-    accountFeatureState.strategies = []; accountFeatureState.draftId = null;
+    accountFeatureState.strategies = []; accountFeatureState.draftId = null; window.cryptoLabUserStrategies = [];
+    window.cryptoLabDiscovery?.refreshUserStrategies([]);
     renderSavedStrategies(); renderSchedules([]); renderCrawlerTemplates([]);
     byId("manual-history-count").textContent = "";
     renderManualHistory([]);
@@ -61,19 +62,22 @@ function setAuthoringMode(mode) {
         button.classList.toggle("active", button.dataset.authoringMode === (article ? "article" : "prompt"));
     });
     byId("article-url-field").hidden = !article;
+    byId("article-text-field").hidden = !article;
     byId("strategy-prompt-field").hidden = article;
     byId("propose-strategy").innerHTML = article
         ? '<span class="btn-icon" aria-hidden="true">🔗</span>Generate from URL'
         : '<span class="btn-icon" aria-hidden="true">✦</span>Generate idea';
     byId("authoring-message").textContent = article
-        ? "Paste a public article URL. Gemini will read it and draft a strategy idea for confirmation."
+        ? "Paste a public article URL. If the site blocks reading, paste the article text too."
         : "Describe the strategy in plain language, then generate an idea to review.";
 }
 
 async function proposeStrategy() {
     const article = byId("authoring-source").value === "article";
-    if (article && !byId("article-url").value.trim()) {
-        byId("authoring-message").textContent = "Enter a public article URL first.";
+    const articleUrl = byId("article-url").value.trim();
+    const articleText = byId("article-text").value.trim();
+    if (article && !articleUrl && !articleText) {
+        byId("authoring-message").textContent = "Enter a public article URL, or paste the article text.";
         byId("article-url").focus();
         return;
     }
@@ -82,7 +86,11 @@ async function proposeStrategy() {
         byId("strategy-prompt").focus();
         return;
     }
-    const body = article ? {articleUrl: byId("article-url").value.trim()} : {prompt: byId("strategy-prompt").value.trim()};
+    const body = article
+        ? articleText
+            ? {prompt: `Create strategy from article.${articleUrl ? ` Source URL: ${articleUrl}` : ""}\n\n${articleText}`}
+            : {articleUrl}
+        : {prompt: byId("strategy-prompt").value.trim()};
     try {
         byId("propose-strategy").disabled = true;
         byId("confirm-strategy").disabled = true;
@@ -102,7 +110,9 @@ async function proposeStrategy() {
         byId("confirm-strategy").disabled = false;
         byId("authoring-message").textContent = "Review the idea, then build and test its code.";
     } catch (error) {
-        byId("authoring-message").textContent = error.message;
+        byId("authoring-message").textContent = error.message.includes("JavaScript verification")
+            ? `${error.message} Copy the article text from your browser and paste it into Article text fallback.`
+            : error.message;
     } finally {
         byId("propose-strategy").disabled = false;
     }
@@ -130,7 +140,10 @@ async function saveStrategy() {
 }
 
 async function loadSavedStrategies() {
-    accountFeatureState.strategies = await api("/api/v1/user-strategies"); renderSavedStrategies();
+    accountFeatureState.strategies = await api("/api/v1/user-strategies");
+    window.cryptoLabUserStrategies = accountFeatureState.strategies;
+    renderSavedStrategies();
+    window.cryptoLabDiscovery?.refreshUserStrategies(accountFeatureState.strategies);
 }
 
 function renderSavedStrategies() {

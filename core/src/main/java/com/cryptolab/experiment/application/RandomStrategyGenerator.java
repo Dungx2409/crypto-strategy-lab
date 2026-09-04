@@ -50,7 +50,7 @@ public final class RandomStrategyGenerator implements StrategyGenerator {
 
     private List<StrategyTemplate> templates(SearchContext context) {
         Map<String, StrategyPluginDescriptor> descriptors = new LinkedHashMap<>();
-        for (StrategyPluginDescriptor descriptor : registry.availableStrategies()) {
+        for (StrategyPluginDescriptor descriptor : registry.authoringStrategies()) {
             String expectedVersion = context.strategyVersions().get(descriptor.type());
             if (context.strategyTypes().contains(descriptor.type())
                     && descriptor.version().equals(expectedVersion)) {
