@@ -16,14 +16,17 @@ class NewsDashboardTest {
         assertThat(html)
                 .contains("News + Sentiment", "news-status", "news-list", "/news.js")
                 .contains("Collect & analyze", "Analyze pending", "analyze-news")
-                .contains("news-interval", "news-coin", "news-provider", "All providers", "Auto-crawl every");
+                .contains("news-interval", "news-coin", "news-provider", "All providers", "Auto-crawl every")
+                .contains("Off (manual only)");
         assertThat(news)
                 .contains("/api/v1/news/collect")
                 .contains("/api/v1/news/analyze")
                 .contains("/api/v1/news/preferences")
                 .contains("/api/v1/news?limit=20")
                 .contains("provider: newsProvider.value")
-                .contains("item.sentiment", "item.score", "item.modelVersion")
+                .contains("item.sentiment", "item.score", "item.modelVersion", "item.summary")
+                .contains("sentiment-blurb")
+                .contains("prefs.interval !== \"off\"")
                 .contains("analyzed")
                 .doesNotContain("/api/v1/market")
                 .doesNotContain("location.reload");

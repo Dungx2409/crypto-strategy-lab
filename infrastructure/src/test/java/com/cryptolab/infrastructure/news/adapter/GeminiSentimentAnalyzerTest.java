@@ -21,7 +21,7 @@ class GeminiSentimentAnalyzerTest {
     @Test
     void parsesVersionedSemanticSentiment() {
         var analyzer = new GeminiSentimentAnalyzer(
-                ignored -> "{\"label\":\"POSITIVE\",\"score\":0.82}",
+                ignored -> "{\"label\":\"POSITIVE\",\"score\":0.82,\"summary\":\"Adoption news looks constructive for BTC near term.\"}",
                 new ObjectMapper(), Clock.fixed(NOW, ZoneOffset.UTC), "gemini-test");
 
         var result = analyzer.analyze(ITEM);
@@ -29,6 +29,7 @@ class GeminiSentimentAnalyzerTest {
         assertThat(result.sentiment()).isEqualTo(SentimentLabel.POSITIVE);
         assertThat(result.score()).isEqualByComparingTo("0.82");
         assertThat(result.model().version()).isEqualTo("gemini-test");
+        assertThat(result.summary()).contains("Adoption news");
     }
 
     @Test

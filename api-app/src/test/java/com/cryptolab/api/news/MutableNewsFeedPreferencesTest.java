@@ -45,6 +45,17 @@ class MutableNewsFeedPreferencesTest {
     }
 
     @Test
+    void offDisablesAutoCrawlSchedule() {
+        MutableNewsFeedPreferences preferences = new MutableNewsFeedPreferences();
+
+        var updated = preferences.update("off", "BTC", "ALL");
+
+        assertThat(updated.interval()).isEqualTo("off");
+        assertThat(preferences.autoCrawlEnabled()).isFalse();
+        assertThat(preferences.intervalDuration()).isNull();
+    }
+
+    @Test
     void acceptsCompositeAsTheAllProvidersAlias() {
         MutableNewsFeedPreferences preferences = new MutableNewsFeedPreferences("composite");
 

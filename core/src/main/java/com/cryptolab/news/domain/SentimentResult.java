@@ -11,7 +11,19 @@ public record SentimentResult(
         ModelDescriptor model,
         String inputVersion,
         String preprocessingVersion,
-        Instant createdAt) {
+        Instant createdAt,
+        String summary) {
+
+    public SentimentResult(
+            String newsId,
+            SentimentLabel sentiment,
+            BigDecimal score,
+            ModelDescriptor model,
+            String inputVersion,
+            String preprocessingVersion,
+            Instant createdAt) {
+        this(newsId, sentiment, score, model, inputVersion, preprocessingVersion, createdAt, null);
+    }
 
     public SentimentResult {
         if (newsId == null || newsId.isBlank()) {
@@ -33,5 +45,20 @@ public record SentimentResult(
         }
         preprocessingVersion = preprocessingVersion.trim();
         Objects.requireNonNull(createdAt, "createdAt must not be null");
+        if (summary != null) {
+            summary = summary.isBlank() ? null : summary.trim();
+        }
+    }
+
+    public SentimentResult withSummary(String summaryText) {
+        return new SentimentResult(
+                newsId,
+                sentiment,
+                score,
+                model,
+                inputVersion,
+                preprocessingVersion,
+                createdAt,
+                summaryText);
     }
 }

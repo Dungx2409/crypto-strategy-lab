@@ -74,12 +74,15 @@ PostgreSQL, RabbitMQ, and a browser dashboard.
   can be saved for Backtest; they are not offered in the Discovery plugin catalog.
 - News collection from CryptoCompare, RSS or Atom feeds, and HTML websites.
   Composite `all` mode merges CryptoCompare and RSS and tolerates one provider
-  failure. Sentiment uses the local keyword model by default, or Gemini when
-  selected. The News screen also sets crawl interval and coin filter.
+  failure. Sentiment uses the local keyword model by default, Gemini when
+  `SENTIMENT_PROVIDER=gemini`, or FinBERT when `SENTIMENT_PROVIDER=finbert`.
+  With a Gemini API key, each scored article also gets a short AI sentiment
+  paragraph on the News Crawler cards. The News screen also sets crawl interval
+  (including Off / manual only) and coin filter.
 - Versioned crawler selector templates, scheduled live-page selector checks, and
   Gemini-assisted replacement selectors that stay `NEEDS_REVIEW` until the account
   owner confirms them.
-- Flyway migrations V1 through V22.
+- Flyway migrations V1 through V23.
 
 ## Run with Docker
 
@@ -104,6 +107,8 @@ DEFAULT_ACCOUNT_USERNAME=demo
 DEFAULT_ACCOUNT_PASSWORD=crypto-demo
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
+HUGGINGFACE_API_KEY=
+HUGGINGFACE_URL=https://router.huggingface.co/hf-inference/models/ProsusAI/finbert
 NEWS_API_KEY=
 NEWS_PROVIDER=all
 NEWS_RSS_URLS=https://www.coindesk.com/arc/outboundfeeds/rss/,https://cointelegraph.com/rss
@@ -116,8 +121,10 @@ DISCOVERY_POLL_INTERVAL=1m
 SESSION_COOKIE_SECURE=false
 ```
 
-Set `SENTIMENT_PROVIDER=gemini` for Gemini semantic sentiment. Selector checks
-run every `CRAWLER_CHECK_INTERVAL` (default 15 minutes). A failed check never
+Set `SENTIMENT_PROVIDER=gemini` for Gemini semantic sentiment, or
+`SENTIMENT_PROVIDER=finbert` with `HUGGINGFACE_API_KEY` for FinBERT scores plus
+a Gemini summary paragraph when `GEMINI_API_KEY` is set. Selector checks run
+every `CRAWLER_CHECK_INTERVAL` (default 15 minutes). A failed check never
 activates an AI proposal without user confirmation.
 
 `CRYPTO_SEARCH_GENERATOR` (default `random` in Compose) sets the preferred

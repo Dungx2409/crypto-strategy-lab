@@ -15,7 +15,8 @@ public record NewsItemResponse(
         String modelName,
         String modelVersion,
         String inputVersion,
-        String preprocessingVersion) {
+        String preprocessingVersion,
+        String summary) {
 
     static NewsItemResponse from(NewsInsight insight) {
         var item = insight.item();
@@ -31,6 +32,7 @@ public record NewsItemResponse(
                 prediction == null ? null : prediction.model().name(),
                 prediction == null ? null : prediction.model().version(),
                 item.inputVersion(),
-                prediction == null ? null : prediction.preprocessingVersion());
+                prediction == null ? null : prediction.preprocessingVersion(),
+                prediction == null ? null : prediction.summary());
     }
 }

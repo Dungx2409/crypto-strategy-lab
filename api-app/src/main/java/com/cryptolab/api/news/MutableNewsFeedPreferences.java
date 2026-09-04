@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @Component
 public final class MutableNewsFeedPreferences implements NewsFeedPreferences {
 
-    static final Set<String> ALLOWED_INTERVALS = Set.of("1m", "2m", "5m", "1h");
+    static final Set<String> ALLOWED_INTERVALS = Set.of("off", "1m", "2m", "5m", "1h");
     private static final Map<String, String> COIN_ALIASES = coinAliases();
 
     private volatile String interval = "5m";
@@ -58,8 +58,16 @@ public final class MutableNewsFeedPreferences implements NewsFeedPreferences {
         return snapshot();
     }
 
+    public boolean autoCrawlEnabled() {
+        return !"off".equals(interval);
+    }
+
+    /**
+     * Scheduled crawl delay, or {@code null} when auto-crawl is off.
+     */
     public Duration intervalDuration() {
         return switch (interval) {
+            case "off" -> null;
             case "1m" -> Duration.ofMinutes(1);
             case "2m" -> Duration.ofMinutes(2);
             case "1h" -> Duration.ofHours(1);

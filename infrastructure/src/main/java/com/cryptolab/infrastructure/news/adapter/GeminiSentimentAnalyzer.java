@@ -47,9 +47,10 @@ public final class GeminiSentimentAnalyzer implements SentimentAnalyzer {
     public SentimentResult analyze(NewsItem item) {
         String output = generate.apply("""
                 Analyze cryptocurrency-news sentiment. Return JSON only with this exact shape:
-                {"label":"POSITIVE|NEUTRAL|NEGATIVE","score":0.0}
+                {"label":"POSITIVE|NEUTRAL|NEGATIVE","score":0.0,"summary":"one short paragraph"}
                 Score must be between -1 and 1. Use the article meaning, not keyword counting.
-                POSITIVE requires a positive score, NEGATIVE a negative score, and NEUTRAL exactly zero.
+                POSITIVE requires a positive score, NEGATIVE a negative score, and NEUTRAL near zero.
+                summary must be 2-4 sentences explaining the market sentiment in plain text.
                 Source: %s
                 Title and body: %s
                 """.formatted(item.provider(), item.normalizedText()));
@@ -70,9 +71,14 @@ public final class GeminiSentimentAnalyzer implements SentimentAnalyzer {
                     || (label == SentimentLabel.NEUTRAL && score.abs().compareTo(new BigDecimal("0.25")) > 0)) {
                 throw new IllegalArgumentException("Gemini sentiment label and score are inconsistent");
             }
+            String summary = null;
+            JsonNode summaryNode = root.get("summary");
+            if (summaryNode != null && summaryNode.isTextual() && !summaryNode.asText().isBlank()) {
+                summary = summaryNode.asText().trim();
+            }
             return new SentimentResult(
                     item.newsId(), label, score, descriptor, item.inputVersion(),
-                    PREPROCESSING_VERSION, clock.instant());
+                    PREPROCESSING_VERSION, clock.instant(), summary);
         } catch (IllegalArgumentException failure) {
             throw failure;
         } catch (Exception failure) {

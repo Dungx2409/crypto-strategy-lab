@@ -262,6 +262,7 @@ pre { max-height: 320px; overflow: auto; padding: 10px; border-radius: 8px; colo
 .news-card a:hover { color: #245fd1; }
 .news-meta, .sentiment { margin: 2px 0 0; color: #747d8f; font-size: .84rem; }
 .sentiment { display: flex; align-items: center; gap: 5px; }
+.sentiment-blurb { margin: 4px 0 0; color: #4d5668; font-size: .84rem; line-height: 1.45; }
 .sentiment-positive { color: #078946; }
 .sentiment-negative { color: #c63343; }
 .sentiment-neutral, .sentiment-pending, .news-empty { color: #747d8f; }

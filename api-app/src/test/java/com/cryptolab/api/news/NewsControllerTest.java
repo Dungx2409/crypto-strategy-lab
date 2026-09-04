@@ -131,6 +131,15 @@ class NewsControllerTest {
     }
 
     @Test
+    void acceptsOffIntervalForManualOnlyCrawl() throws Exception {
+        mockMvc.perform(put("/api/v1/news/preferences")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"interval\":\"off\",\"coin\":\"ALL\",\"provider\":\"ALL\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.interval").value("off"));
+    }
+
+    @Test
     void collectUsesConfiguredCoinCategories() throws Exception {
         provider.items = List.of(item());
 

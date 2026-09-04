@@ -72,6 +72,12 @@ function renderNews(items) {
             : "Sentiment pending"));
 
         article.append(heading, meta, sentiment);
+        if (item.summary) {
+            const summary = document.createElement("p");
+            summary.className = "sentiment-blurb";
+            summary.textContent = item.summary;
+            article.append(summary);
+        }
         if (!item.sentiment) {
             const actions = document.createElement("div");
             actions.className = "button-row news-card-actions";
@@ -139,9 +145,12 @@ async function saveNewsPreferences() {
         newsProvider.value = body.provider;
         newsMessage.dataset.keep = "true";
         const providerLabel = newsProvider.options[newsProvider.selectedIndex].text;
+        const scheduleLabel = body.interval === "off"
+            ? "manual crawl only"
+            : `every ${body.interval}`;
         newsMessage.textContent = body.categories
-            ? `${providerLabel} every ${body.interval} for ${body.coin}`
-            : `${providerLabel} every ${body.interval} for all coins`;
+            ? `${providerLabel} · ${scheduleLabel} for ${body.coin}`
+            : `${providerLabel} · ${scheduleLabel} for all coins`;
     } catch (error) {
         newsMessage.textContent = error.message;
     } finally {
@@ -220,9 +229,13 @@ saveNewsPreferencesButton.addEventListener("click", saveNewsPreferences);
 });
 
 loadNewsPreferences()
-    .catch(error => { newsMessage.textContent = error.message; })
-    .finally(() => loadStoredNews().then(refreshNews).catch(error => {
+    .then(prefs => loadStoredNews().then(() => {
+        if (prefs && prefs.interval !== "off") {
+            return refreshNews();
+        }
+    }))
+    .catch(error => {
         newsMessage.textContent = error.message;
         setNewsStatus("DOWN", "DOWN");
         renderNews([]);
-    }));
+    });

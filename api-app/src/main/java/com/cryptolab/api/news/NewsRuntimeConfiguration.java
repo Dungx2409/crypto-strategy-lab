@@ -2,6 +2,8 @@ package com.cryptolab.api.news;
 
 import com.cryptolab.infrastructure.news.adapter.DeterministicKeywordSentimentAnalyzer;
 import com.cryptolab.infrastructure.news.adapter.GeminiSentimentAnalyzer;
+import com.cryptolab.infrastructure.news.adapter.GeminiSentimentSummaryDecorator;
+import com.cryptolab.infrastructure.news.adapter.HuggingFaceFinBERTSentimentAnalyzer;
 import com.cryptolab.infrastructure.news.adapter.RssNewsProvider;
 import com.cryptolab.infrastructure.news.adapter.SelectableNewsProvider;
 import com.cryptolab.infrastructure.strategy.adapter.GeminiStrategyAuthoringModel;
@@ -104,8 +106,12 @@ class NewsRuntimeConfiguration {
             name = "crypto.sentiment.provider",
             havingValue = "keyword",
             matchIfMissing = true)
-    SentimentAnalyzer deterministicKeywordSentimentAnalyzer(Clock marketDataClock) {
-        return new DeterministicKeywordSentimentAnalyzer(marketDataClock);
+    SentimentAnalyzer deterministicKeywordSentimentAnalyzer(
+            Clock marketDataClock,
+            GeminiStrategyAuthoringModel gemini,
+            @Value("${crypto.ai.gemini.api-key:}") String geminiApiKey) {
+        return withOptionalGeminiSummary(
+                new DeterministicKeywordSentimentAnalyzer(marketDataClock), gemini, geminiApiKey);
     }
 
     @Bean
@@ -116,6 +122,32 @@ class NewsRuntimeConfiguration {
             Clock marketDataClock,
             @Value("${crypto.ai.gemini.model:gemini-2.5-flash}") String model) {
         return new GeminiSentimentAnalyzer(gemini, objectMapper, marketDataClock, model);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "crypto.sentiment.provider", havingValue = "finbert")
+    SentimentAnalyzer finbertSentimentAnalyzer(
+            ObjectMapper objectMapper,
+            Clock marketDataClock,
+            GeminiStrategyAuthoringModel gemini,
+            @Value("${crypto.ai.huggingface.url:https://router.huggingface.co/hf-inference/models/ProsusAI/finbert}")
+                    String modelUrl,
+            @Value("${crypto.ai.huggingface.api-key:}") String apiKey,
+            @Value("${crypto.ai.gemini.api-key:}") String geminiApiKey) {
+        return withOptionalGeminiSummary(
+                new HuggingFaceFinBERTSentimentAnalyzer(objectMapper, marketDataClock, modelUrl, apiKey),
+                gemini,
+                geminiApiKey);
+    }
+
+    private static SentimentAnalyzer withOptionalGeminiSummary(
+            SentimentAnalyzer analyzer,
+            GeminiStrategyAuthoringModel gemini,
+            String geminiApiKey) {
+        if (geminiApiKey == null || geminiApiKey.isBlank()) {
+            return analyzer;
+        }
+        return new GeminiSentimentSummaryDecorator(analyzer, gemini::generateText);
     }
 
     @Bean

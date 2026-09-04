@@ -177,6 +177,10 @@
                         <button id="start-search" type="button"><span class="btn-icon" aria-hidden="true">▶</span>Start discovery</button>
                         <button id="cancel-search" class="secondary" type="button" disabled><span class="btn-icon" aria-hidden="true">■</span>Stop</button>
                     </div>
+                    <div class="controls compact">
+                        <label>Discovery history<select id="discovery-history"><option value="">No discovery runs yet</option></select></label>
+                        <button id="refresh-discovery-history" class="secondary" type="button">Refresh history</button>
+                    </div>
                     <p id="search-message" class="message" role="status">Waiting for market data.</p>
                     <div class="progress-track"><span id="search-progress-bar"></span></div>
                     <div class="metric-grid">
@@ -192,7 +196,12 @@
                 </section>
                 <section class="panel">
                     <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">♜</span><div><p class="eyebrow">Top strategies</p><h2 id="leaderboard-title">Leaderboard</h2></div></div><div class="sort-controls"><label>Sort by<select id="leaderboard-sort"><option value="SCORE" selected>Score</option><option value="RETURN">Return</option><option value="WIN_RATE">Win rate</option><option value="MAX_DRAWDOWN">Max drawdown</option><option value="TRADES">Trades</option><option value="RANK">Rank</option></select></label><label>Order<select id="leaderboard-direction"><option value="DESC" selected>High first</option><option value="ASC">Low first</option></select></label></div></div>
+                    <p id="leaderboard-run-label" class="message">Start or choose a discovery run.</p>
                     <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Strategy</th><th>Return</th><th>Win rate</th><th>MDD</th><th>Trades</th><th>Score</th></tr></thead><tbody id="leaderboard-body"><tr><td colspan="7" class="empty">No completed experiments yet.</td></tr></tbody></table></div>
+                </section>
+                <section class="panel">
+                    <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">★</span><div><p class="eyebrow">Best from every run</p><h2>All-time top 20</h2></div></div></div>
+                    <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Strategy</th><th>Return</th><th>Win rate</th><th>MDD</th><th>Trades</th><th>Score</th></tr></thead><tbody id="all-time-leaderboard-body"><tr><td colspan="7" class="empty">No completed experiments yet.</td></tr></tbody></table></div>
                 </section>
             </div>
             <section class="panel feature-panel">
@@ -271,6 +280,7 @@
                 </label>
                 <label>Auto-crawl every
                     <select id="news-interval">
+                        <option value="off">Off (manual only)</option>
                         <option value="1m">1 minute</option>
                         <option value="2m">2 minutes</option>
                         <option value="5m" selected>5 minutes</option>

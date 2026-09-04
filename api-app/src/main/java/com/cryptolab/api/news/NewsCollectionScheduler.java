@@ -54,18 +54,20 @@ final class NewsCollectionScheduler {
     }
 
     void reschedule(Duration interval) {
-        Duration delay = interval == null || interval.isZero() || interval.isNegative()
-                ? Duration.ofMinutes(5)
-                : interval;
         synchronized (scheduleLock) {
             if (scheduled != null) {
                 scheduled.cancel(false);
+                scheduled = null;
+            }
+            if (interval == null || interval.isZero() || interval.isNegative()) {
+                LOGGER.info("news_collection_disabled");
+                return;
             }
             scheduled = taskScheduler.scheduleWithFixedDelay(
                     this::collect,
                     Instant.now().plusSeconds(30),
-                    delay);
-            LOGGER.info("news_collection_rescheduled interval={}", delay);
+                    interval);
+            LOGGER.info("news_collection_rescheduled interval={}", interval);
         }
     }
 

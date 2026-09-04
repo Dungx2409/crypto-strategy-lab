@@ -88,8 +88,8 @@ public class JdbcNewsStore implements NewsStore {
                 """
                 INSERT INTO sentiment_predictions (
                     id, news_id, sentiment, score, model_name, model_version,
-                    input_version, preprocessing_version, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    input_version, preprocessing_version, created_at, summary
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (news_id, model_name, model_version, input_version, preprocessing_version)
                 DO NOTHING
                 """,
@@ -101,7 +101,8 @@ public class JdbcNewsStore implements NewsStore {
                 result.model().version(),
                 result.inputVersion(),
                 result.preprocessingVersion(),
-                timestamp(result.createdAt()));
+                timestamp(result.createdAt()),
+                result.summary());
     }
 
     @Override
@@ -112,12 +113,13 @@ public class JdbcNewsStore implements NewsStore {
                        n.normalized_text, n.input_version,
                        p.sentiment, p.score, p.model_name, p.model_version,
                        p.prediction_input_version, p.preprocessing_version,
-                       p.prediction_created_at
+                       p.prediction_created_at, p.summary
                 FROM news_items n
                 LEFT JOIN LATERAL (
                     SELECT sentiment, score, model_name, model_version,
                            input_version AS prediction_input_version,
-                           preprocessing_version, created_at AS prediction_created_at
+                           preprocessing_version, created_at AS prediction_created_at,
+                           summary
                     FROM sentiment_predictions
                     WHERE news_id = n.news_id AND input_version = n.input_version
                     ORDER BY created_at DESC, id
@@ -163,7 +165,8 @@ public class JdbcNewsStore implements NewsStore {
                         resultSet.getString("model_version")),
                 resultSet.getString("prediction_input_version"),
                 resultSet.getString("preprocessing_version"),
-                resultSet.getObject("prediction_created_at", OffsetDateTime.class).toInstant());
+                resultSet.getObject("prediction_created_at", OffsetDateTime.class).toInstant(),
+                resultSet.getString("summary"));
         return new NewsInsight(item, Optional.of(prediction));
     }
 
