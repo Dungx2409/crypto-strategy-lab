@@ -167,7 +167,7 @@ public final class ContinuousDiscoveryService {
         Map<String, String> versions = descriptors.stream().collect(Collectors.toMap(
                 item -> item.type(), item -> item.version(), (left, right) -> left));
         SearchContext context = new SearchContext(
-                searchRunId, dataset, strategyTypes, versions, new SearchParameterSpace(Map.of()),
+                searchRunId, dataset, strategyTypes, versions, Map.of(), new SearchParameterSpace(Map.of()),
                 new CombinationPolicyDefinition("MAJORITY", "1.0", Map.of(), BigDecimal.ZERO),
                 searchRunId.getMostSignificantBits() ^ searchRunId.getLeastSignificantBits(),
                 new StopConditions(schedule.candidateLimit(), null, null),

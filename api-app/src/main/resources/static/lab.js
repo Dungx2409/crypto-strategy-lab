@@ -1,4 +1,4 @@
-const labState = { catalog: [], userStrategies: [], capabilities: null, searchRunId: null, searchStartedAt: null, stopConditions: null, startingSearch: false, socket: null, connected: false, subscriptions: new Map(), poll: null };
+const labState = { catalog: [], userStrategies: [], capabilities: null, searchRunId: null, currentSearchRun: null, searchStartedAt: null, stopConditions: null, discoveryHistory: [], startingSearch: false, socket: null, connected: false, subscriptions: new Map(), poll: null };
 const byId = id => document.getElementById(id);
 
 async function api(url, options) {
@@ -49,6 +49,8 @@ function savedStrategyPlugins() {
         const definitions = strategy.document?.strategies || [];
         if (definitions.length !== 1) return [];
         const definition = definitions[0];
+        const label = definition.displayLabel || acronym(strategy.document.name);
+        const fullName = strategy.document.name || label;
         const catalogPlugin = labState.catalog.find(plugin => plugin.type === definition.type && plugin.version === definition.version);
         const allowedParameters = new Set(Object.keys(catalogPlugin?.parameterSchema || {}));
         const fixedParameters = catalogPlugin
@@ -60,11 +62,27 @@ function savedStrategyPlugins() {
             version: definition.version,
             parameterSchema: {},
             fixedParameters,
-            displayName: strategy.document.name,
+            displayName: strategyDisplayName(fullName, label),
             displayVersion: `saved v${strategy.version}`,
+            displayLabel: label,
             savedStrategyId: strategy.id
         }];
     });
+}
+
+function strategyDisplayName(name, label) {
+    const cleanName = String(name || "").trim();
+    const cleanLabel = String(label || "").trim();
+    if (!cleanLabel) return cleanName || "AI strategy";
+    if (!cleanName || cleanName.toUpperCase() === cleanLabel.toUpperCase()) return cleanLabel;
+    if (cleanName.toUpperCase().endsWith(`(${cleanLabel.toUpperCase()})`)) return cleanName;
+    return `${cleanName} (${cleanLabel})`;
+}
+
+function acronym(value) {
+    const words = String(value || "").toUpperCase().match(/[A-Z0-9]+/g) || [];
+    const label = words.map(word => word[0]).join("").slice(0, 16);
+    return label.length >= 2 ? label : "AI";
 }
 
 function discoveryCatalog() {
@@ -77,11 +95,21 @@ function renderStrategies() {
         const card = document.createElement("article"); card.className = "strategy-card"; card.dataset.type = plugin.type; card.dataset.version = plugin.version;
         if (plugin.fixedParameters) card.dataset.fixedParameters = JSON.stringify(plugin.fixedParameters);
         if (plugin.savedStrategyId) card.dataset.savedStrategyId = plugin.savedStrategyId;
+        if (plugin.displayLabel) card.dataset.displayLabel = plugin.displayLabel;
         const header = document.createElement("header"); const label = document.createElement("label"); const check = document.createElement("input"); check.type = "checkbox"; check.checked = !plugin.savedStrategyId; check.className = "strategy-enabled";
         const icon = document.createElement("span"); icon.className = "strategy-type-icon"; icon.setAttribute("aria-hidden", "true"); icon.textContent = strategyIcon(plugin.type);
         label.append(check, icon, document.createTextNode(` ${plugin.displayName || plugin.type}`)); const version = document.createElement("span"); version.className = "muted"; version.textContent = plugin.displayVersion || plugin.version; header.append(label, version); card.append(header);
         const grid = document.createElement("div"); grid.className = "parameter-grid";
         Object.entries(plugin.parameterSchema).forEach(([name, schema]) => { const field = document.createElement("label"); field.textContent = name; const input = document.createElement("input"); input.dataset.parameter = name; input.dataset.parameterType = schema.type; input.value = suggestedValues(name, schema); field.append(input); grid.append(field); });
+        Object.entries(plugin.fixedParameters || {}).forEach(([name, value]) => {
+            const field = document.createElement("label");
+            field.textContent = `${name} (fixed)`;
+            const input = document.createElement(String(value).length > 80 ? "textarea" : "input");
+            input.value = typeof value === "object" ? JSON.stringify(value) : String(value);
+            input.disabled = true;
+            field.append(input);
+            grid.append(field);
+        });
         const weightField = document.createElement("label");
         weightField.className = "weight-field";
         const weightCaption = document.createElement("span");
@@ -136,6 +164,7 @@ function renderSelectedStrategyChips() {
 async function loadCapabilities() {
     const [catalog, capabilities] = await Promise.all([api("/api/v1/strategies"), api("/api/v1/search-runs/capabilities")]);
     labState.catalog = catalog; labState.capabilities = capabilities; labState.userStrategies = window.cryptoLabUserStrategies || []; renderStrategies();
+    window.cryptoLabAccountFeatures?.refreshManualStrategyOptions?.();
     byId("execution-version").value = `${capabilities.engineVersion} · ${capabilities.fillPolicy}`;
     const generator = byId("generator"); generator.replaceChildren(); capabilities.availableGenerators.forEach(type => { const option = document.createElement("option"); option.value = type; option.textContent = type.toUpperCase(); option.selected = type === capabilities.defaultGenerator; generator.append(option); });
 }
@@ -145,11 +174,43 @@ function refreshDiscoveryUserStrategies(strategies) {
     renderStrategies();
 }
 
+function discoveryRunLabel(run) {
+    const created = run.createdAt ? new Date(run.createdAt).toLocaleString() : "unknown time";
+    const best = run.bestScore ?? "—";
+    const strategies = run.strategySummary ? ` · ${run.strategySummary}` : "";
+    return `${created} · ${run.status} · ${run.generatorType}${strategies} · best ${best}`;
+}
+
+async function loadDiscoveryHistory(selectedId = labState.searchRunId) {
+    const runs = await api("/api/v1/search-runs?limit=25");
+    labState.discoveryHistory = runs;
+    const select = byId("discovery-history");
+    select.replaceChildren();
+    if (!runs.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No discovery runs yet";
+        select.append(option);
+        return;
+    }
+    runs.forEach(run => {
+        const option = document.createElement("option");
+        option.value = run.searchRunId;
+        option.textContent = discoveryRunLabel(run);
+        option.selected = run.searchRunId === selectedId;
+        select.append(option);
+    });
+    if (selectedId && runs.some(run => run.searchRunId === selectedId)) {
+        select.value = selectedId;
+    }
+}
+
 function selectedSearchConfiguration() {
-    const strategyTypes = [], strategyVersions = {}, parameterSpace = {}, weights = {};
+    const strategyTypes = [], strategyVersions = {}, strategyLabels = {}, parameterSpace = {}, weights = {};
     document.querySelectorAll(".strategy-card").forEach(card => {
         if (!card.querySelector(".strategy-enabled").checked) return;
         const type = card.dataset.type; strategyTypes.push(type); strategyVersions[type] = card.dataset.version; weights[type] = Number(card.querySelector(".strategy-weight").value); parameterSpace[type] = {};
+        if (card.dataset.displayLabel) strategyLabels[type] = card.dataset.displayLabel;
         if (card.dataset.fixedParameters) {
             Object.entries(JSON.parse(card.dataset.fixedParameters)).forEach(([name, value]) => {
                 parameterSpace[type][name] = [value];
@@ -168,7 +229,7 @@ function selectedSearchConfiguration() {
         throw new Error("Discovery can use only one strategy of each type at a time. Select one saved AI strategy or one built-in strategy for the same type.");
     }
     const policy = byId("combination-policy").value;
-    return { strategyTypes, strategyVersions, parameterSpace, combinationPolicy: { type: policy, version: "1.0", weights: policy === "WEIGHTED" ? weights : {}, threshold: policy === "WEIGHTED" ? Number(byId("policy-threshold").value) : 0 } };
+    return { strategyTypes, strategyVersions, strategyLabels, parameterSpace, combinationPolicy: { type: policy, version: "1.0", weights: policy === "WEIGHTED" ? weights : {}, threshold: policy === "WEIGHTED" ? Number(byId("policy-threshold").value) : 0 } };
 }
 
 async function materializeDataset() {
@@ -226,12 +287,13 @@ async function startSearch() {
         byId("search-message").textContent = generator === "genetic"
             ? `Search ${run.searchRunId} · genetic generations wait for worker fitness between rounds`
             : `Search ${run.searchRunId}`;
-        subscribeProofTopics(run.searchRunId); renderSearch(run); beginPolling();
+        subscribeProofTopics(run.searchRunId); renderSearch(run); await loadDiscoveryHistory(run.searchRunId); await loadLeaderboard(); await loadAllTimeLeaderboard(); beginPolling();
     } catch (error) { labState.startingSearch = false; byId("search-message").textContent = error.message; byId("start-search").disabled = false; byId("search-status").textContent = "FAILED"; byId("search-status").className = "status status-offline"; }
 }
 
 async function cancelSearch() { if (!labState.searchRunId) return; try { renderSearch(await api(`/api/v1/search-runs/${labState.searchRunId}/cancel`, {method:"POST"})); } catch (error) { byId("search-message").textContent = error.message; } }
 function renderSearch(run) {
+    labState.currentSearchRun = run;
     const terminal = ["COMPLETED","FAILED","CANCELLED"].includes(run.status); const badge = byId("search-status"); badge.textContent = `${run.status} · ${run.generatorType}`; badge.className = `status ${run.status === "FAILED" ? "status-offline" : terminal ? "status-online" : "status-degraded"}`;
     byId("generated-count").textContent = run.generatedCandidates; byId("pending-count").textContent = run.pendingDispatchJobs; byId("queued-count").textContent = run.queuedJobs; byId("running-count").textContent = run.runningJobs; byId("completed-count").textContent = run.completedJobs; byId("failed-count").textContent = run.failedJobs; byId("best-score").textContent = run.bestScore ?? "—";
     const started = run.startedAt ? new Date(run.startedAt).getTime() : labState.searchStartedAt; const ended = run.endedAt ? new Date(run.endedAt).getTime() : Date.now(); byId("elapsed-time").textContent = started ? `${Math.max(0, Math.round((ended-started)/1000))}s` : "0s";
@@ -250,26 +312,105 @@ async function loadLeaderboard() {
     if (!labState.selectedExperimentId && data.items[0]) { loadExperiment(data.items[0].experimentId); } else if (labState.selectedExperimentId && !document.querySelector("[data-selected-experiment]")) { const exists = data.items.some(i => i.experimentId === labState.selectedExperimentId); if (!exists && data.items[0]) loadExperiment(data.items[0].experimentId); }
 }
 
-function provenanceItem(label, value) { const item = document.createElement("article"); item.className = "provenance-item"; const name = document.createElement("span"); name.textContent = label; const data = document.createElement("strong"); data.textContent = value ?? "—"; item.append(name,data); return item; }
 async function loadExperiment(experimentId) {
     labState.selectedExperimentId = experimentId;
     document.querySelectorAll("#leaderboard-body tr").forEach(row => { if (row.dataset.experimentId === experimentId) row.dataset.selectedExperiment = "true"; else delete row.dataset.selectedExperiment; });
     byId("experiment-message").textContent = "Loading immutable result…";
     try {
-        const [details, provenance, dataset] = await Promise.all([api(`/api/v1/experiments/${experimentId}`), api(`/api/v1/experiments/${experimentId}/provenance`),api(`/api/v1/experiments/${experimentId}/candles`)]); details.candles=dataset.candles; byId("experiment-rank").textContent = details.rank ? `TOP #${details.rank}` : details.status; byId("experiment-rank").className = "status status-online"; byId("experiment-message").textContent = `${details.strategies.map(s => `${s.type}@${s.version}`).join(" + ")} · ${details.dataset.symbol} ${details.dataset.timeframe}`;
+        const [details, provenance, dataset] = await Promise.all([api(`/api/v1/experiments/${experimentId}`), api(`/api/v1/experiments/${experimentId}/provenance`),api(`/api/v1/experiments/${experimentId}/candles`)]); details.candles=dataset.candles; byId("experiment-rank").textContent = details.rank ? `TOP #${details.rank}` : details.status; byId("experiment-rank").className = "status status-online"; byId("experiment-message").textContent = `${experimentRunText(details)} · ${generatorText(details.generator)} · ${strategyShortText(details.strategies)} · ${details.dataset.symbol} ${details.dataset.timeframe} · ${formatDateTime(details.startedAt)}`;
         byId("manual-timeframe").value = details.dataset.timeframe;
         byId("manual-symbol").value = details.dataset.symbol;
         byId("metric-win-rate").textContent = details.metrics ? `${details.metrics.winRatePct ?? "-"}%` : "-";
         byId("metric-return").textContent = details.metrics ? `${details.metrics.totalReturnPct}%` : "-";
         byId("metric-drawdown").textContent = details.metrics ? `${details.metrics.maxDrawdownPct}%` : "-";
         byId("metric-trades").textContent = details.metrics?.totalTrades ?? "-";
-        const grid = byId("provenance-grid"); grid.replaceChildren(provenanceItem("Experiment",details.experimentId),provenanceItem("Candidate hash",details.candidateHash),provenanceItem("Dataset checksum",details.dataset.checksum),provenanceItem("Dataset range",`${details.dataset.from} to ${details.dataset.to}`),provenanceItem("Generator",`${details.generator.type}@${details.generator.version}`),provenanceItem("Evaluator",details.evaluatorVersion),provenanceItem("Engine",`${details.executionConfig.engineVersion} · ${details.executionConfig.fillPolicy}`),provenanceItem("Code / build",`${details.codeCommit} / ${details.buildVersion}`),provenanceItem("Return",details.metrics ? `${details.metrics.totalReturnPct}%` : "-"),provenanceItem("Win rate",details.metrics ? `${details.metrics.winRatePct ?? "-"}%` : "-"),provenanceItem("MDD",details.metrics ? `${details.metrics.maxDrawdownPct}%` : "-"),provenanceItem("Trades",details.metrics?.totalTrades),provenanceItem("Score",details.metrics?.score));
+        const grid = byId("provenance-grid"); grid.replaceChildren(provenanceItem("Run",experimentRunText(details)),provenanceItem("Run time",`${formatDateTime(details.startedAt)} to ${formatDateTime(details.completedAt)}`),provenanceItem("Search method",generatorText(details.generator)),provenanceItem("Strategies used",strategyConfigText(details.strategies)),provenanceItem("Experiment",details.experimentId),provenanceItem("Candidate hash",details.candidateHash),provenanceItem("Dataset checksum",details.dataset.checksum),provenanceItem("Dataset range",`${details.dataset.from} to ${details.dataset.to}`),provenanceItem("Evaluator",details.evaluatorVersion),provenanceItem("Engine",`${details.executionConfig.engineVersion} · ${details.executionConfig.fillPolicy}`),provenanceItem("Code / build",`${details.codeCommit} / ${details.buildVersion}`),provenanceItem("Return",details.metrics ? `${details.metrics.totalReturnPct}%` : "-"),provenanceItem("Win rate",details.metrics ? `${details.metrics.winRatePct ?? "-"}%` : "-"),provenanceItem("MDD",details.metrics ? `${details.metrics.maxDrawdownPct}%` : "-"),provenanceItem("Trades",details.metrics?.totalTrades),provenanceItem("Score",details.metrics?.score));
         renderArtifacts("signals", details.signals, signal => `${signal.at} · ${signal.strategyType}@${signal.strategyVersion} · ${signal.type} (${signal.strength}) · ${signal.reason}`); renderArtifacts("trades", details.trades, trade => `${trade.direction || "LONG"} · ${trade.entryTime} @ ${trade.entryPrice} to ${trade.exitTime} @ ${trade.exitPrice} · ${trade.exitReason || "SIGNAL"} · PnL ${trade.pnl}`); byId("provenance-json").textContent = JSON.stringify(provenance,null,2);
         window.cryptoLabCurrentExperiment = details;
         window.cryptoLabBacktest.render(details);
     } catch (error) { byId("experiment-message").textContent = error.message; }
 }
 function renderArtifacts(id, items, describe) { const host = byId(id); host.replaceChildren(); if (!items?.length) { host.className = "artifact-list empty"; host.textContent = `No ${id}.`; return; } host.className = "artifact-list"; items.forEach(item => { const row = document.createElement("div"); row.className = "artifact-row"; row.textContent = describe(item); host.append(row); }); }
+
+function renderLeaderboardRows(bodyId, items, emptyText, showRun = false) {
+    const body = byId(bodyId);
+    body.replaceChildren();
+    if (!items.length) {
+        const row = body.insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = showRun ? 8 : 7;
+        cell.className = "empty";
+        cell.textContent = emptyText;
+        return;
+    }
+    items.forEach(item => {
+        const row = body.insertRow();
+        row.dataset.experimentId = item.experimentId;
+        if (labState.selectedExperimentId === item.experimentId) row.dataset.selectedExperiment = "true";
+        const values = showRun
+            ? [item.strategySummary, `${item.returnPct}%`, `${item.winRatePct ?? "-"}%`, `${item.maxDrawdownPct}%`, item.totalTrades, item.score]
+            : [item.rank, item.strategySummary, `${item.returnPct}%`, `${item.winRatePct ?? "-"}%`, `${item.maxDrawdownPct}%`, item.totalTrades, item.score];
+        if (showRun) {
+            const rankCell = row.insertCell();
+            rankCell.textContent = item.rank;
+            appendLeaderboardRunCell(row, item);
+        }
+        values
+            .forEach(value => {
+                const cell = row.insertCell();
+                cell.textContent = value;
+            });
+        row.addEventListener("click", () => {
+            loadExperiment(item.experimentId);
+            if (typeof showView === "function") showView("backtest");
+        });
+    });
+}
+
+async function loadLeaderboard() {
+    if (!labState.searchRunId) return;
+    const query = new URLSearchParams({
+        searchRunId: labState.searchRunId,
+        limit: "50",
+        sort: byId("leaderboard-sort").value,
+        direction: byId("leaderboard-direction").value
+    });
+    const data = await api(`/api/v1/leaderboard?${query}`);
+    const run = labState.discoveryHistory.find(item => item.searchRunId === labState.searchRunId)
+        || (labState.currentSearchRun?.searchRunId === labState.searchRunId ? labState.currentSearchRun : null);
+    byId("leaderboard-run-label").textContent = run
+        ? `Showing ${discoveryRunLabel(run)}`
+        : `Showing discovery ${labState.searchRunId}`;
+    renderLeaderboardRows("leaderboard-body", data.items, "No completed experiments yet.");
+    if (!labState.selectedExperimentId && data.items[0]) {
+        loadExperiment(data.items[0].experimentId);
+    } else if (labState.selectedExperimentId && !document.querySelector("[data-selected-experiment]")) {
+        const exists = data.items.some(item => item.experimentId === labState.selectedExperimentId);
+        if (!exists && data.items[0]) loadExperiment(data.items[0].experimentId);
+    }
+}
+
+async function loadAllTimeLeaderboard() {
+    const query = new URLSearchParams({
+        limit: "20",
+        sort: byId("leaderboard-sort").value,
+        direction: byId("leaderboard-direction").value
+    });
+    const data = await api(`/api/v1/leaderboard/all-time?${query}`);
+    renderLeaderboardRows("all-time-leaderboard-body", data.items, "No completed experiments yet.", true);
+}
+
+async function selectDiscoveryRun(searchRunId) {
+    if (!searchRunId) return;
+    labState.searchRunId = searchRunId;
+    const run = await api(`/api/v1/search-runs/${searchRunId}`);
+    labState.currentSearchRun = run;
+    labState.searchStartedAt = run.startedAt ? new Date(run.startedAt).getTime() : null;
+    labState.stopConditions = { ...run.stopConditions };
+    renderSearch(run);
+    await loadDiscoveryHistory(searchRunId);
+    await loadLeaderboard();
+}
 
 function connectProofSocket() { const protocol = location.protocol === "https:" ? "wss" : "ws"; labState.socket = new WebSocket(`${protocol}://${location.host}/ws`); labState.socket.addEventListener("open", () => labState.socket.send(`CONNECT\naccept-version:1.2\nhost:${location.host}\nheart-beat:10000,10000\n\n\u0000`)); labState.socket.addEventListener("message", event => event.data.split("\u0000").filter(Boolean).forEach(handleProofFrame)); labState.socket.addEventListener("close", () => { labState.connected=false; setTimeout(connectProofSocket,2000); }); }
 function handleProofFrame(frame) { if (frame.startsWith("CONNECTED")) { labState.connected=true; labState.subscriptions.forEach((handler,destination) => sendProofSubscription(destination)); return; } if (!frame.startsWith("MESSAGE")) return; const split=frame.indexOf("\n\n"); const destination=(frame.match(/\ndestination:([^\n]+)/)||[])[1]; if (split>=0 && destination && labState.subscriptions.has(destination)) labState.subscriptions.get(destination)(JSON.parse(frame.slice(split+2))); }
@@ -299,4 +440,12 @@ byId("combination-policy").addEventListener("change", event => {
 });
 byId("policy-threshold").disabled = true;
 window.cryptoLabDiscovery = { refreshUserStrategies: refreshDiscoveryUserStrategies };
-loadCapabilities().catch(error => byId("search-message").textContent = error.message); refreshSystemStatus(); setInterval(refreshSystemStatus,5000); connectProofSocket();
+byId("discovery-history").addEventListener("change", event => selectDiscoveryRun(event.target.value).catch(error => byId("search-message").textContent = error.message));
+byId("refresh-discovery-history").addEventListener("click", () => loadDiscoveryHistory().catch(error => byId("search-message").textContent = error.message));
+["leaderboard-sort","leaderboard-direction"].forEach(id => byId(id).addEventListener("change", () => loadAllTimeLeaderboard().catch(error => byId("search-message").textContent = error.message)));
+loadCapabilities().catch(error => byId("search-message").textContent = error.message);
+loadDiscoveryHistory().then(() => {
+    if (labState.discoveryHistory[0] && !labState.searchRunId) return selectDiscoveryRun(labState.discoveryHistory[0].searchRunId);
+}).catch(error => byId("search-message").textContent = error.message);
+loadAllTimeLeaderboard().catch(error => byId("search-message").textContent = error.message);
+refreshSystemStatus(); setInterval(refreshSystemStatus,5000); connectProofSocket();

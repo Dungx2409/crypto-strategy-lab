@@ -43,6 +43,7 @@ class StompRealtimePublisherTest {
                         "checksum"),
                 List.of("MA"),
                 Map.of("MA", "1.0"),
+                Map.of(),
                 new SearchParameterSpace(Map.of(
                         "MA", Map.of("fastPeriod", List.of(10), "slowPeriod", List.of(20)))),
                 new CombinationPolicyDefinition("MAJORITY", "1.0", Map.of(), BigDecimal.ZERO),

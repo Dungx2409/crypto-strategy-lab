@@ -51,11 +51,13 @@ public class JdbcExperimentRepository
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final JdbcLeaderboardQueryRepository leaderboardQueryRepository;
 
     @Autowired
     public JdbcExperimentRepository(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.leaderboardQueryRepository = new JdbcLeaderboardQueryRepository(jdbcTemplate, objectMapper);
     }
 
     @Override
@@ -214,53 +216,12 @@ public class JdbcExperimentRepository
     @Override
     public List<LeaderboardEntry> findLeaderboard(
             UUID searchRunId, int limit, LeaderboardSort sort, SortDirection direction) {
-        String orderBy = leaderboardOrderBy(sort, direction);
-        return jdbcTemplate.query(
-                """
-                SELECT l.search_run_id, l.rank, l.experiment_id, l.score, l.return_pct,
-                       l.max_drawdown_pct, l.total_trades, l.win_rate_pct, c.candidate_spec_json
-                FROM leaderboard_entries l
-                JOIN experiments e ON e.id = l.experiment_id
-                JOIN candidates c ON c.id = e.candidate_id
-                WHERE l.search_run_id = ?
-                ORDER BY %s, l.rank
-                LIMIT ?
-                """.formatted(orderBy),
-                (resultSet, rowNumber) -> {
-                    CandidateStrategy candidate = read(
-                            resultSet.getString("candidate_spec_json"), CandidateStrategy.class);
-                    EvaluationMetrics values = new EvaluationMetrics(
-                            resultSet.getBigDecimal("return_pct"),
-                            resultSet.getBigDecimal("max_drawdown_pct"),
-                            resultSet.getInt("total_trades"),
-                            resultSet.getBigDecimal("win_rate_pct"),
-                            resultSet.getBigDecimal("score"));
-                    Ranking ranking = new Ranking(
-                            resultSet.getInt("rank"),
-                            resultSet.getObject("experiment_id", UUID.class),
-                            values);
-                    String summary = candidate.strategies().stream()
-                            .map(strategy -> strategy.type())
-                            .reduce((left, right) -> left + "+" + right)
-                            .orElseThrow();
-                    return new LeaderboardEntry(
-                            resultSet.getObject("search_run_id", UUID.class), ranking, summary);
-                },
-                searchRunId,
-                limit);
+        return leaderboardQueryRepository.findLeaderboard(searchRunId, limit, sort, direction);
     }
 
-    private static String leaderboardOrderBy(LeaderboardSort sort, SortDirection direction) {
-        String column = switch (sort) {
-            case RANK -> "l.rank";
-            case SCORE -> "l.score";
-            case RETURN -> "l.return_pct";
-            case WIN_RATE -> "l.win_rate_pct";
-            case MAX_DRAWDOWN -> "l.max_drawdown_pct";
-            case TRADES -> "l.total_trades";
-        };
-        String sqlDirection = direction == SortDirection.ASC ? "ASC" : "DESC";
-        return column + " " + sqlDirection;
+    @Override
+    public List<LeaderboardEntry> findAllTimeLeaderboard(int limit, LeaderboardSort sort, SortDirection direction) {
+        return leaderboardQueryRepository.findAllTimeLeaderboard(limit, sort, direction);
     }
 
     @Override

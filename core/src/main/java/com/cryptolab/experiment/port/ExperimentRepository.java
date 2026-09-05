@@ -31,6 +31,8 @@ public interface ExperimentRepository {
     List<LeaderboardEntry> findLeaderboard(
             UUID searchRunId, int limit, LeaderboardSort sort, SortDirection direction);
 
+    List<LeaderboardEntry> findAllTimeLeaderboard(int limit, LeaderboardSort sort, SortDirection direction);
+
     Optional<ExperimentDetails> findDetails(UUID experimentId);
 
     Optional<ExperimentPlan> findPlan(UUID experimentId);

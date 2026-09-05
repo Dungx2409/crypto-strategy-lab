@@ -30,6 +30,7 @@ class AuthoredStrategyDiscoveryTest {
                 ExperimentTestFixtures.dataset().reference(),
                 List.of("AI_DSL"),
                 Map.of("AI_DSL", "1.0"),
+                Map.of("AI_DSL", "DCA"),
                 new SearchParameterSpace(Map.of(
                         "AI_DSL",
                         Map.of("source", List.of("BUY WHEN CLOSE > SMA(CLOSE, 10)\nSELL WHEN CLOSE < SMA(CLOSE, 10)")))),
@@ -43,10 +44,11 @@ class AuthoredStrategyDiscoveryTest {
         assertThat(candidate).isPresent();
         assertThat(candidate.orElseThrow().strategies())
                 .singleElement()
-                .satisfies(strategy -> {
-                    assertThat(strategy.type()).isEqualTo("AI_DSL");
-                    assertThat(strategy.parameters()).containsKey("source");
-                });
+        .satisfies(strategy -> {
+        assertThat(strategy.type()).isEqualTo("AI_DSL");
+        assertThat(strategy.displayLabel()).isEqualTo("DCA");
+        assertThat(strategy.parameters()).containsKey("source");
+        });
         assertThat(registry.created.get()).isNotNull();
     }
 

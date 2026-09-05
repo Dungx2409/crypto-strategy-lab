@@ -73,11 +73,12 @@ class GeneratorReplacementArchitectureTest {
                         Instant.parse("2026-08-18T00:00:00Z"),
                         Instant.parse("2026-08-18T01:00:00Z"),
                         "proof-v1",
-                        "proof-checksum"),
-                List.of("MA"),
-                Map.of("MA", "1.0"),
-                new SearchParameterSpace(Map.of(
-                        "MA", Map.of("fastPeriod", List.of(10), "slowPeriod", List.of(20)))),
+                "proof-checksum"),
+        List.of("MA"),
+        Map.of("MA", "1.0"),
+        Map.of(),
+        new SearchParameterSpace(Map.of(
+                "MA", Map.of("fastPeriod", List.of(10), "slowPeriod", List.of(20)))),
                 new CombinationPolicyDefinition("MAJORITY", "1.0", Map.of(), BigDecimal.ZERO),
                 42L,
                 new StopConditions(1L, null, null),
@@ -88,11 +89,12 @@ class GeneratorReplacementArchitectureTest {
         SearchContext single = context();
         return new SearchContext(
                 single.searchRunId(),
-                single.dataset(),
-                List.of("MA", "RSI"),
-                Map.of("MA", "1.0", "RSI", "1.0"),
-                new SearchParameterSpace(Map.of(
-                        "MA", Map.of("fastPeriod", List.of(10), "slowPeriod", List.of(20)),
+        single.dataset(),
+        List.of("MA", "RSI"),
+        Map.of("MA", "1.0", "RSI", "1.0"),
+        Map.of(),
+        new SearchParameterSpace(Map.of(
+                "MA", Map.of("fastPeriod", List.of(10), "slowPeriod", List.of(20)),
                         "RSI", Map.of(
                                 "period", List.of(14),
                                 "oversold", List.of(30),

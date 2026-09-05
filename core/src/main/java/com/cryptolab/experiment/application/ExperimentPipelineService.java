@@ -109,6 +109,13 @@ public final class ExperimentPipelineService {
         return repository.findLeaderboard(searchRunId, limit, sort, direction);
     }
 
+    public List<LeaderboardEntry> allTimeLeaderboard(int limit, LeaderboardSort sort, SortDirection direction) {
+        if (limit < 1 || limit > 500) {
+            throw new IllegalArgumentException("leaderboard limit must be between 1 and 500");
+        }
+        return repository.findAllTimeLeaderboard(limit, sort, direction);
+    }
+
     public RerunResult rerun(UUID sourceExperimentId) {
         ExperimentPlan source = repository.findPlan(sourceExperimentId)
                 .orElseThrow(() -> new ExperimentNotFoundException(sourceExperimentId));

@@ -69,6 +69,7 @@ class LeaderboardControllerTest {
         mockMvc.perform(get("/api/v1/leaderboard").param("searchRunId", SEARCH_RUN_ID.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].searchRunId").value(SEARCH_RUN_ID.toString()))
                 .andExpect(jsonPath("$.items[0].experimentId").value(HIGH_TRADES.toString()))
                 .andExpect(jsonPath("$.items[0].score").value(12))
                 .andExpect(jsonPath("$.items[1].experimentId").value(LOW_TRADES.toString()));
@@ -174,6 +175,16 @@ class LeaderboardControllerTest {
                     .sorted(comparator.thenComparingInt(Ranking::rank))
                     .limit(limit)
                     .map(ranking -> new LeaderboardEntry(searchRunId, ranking, "TEST"))
+                    .toList();
+        }
+
+        @Override
+        public List<LeaderboardEntry> findAllTimeLeaderboard(
+                int limit, LeaderboardSort sort, SortDirection direction) {
+            return rankings.values().stream()
+                    .flatMap(List::stream)
+                    .limit(limit)
+                    .map(ranking -> new LeaderboardEntry(UUID.randomUUID(), ranking, "TEST"))
                     .toList();
         }
 

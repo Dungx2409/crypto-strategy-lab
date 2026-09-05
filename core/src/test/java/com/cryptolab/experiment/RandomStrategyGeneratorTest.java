@@ -122,6 +122,7 @@ class RandomStrategyGeneratorTest {
                 ExperimentTestFixtures.dataset().reference(),
                 List.of("RSI", "MA"),
                 Map.of("MA", "1.0", "RSI", "1.0"),
+                Map.of(),
                 new SearchParameterSpace(Map.of(
                         "MA", Map.of(
                                 "fastPeriod", List.of(10, 20),

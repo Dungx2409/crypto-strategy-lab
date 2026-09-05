@@ -240,10 +240,11 @@ class SearchRunIT {
         List<Object> values = IntStream.rangeClosed(1, 100).boxed().map(value -> (Object) value).toList();
         SearchContext context = new SearchContext(
                 id,
-                DATASET,
-                List.of("TEST"),
-                Map.of("TEST", "1.0"),
-                new SearchParameterSpace(Map.of("TEST", Map.of("value", values))),
+        DATASET,
+        List.of("TEST"),
+        Map.of("TEST", "1.0"),
+        Map.of(),
+        new SearchParameterSpace(Map.of("TEST", Map.of("value", values))),
                 new CombinationPolicyDefinition("MAJORITY", "1.0", Map.of(), BigDecimal.ZERO),
                 9876L,
                 new StopConditions(maxCandidates, null, null),
@@ -358,6 +359,11 @@ class SearchRunIT {
         @Override
         public Optional<SearchRunSummary> findSummary(UUID searchRunId) {
             return delegate.findSummary(searchRunId);
+        }
+
+        @Override
+        public List<SearchRunSummary> findRecentSummaries(int limit) {
+            return delegate.findRecentSummaries(limit);
         }
     }
 }

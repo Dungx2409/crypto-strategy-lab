@@ -142,6 +142,7 @@ class SearchCoordinatorTest {
                 ExperimentTestFixtures.dataset().reference(),
                 List.of("TEST"),
                 Map.of("TEST", "1.0"),
+                Map.of(),
                 new SearchParameterSpace(Map.of("TEST", Map.of("value", List.of(1, 2)))),
                 new CombinationPolicyDefinition("MAJORITY", "1.0", Map.of(), BigDecimal.ZERO),
                 99,
@@ -285,6 +286,11 @@ class SearchCoordinatorTest {
             return Optional.of(new SearchRunSummary(
                     run, generated, persisted, persisted, 0, 0, 0, 0, 0,
                     null, noImprovement, stopReason, null, null));
+        }
+
+        @Override
+        public List<SearchRunSummary> findRecentSummaries(int limit) {
+            return List.of(findSummary(run.id()).orElseThrow());
         }
 
         private static SearchRun copyWithCancellation(SearchRun source) {

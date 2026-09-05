@@ -362,7 +362,7 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
     @Override
     public Optional<SearchRunSummary> findSummary(UUID searchRunId) {
         return jdbcTemplate.query(
-                        """
+                """
                         SELECT sr.id, sr.status, sr.generator_type, sr.generator_version, sr.search_config_json,
                                created_at, started_at, ended_at, cancel_requested,
                                generated_candidates, persisted_candidates, best_score,
@@ -388,6 +388,37 @@ public class JdbcSearchRunRepository implements SearchRunRepository {
                         searchRunId)
                 .stream()
                 .findFirst();
+    }
+
+    @Override
+    public List<SearchRunSummary> findRecentSummaries(int limit) {
+        return jdbcTemplate.query(
+                """
+                SELECT sr.id, sr.status, sr.generator_type, sr.generator_version, sr.search_config_json,
+                       created_at, started_at, ended_at, cancel_requested,
+                       generated_candidates, persisted_candidates, best_score,
+                       no_improvement_iterations, stop_reason, failure_code, failure_message,
+                       (SELECT count(*) FROM backtest_jobs j
+                        WHERE j.search_run_id = sr.id
+                          AND j.status IN ('PENDING_DISPATCH', 'RETRY_PENDING'))
+                          AS pending_dispatch_jobs,
+                       (SELECT count(*) FROM backtest_jobs j
+                        WHERE j.search_run_id = sr.id AND j.status = 'QUEUED') AS queued_jobs,
+                       (SELECT count(*) FROM backtest_jobs j
+                        WHERE j.search_run_id = sr.id AND j.status = 'RUNNING') AS running_jobs,
+                       (SELECT count(*) FROM backtest_jobs j
+                        WHERE j.search_run_id = sr.id AND j.status = 'COMPLETED') AS completed_jobs,
+                       (SELECT count(*) FROM backtest_jobs j
+                        WHERE j.search_run_id = sr.id AND j.status = 'FAILED') AS failed_jobs,
+                       (SELECT count(*) FROM backtest_jobs j
+                        WHERE j.search_run_id = sr.id AND j.status = 'CANCELLED') AS cancelled_jobs
+                FROM search_runs sr
+                WHERE sr.generator_type <> 'manual'
+                ORDER BY sr.created_at DESC
+                LIMIT ?
+                """,
+                (resultSet, rowNumber) -> summary(resultSet),
+                limit);
     }
 
     private SearchRunSummary summary(ResultSet resultSet) throws SQLException {

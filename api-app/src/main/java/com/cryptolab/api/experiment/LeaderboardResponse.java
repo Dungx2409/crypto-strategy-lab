@@ -15,6 +15,7 @@ public record LeaderboardResponse(UUID searchRunId, List<Item> items) {
 
     public record Item(
             int rank,
+            UUID searchRunId,
             UUID experimentId,
             String strategySummary,
             BigDecimal returnPct,
@@ -27,6 +28,7 @@ public record LeaderboardResponse(UUID searchRunId, List<Item> items) {
             var ranking = entry.ranking();
             return new Item(
                     ranking.rank(),
+                    entry.searchRunId(),
                     ranking.experimentId(),
                     entry.strategySummary(),
                     ranking.metrics().totalReturnPct(),

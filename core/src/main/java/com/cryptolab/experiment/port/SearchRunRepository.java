@@ -47,4 +47,6 @@ public interface SearchRunRepository {
     void fail(UUID searchRunId, String failureCode, String failureMessage, Instant failedAt);
 
     Optional<SearchRunSummary> findSummary(UUID searchRunId);
+
+    List<SearchRunSummary> findRecentSummaries(int limit);
 }

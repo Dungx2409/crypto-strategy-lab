@@ -13,6 +13,7 @@ public record SearchContext(
         MarketDatasetRef dataset,
         List<String> strategyTypes,
         Map<String, String> strategyVersions,
+        Map<String, String> strategyLabels,
         SearchParameterSpace parameterSpace,
         CombinationPolicyDefinition combinationPolicy,
         long randomSeed,
@@ -48,6 +49,21 @@ public record SearchContext(
             throw new IllegalArgumentException("strategyVersions must define exactly the selected strategyTypes");
         }
         strategyVersions = Map.copyOf(versions);
+        Map<String, String> labels = new LinkedHashMap<>();
+        if (strategyLabels != null) {
+            strategyLabels.forEach((type, label) -> {
+                if (type == null || type.isBlank()) {
+                    throw new IllegalArgumentException("strategyLabels must contain non-blank strategy types");
+                }
+                if (label != null && !label.isBlank()) {
+                    labels.put(type.trim().toUpperCase(Locale.ROOT), label.trim().toUpperCase(Locale.ROOT));
+                }
+            });
+        }
+        if (!strategyTypes.containsAll(labels.keySet())) {
+            throw new IllegalArgumentException("strategyLabels contains an unselected strategy type");
+        }
+        strategyLabels = Map.copyOf(labels);
         parameterSpace = parameterSpace == null ? new SearchParameterSpace(Map.of()) : parameterSpace;
         if (!strategyTypes.containsAll(parameterSpace.values().keySet())) {
             throw new IllegalArgumentException("parameterSpace contains an unselected strategy type");

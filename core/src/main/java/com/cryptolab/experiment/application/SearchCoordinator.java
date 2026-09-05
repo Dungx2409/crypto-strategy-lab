@@ -212,6 +212,13 @@ public final class SearchCoordinator {
                 .orElseThrow(() -> new SearchRunNotFoundException(searchRunId));
     }
 
+    public List<SearchRunSummary> history(int limit) {
+        if (limit < 1 || limit > 200) {
+            throw new IllegalArgumentException("history limit must be between 1 and 200");
+        }
+        return repository.findRecentSummaries(limit);
+    }
+
     public void recordEvaluation(UUID searchRunId, BigDecimal score) {
         repository.recordEvaluation(searchRunId, score);
     }

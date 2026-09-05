@@ -148,16 +148,95 @@ async function loadSavedStrategies() {
 
 function renderSavedStrategies() {
     const host = byId("saved-strategies"), select = byId("manual-strategy"); host.replaceChildren(); select.replaceChildren();
+    renderManualStrategyOptions();
     if (!accountFeatureState.strategies.length) {
         host.textContent = accountFeatureState.account ? "⌘ No saved strategies." : "⇢ Sign in to load saved strategies.";
-        const option = document.createElement("option"); option.value=""; option.textContent="No saved strategy"; select.append(option); return;
+        return;
     }
     accountFeatureState.strategies.forEach(strategy => {
         const row=document.createElement("article"); row.className="saved-row";
         const text=document.createElement("div"); text.innerHTML=`<strong></strong><small></small>`; text.querySelector("strong").textContent=`⌘ ${strategy.document.name} v${strategy.version}`; text.querySelector("small").textContent=strategy.document.strategies.map(item=>item.type).join(" + ");
         row.append(text,featureButton("Delete",async()=>{await api(`/api/v1/user-strategies/${strategy.id}`,{method:"DELETE"});await loadSavedStrategies();},true,"✕")); host.append(row);
-        const option=document.createElement("option"); option.value=strategy.id; option.textContent=`${strategy.document.name} v${strategy.version}`; select.append(option);
     });
+}
+
+function renderManualStrategyOptions() {
+    const select = byId("manual-strategy");
+    if (!select) return;
+    const previous = select.value;
+    select.replaceChildren();
+    const catalog = labState.catalog || [];
+    catalog.forEach(plugin => {
+        const option = document.createElement("option");
+        option.value = `catalog:${plugin.type}@${plugin.version}`;
+        option.textContent = `${plugin.displayName || plugin.type} ${plugin.version} · default settings`;
+        select.append(option);
+    });
+    accountFeatureState.strategies.forEach(strategy => {
+        const option = document.createElement("option");
+        option.value = `saved:${strategy.id}`;
+        option.textContent = `${strategy.document.name} v${strategy.version} · saved`;
+        select.append(option);
+    });
+    if (!select.options.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No strategy available";
+        select.append(option);
+        return;
+    }
+    if ([...select.options].some(option => option.value === previous)) {
+        select.value = previous;
+    }
+}
+
+function defaultParameterValue(schema) {
+    if (!schema || typeof schema !== "object") return null;
+    if (schema.default !== undefined) return schema.default;
+    if (schema.type === "integer" || schema.type === "number") {
+        if (schema.minimum !== undefined) return Number(schema.minimum);
+        if (schema.exclusiveMinimum !== undefined) return Number(schema.exclusiveMinimum) + 1;
+        return schema.type === "integer" ? 1 : 1;
+    }
+    return "";
+}
+
+function manualCatalogDocument(plugin) {
+    const parameters = {};
+    Object.entries(plugin.parameterSchema || {}).forEach(([name, schema]) => {
+        parameters[name] = defaultParameterValue(schema);
+    });
+    return {
+        name: plugin.displayName || plugin.type,
+        description: "Manual backtest from Strategy Engine catalog defaults.",
+        strategies: [{type: plugin.type, version: plugin.version, parameters, displayLabel: plugin.type}],
+        combinationPolicy: {type: "MAJORITY", version: "1.0", weights: {}, threshold: 0}
+    };
+}
+
+function labelStrategyDocument(document) {
+    return {
+        ...document,
+        strategies: (document.strategies || []).map(strategy => ({
+            ...strategy,
+            displayLabel: strategy.displayLabel || acronym(document.name)
+        }))
+    };
+}
+
+function selectedManualStrategyDocument() {
+    const value = byId("manual-strategy").value;
+    if (!value) return null;
+    if (value.startsWith("saved:")) {
+        const document = accountFeatureState.strategies.find(item => `saved:${item.id}` === value)?.document;
+        return document ? labelStrategyDocument(document) : null;
+    }
+    if (value.startsWith("catalog:")) {
+        const identity = value.slice("catalog:".length);
+        const plugin = (labState.catalog || []).find(item => `${item.type}@${item.version}` === identity);
+        return plugin ? manualCatalogDocument(plugin) : null;
+    }
+    return accountFeatureState.strategies.find(item => item.id === value)?.document || null;
 }
 
 function scheduleBody() { return {symbol:byId("schedule-symbol").value,timeframe:byId("schedule-timeframe").value,lookback:`P${byId("schedule-lookback").value}D`,initialCapital:Number(byId("schedule-capital").value),candidateLimit:Number(byId("schedule-candidates").value),interval:`PT${byId("schedule-interval").value}H`}; }
@@ -396,8 +475,8 @@ async function runManualBacktest() {
     if (button.disabled) return;
     try {
         setManualBacktestProgress("Validating backtest inputs…", 8, true);
-        const strategy = accountFeatureState.strategies.find(item => item.id === byId("manual-strategy").value);
-        if (!strategy) throw new Error("Choose a saved strategy.");
+        const strategyDocument = selectedManualStrategyDocument();
+        if (!strategyDocument) throw new Error("Choose a strategy.");
         const fromValue = byId("manual-from").value, toValue = byId("manual-to").value;
         if (Boolean(fromValue) !== Boolean(toValue)) throw new Error("Choose both From and To, or leave both blank.");
         const query = new URLSearchParams({
@@ -421,8 +500,8 @@ async function runManualBacktest() {
             timeframe: market.timeframe,
             datasetVersion: `manual-${Date.now()}`,
             candles,
-            strategies: strategy.document.strategies,
-            combinationPolicy: strategy.document.combinationPolicy,
+            strategies: strategyDocument.strategies,
+            combinationPolicy: strategyDocument.combinationPolicy,
             executionConfig: {
                 initialCapital: Number(byId("initial-capital").value),
                 feeRate: Number(byId("fee-rate").value),
@@ -471,7 +550,7 @@ function shortDate(value) {
     return value ? new Date(value).toLocaleString() : "not finished";
 }
 function strategyLabel(item) {
-    const names = item.strategies?.map(strategy => strategy.type).join(" + ");
+    const names = item.strategies?.map(strategy => strategy.displayLabel || strategy.type).join(" + ");
     return names || "strategy";
 }
 function renderManualHistory(items) {
@@ -525,5 +604,6 @@ byId("manual-period").addEventListener("change",applyBacktestPeriod);byId("backt
 ["schedule-lookback","schedule-interval"].forEach(id=>byId(id).addEventListener("input",()=>{byId(id==="schedule-lookback"?"schedule-lookback-preset":"schedule-frequency-preset").value="";}));
 ["manual-from","manual-to"].forEach(id=>byId(id).addEventListener("input",()=>byId("manual-period").value="custom"));
 ["position-size-pct","stop-loss-pct","take-profit-pct","trailing-stop-pct","allow-short"].forEach(id=>byId(id).addEventListener("input",()=>byId("backtest-risk-profile").value="custom"));
+window.cryptoLabAccountFeatures = { refreshManualStrategyOptions: renderManualStrategyOptions };
 applySchedulePresets();applyBacktestPeriod();applyRiskProfile();
 refreshAccount();

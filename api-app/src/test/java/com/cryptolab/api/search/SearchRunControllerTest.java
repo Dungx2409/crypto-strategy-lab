@@ -243,5 +243,10 @@ class SearchRunControllerTest {
                     run, generated, persisted, persisted, 0, 0, 0, 0, 0,
                     null, 0, reason, null, null));
         }
+
+        @Override
+        public List<SearchRunSummary> findRecentSummaries(int limit) {
+            return run == null ? List.of() : List.of(findSummary(run.id()).orElseThrow());
+        }
     }
 }

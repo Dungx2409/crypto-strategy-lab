@@ -178,7 +178,8 @@ public final class GeneticStrategyGenerator implements StrategyGenerator {
                             random.nextBoolean()
                                     ? entry.getValue()
                                     : second.parameters().getOrDefault(entry.getKey(), entry.getValue())));
-            child.add(new StrategyDefinition(first.type(), first.version(), parameters));
+            child.add(new StrategyDefinition(
+                    first.type(), first.version(), parameters, first.displayLabel()));
         }
         return child.isEmpty() ? left : List.copyOf(child);
     }
@@ -227,7 +228,8 @@ public final class GeneticStrategyGenerator implements StrategyGenerator {
         List<StrategyDefinition> mutated = new ArrayList<>(genome);
         mutated.set(
                 strategyIndex,
-                new StrategyDefinition(source.type(), source.version(), mutatedParameters));
+                new StrategyDefinition(
+                        source.type(), source.version(), mutatedParameters, source.displayLabel()));
         return List.copyOf(mutated);
     }
 

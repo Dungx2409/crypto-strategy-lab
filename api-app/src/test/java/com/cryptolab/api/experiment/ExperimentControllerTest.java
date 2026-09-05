@@ -277,6 +277,12 @@ class ExperimentControllerTest {
                     .toList();
         }
 
+        @Override
+        public List<LeaderboardEntry> findAllTimeLeaderboard(
+                int limit, LeaderboardSort sort, SortDirection direction) {
+            return List.of();
+        }
+
         private static java.util.Comparator<Ranking> leaderboardComparator(
                 LeaderboardSort sort, SortDirection direction) {
             java.util.Comparator<Ranking> comparator = switch (sort) {

@@ -206,10 +206,11 @@ class BacktestJobOutboxIT {
     private static UUID persistOneJob(UUID searchRunId, int candidateNumber) {
         SearchContext context = new SearchContext(
                 searchRunId,
-                DATASET,
-                List.of("MA"),
-                Map.of("MA", "1.0"),
-                new SearchParameterSpace(Map.of("MA", Map.of("fastPeriod", List.of(10, 20)))),
+        DATASET,
+        List.of("MA"),
+        Map.of("MA", "1.0"),
+        Map.of(),
+        new SearchParameterSpace(Map.of("MA", Map.of("fastPeriod", List.of(10, 20)))),
                 policy(),
                 1234L,
                 new StopConditions(1L, null, null),

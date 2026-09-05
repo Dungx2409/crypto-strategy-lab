@@ -23,5 +23,16 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check static JavaScript syntax
+        run: |
+          node --check api-app/src/main/resources/static/result-ui.js
+          node --check api-app/src/main/resources/static/lab.js
+          node --check api-app/src/main/resources/static/account-features.js
+
       - name: Verify Maven reactor
         run: ./mvnw --batch-mode --no-transfer-progress clean verify

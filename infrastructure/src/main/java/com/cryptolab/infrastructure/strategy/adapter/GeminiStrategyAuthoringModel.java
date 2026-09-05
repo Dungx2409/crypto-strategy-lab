@@ -74,8 +74,10 @@ public final class GeminiStrategyAuthoringModel implements StrategyAuthoringMode
         return generateText("""
                 Convert the confirmed idea into one restricted JSON object. Output JSON only, without Markdown.
                 The exact shape is:
-                {"name":"...","description":"...","strategies":[{"type":"...","version":"...","parameters":{}}],"combinationPolicy":{"type":"MAJORITY","version":"1.0","weights":{},"threshold":0}}
+ {"name":"...","description":"...","strategies":[{"type":"...","version":"...","displayLabel":"...","parameters":{}}],"combinationPolicy":{"type":"MAJORITY","version":"1.0","weights":{},"threshold":0}}
                 Use only registered type, version, and parameter names.
+                For AI_DSL, set displayLabel to a short strategy code, for example Dollar Cost Averaging becomes DCA.
+                displayLabel must contain 2 to 16 uppercase letters, digits, or underscores.
                 The strategies array must include AI_DSL@1.0 with executable Trading DSL source in
                 parameters.source. The source must contain exactly these two rules in this order:
                 BUY WHEN <boolean expression>

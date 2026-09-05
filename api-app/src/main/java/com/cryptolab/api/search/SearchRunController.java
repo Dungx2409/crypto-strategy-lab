@@ -3,6 +3,7 @@ package com.cryptolab.api.search;
 import com.cryptolab.experiment.application.SearchCoordinator;
 import com.cryptolab.experiment.application.DeterministicBacktestEngine;
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -75,6 +76,13 @@ public final class SearchRunController {
                 coordinator.availableGeneratorTypes(),
                 DeterministicBacktestEngine.VERSION,
                 DeterministicBacktestEngine.FILL_POLICY);
+    }
+
+    @GetMapping
+    public List<SearchRunResponse> history(@RequestParam(defaultValue = "25") int limit) {
+        return coordinator.history(limit).stream()
+                .map(SearchRunResponse::from)
+                .toList();
     }
 
     @GetMapping("/{searchRunId}")

@@ -14,6 +14,7 @@ public record SearchRunResponse(
         boolean cancelRequested,
         String generatorType,
         String generatorVersion,
+        String strategySummary,
         long randomSeed,
         int batchSize,
         StopConditions stopConditions,
@@ -42,6 +43,7 @@ public record SearchRunResponse(
                 run.cancelRequested(),
                 run.generatorType(),
                 run.generatorVersion(),
+                strategySummary(run),
                 run.context().randomSeed(),
                 run.context().batchSize(),
                 run.context().stopConditions(),
@@ -61,5 +63,16 @@ public record SearchRunResponse(
                 run.endedAt(),
                 summary.failureCode(),
                 summary.failureMessage());
+    }
+
+    private static String strategySummary(com.cryptolab.experiment.domain.SearchRun run) {
+        return run.context().strategyTypes().stream()
+                .map(type -> {
+                    String label = run.context().strategyLabels().getOrDefault(type, type);
+                    String version = run.context().strategyVersions().get(type);
+                    return label + "@" + version;
+                })
+                .reduce((left, right) -> left + " + " + right)
+                .orElse("—");
     }
 }

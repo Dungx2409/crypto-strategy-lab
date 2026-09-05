@@ -33,4 +33,17 @@ public final class LeaderboardController {
                         LeaderboardSort.parse(sort),
                         SortDirection.parse(direction)));
     }
+
+    @GetMapping("/all-time")
+    public LeaderboardResponse allTime(
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String direction) {
+        return LeaderboardResponse.from(
+                null,
+                pipeline.allTimeLeaderboard(
+                        limit,
+                        LeaderboardSort.parse(sort),
+                        SortDirection.parse(direction)));
+    }
 }

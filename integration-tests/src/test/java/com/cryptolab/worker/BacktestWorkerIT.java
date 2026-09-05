@@ -411,11 +411,12 @@ class BacktestWorkerIT {
         UUID searchRunId = UUID.randomUUID();
         SearchContext context = new SearchContext(
                 searchRunId,
-                DATASET,
-                List.of("MA"),
-                Map.of("MA", "1.0"),
-                new SearchParameterSpace(Map.of(
-                        "MA", Map.of("fastPeriod", List.of(1), "slowPeriod", List.of(2)))),
+        DATASET,
+        List.of("MA"),
+        Map.of("MA", "1.0"),
+        Map.of(),
+        new SearchParameterSpace(Map.of(
+                "MA", Map.of("fastPeriod", List.of(1), "slowPeriod", List.of(2)))),
                 policy(),
                 1234L,
                 new StopConditions(1L, null, null),

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Crypto Strategy Lab</title>
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/styles.css?v=20260905-6">
 </head>
 <body>
 <main id="auth-gate" class="auth-gate" aria-labelledby="auth-gate-title">
@@ -201,22 +201,22 @@
                 </section>
                 <section class="panel">
                     <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">★</span><div><p class="eyebrow">Best from every run</p><h2>All-time top 20</h2></div></div></div>
-                    <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Strategy</th><th>Return</th><th>Win rate</th><th>MDD</th><th>Trades</th><th>Score</th></tr></thead><tbody id="all-time-leaderboard-body"><tr><td colspan="7" class="empty">No completed experiments yet.</td></tr></tbody></table></div>
+                    <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Run</th><th>Strategy</th><th>Return</th><th>Win rate</th><th>MDD</th><th>Trades</th><th>Score</th></tr></thead><tbody id="all-time-leaderboard-body"><tr><td colspan="8" class="empty">No completed experiments yet.</td></tr></tbody></table></div>
+                </section>
+                <section class="panel feature-panel">
+                    <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">◷</span><div><p class="eyebrow">Automatic discovery</p><h2>Keep searching in the background</h2></div></div><span class="muted">Saved to your account</span></div>
+                    <div class="controls simple-controls">
+                        <label>Coin<select id="schedule-symbol"><option>BTCUSDT</option><option>ETHUSDT</option><option>SOLUSDT</option><option>BNBUSDT</option></select></label>
+                        <label>Timeframe<select id="schedule-timeframe"><option>15m</option><option selected>1h</option><option>4h</option><option>1d</option></select></label>
+                        <label>History<select id="schedule-lookback-preset"><option value="30">One month</option><option value="90">Three months</option><option value="365" selected>One year</option></select></label>
+                        <label>Run<select id="schedule-frequency-preset"><option value="24" selected>Every day</option><option value="12">Twice a day</option><option value="168">Every week</option></select></label>
+                    </div>
+                    <details class="advanced-panel"><summary>Advanced schedule settings</summary><div class="controls"><label>History days<input id="schedule-lookback" type="number" value="365" min="1"></label><label>Starting capital<input id="schedule-capital" type="number" value="10000" min="1"></label><label>Tests per run<input id="schedule-candidates" type="number" value="125" min="1"></label><label>Interval hours<input id="schedule-interval" type="number" value="24" min="1"></label></div></details>
+                    <button id="create-schedule" type="button"><span class="btn-icon" aria-hidden="true">＋</span>Start automatic discovery</button>
+                    <p id="schedule-message" class="message"></p>
+                    <div id="schedule-list" class="saved-list"></div>
                 </section>
             </div>
-            <section class="panel feature-panel">
-                <div class="panel-heading"><div><span class="panel-icon" aria-hidden="true">◷</span><div><p class="eyebrow">Automatic discovery</p><h2>Keep searching in the background</h2></div></div><span class="muted">Saved to your account</span></div>
-                <div class="controls simple-controls">
-                    <label>Coin<select id="schedule-symbol"><option>BTCUSDT</option><option>ETHUSDT</option><option>SOLUSDT</option><option>BNBUSDT</option></select></label>
-                    <label>Timeframe<select id="schedule-timeframe"><option>15m</option><option selected>1h</option><option>4h</option><option>1d</option></select></label>
-                    <label>History<select id="schedule-lookback-preset"><option value="30">One month</option><option value="90">Three months</option><option value="365" selected>One year</option></select></label>
-                    <label>Run<select id="schedule-frequency-preset"><option value="24" selected>Every day</option><option value="12">Twice a day</option><option value="168">Every week</option></select></label>
-                </div>
-                <details class="advanced-panel"><summary>Advanced schedule settings</summary><div class="controls"><label>History days<input id="schedule-lookback" type="number" value="365" min="1"></label><label>Starting capital<input id="schedule-capital" type="number" value="10000" min="1"></label><label>Tests per run<input id="schedule-candidates" type="number" value="125" min="1"></label><label>Interval hours<input id="schedule-interval" type="number" value="24" min="1"></label></div></details>
-                <button id="create-schedule" type="button"><span class="btn-icon" aria-hidden="true">＋</span>Start automatic discovery</button>
-                <p id="schedule-message" class="message"></p>
-                <div id="schedule-list" class="saved-list"></div>
-            </section>
         </section>
 
         <section id="view-backtest" class="view" data-title="Backtest & Trade Results" data-subtitle="Inspect deterministic trades, metrics, signals, and immutable provenance">
@@ -370,7 +370,8 @@
 <script src="/app.js"></script>
 <script src="/market.js"></script>
 <script src="/news.js"></script>
-<script src="/lab.js"></script>
-<script src="/account-features.js"></script>
+    <script src="/result-ui.js?v=20260905-6"></script>
+    <script src="/lab.js?v=20260905-6"></script>
+    <script src="/account-features.js?v=20260905-6"></script>
 </body>
 </html>

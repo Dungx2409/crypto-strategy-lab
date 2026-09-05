@@ -74,7 +74,11 @@ public final class RandomStrategyGenerator implements StrategyGenerator {
                     .map(entry -> new ParameterDimension(
                             entry.getKey(), choices(context, descriptor.type(), entry.getKey(), entry.getValue())))
                     .toList();
-            templates.add(new StrategyTemplate(descriptor.type(), descriptor.version(), dimensions));
+            templates.add(new StrategyTemplate(
+                    descriptor.type(),
+                    descriptor.version(),
+                    context.strategyLabels().get(descriptor.type()),
+                    dimensions));
         }
         return List.copyOf(templates);
     }
@@ -180,7 +184,8 @@ public final class RandomStrategyGenerator implements StrategyGenerator {
                 parameterCombination /= dimension.choices().size();
                 parameters.put(dimension.name(), dimension.choices().get(choiceIndex));
             }
-            definitions.add(new StrategyDefinition(template.type(), template.version(), parameters));
+            definitions.add(new StrategyDefinition(
+                    template.type(), template.version(), parameters, template.displayLabel()));
         }
         return List.copyOf(definitions);
     }
@@ -212,7 +217,11 @@ public final class RandomStrategyGenerator implements StrategyGenerator {
         return left >= modulus - right ? left - (modulus - right) : left + right;
     }
 
-    private record StrategyTemplate(String type, String version, List<ParameterDimension> dimensions) {}
+    private record StrategyTemplate(
+            String type,
+            String version,
+            String displayLabel,
+            List<ParameterDimension> dimensions) {}
 
     private record ParameterDimension(String name, List<Object> choices) {}
 }

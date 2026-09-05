@@ -148,6 +148,12 @@ class ExperimentPipelineServiceTest {
         }
 
         @Override
+        public List<LeaderboardEntry> findAllTimeLeaderboard(
+                int limit, LeaderboardSort sort, SortDirection direction) {
+            return List.of();
+        }
+
+        @Override
         public Optional<ExperimentDetails> findDetails(UUID experimentId) {
             if (result == null || evaluation == null) {
                 return Optional.empty();
