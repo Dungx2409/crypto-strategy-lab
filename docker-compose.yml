@@ -63,7 +63,7 @@ services:
       SENTIMENT_PROVIDER: ${SENTIMENT_PROVIDER:-keyword}
       CRAWLER_CHECK_INTERVAL: ${CRAWLER_CHECK_INTERVAL:-15m}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
       HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY:-}
       HUGGINGFACE_URL: ${HUGGINGFACE_URL:-https://router.huggingface.co/hf-inference/models/ProsusAI/finbert}
     ports:

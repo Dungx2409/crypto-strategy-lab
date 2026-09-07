@@ -49,7 +49,7 @@ class CrawlerTemplateControllerTest {
 
     @Test
     void storesSelectorsUnderTheSessionAccount() throws Exception {
-        mockMvc.perform(post("/api/v1/crawler-templates")
+        mockMvc.perform(post("/api/v1/news-websites")
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -73,7 +73,7 @@ class CrawlerTemplateControllerTest {
         doThrow(new IllegalStateException("GEMINI_API_KEY is blank; set it before using strategy authoring"))
                 .when(repairModel).repair(any(), any(), any(), any());
 
-        mockMvc.perform(post("/api/v1/crawler-templates/{id}/repair", TEMPLATE_ID)
+        mockMvc.perform(post("/api/v1/news-websites/{id}/repair", TEMPLATE_ID)
                         .session(authenticatedSession())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sampleHtml\":\"<article></article>\",\"failure\":\"no match\"}"))

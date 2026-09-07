@@ -23,6 +23,8 @@ public final class HuggingFaceFinBERTSentimentAnalyzer implements SentimentAnaly
 
     private static final String PREPROCESSING_VERSION = "finbert-v1";
     private static final ModelDescriptor DESCRIPTOR = new ModelDescriptor("finbert", "v1");
+    private static final int MAX_INPUT_WORDS = 180;
+    private static final int MAX_INPUT_CHARS = 1_000;
 
     private final ObjectMapper objectMapper;
     private final Clock clock;
@@ -64,7 +66,7 @@ public final class HuggingFaceFinBERTSentimentAnalyzer implements SentimentAnaly
 
         try {
             ObjectNode payload = objectMapper.createObjectNode();
-            payload.put("inputs", item.normalizedText());
+            payload.put("inputs", truncateForFinbert(item.normalizedText()));
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(modelUrl))
@@ -144,5 +146,35 @@ public final class HuggingFaceFinBERTSentimentAnalyzer implements SentimentAnaly
             return SentimentLabel.NEGATIVE;
         }
         return SentimentLabel.NEUTRAL;
+    }
+
+    private static String truncateForFinbert(String text) {
+        String normalized = Objects.requireNonNull(text, "text must not be null").trim();
+        if (normalized.length() <= MAX_INPUT_CHARS
+                && normalized.split("\\s+").length <= MAX_INPUT_WORDS) {
+            return normalized;
+        }
+        StringBuilder result = new StringBuilder(Math.min(normalized.length(), MAX_INPUT_CHARS));
+        int wordCount = 0;
+        for (String word : normalized.split("\\s+")) {
+            if (word.isBlank()) {
+                continue;
+            }
+            if (result.length() > 0 && result.length() + 1 + word.length() > MAX_INPUT_CHARS) {
+                break;
+            }
+            if (result.length() == 0 && word.length() > MAX_INPUT_CHARS) {
+                return word.substring(0, MAX_INPUT_CHARS);
+            }
+            if (result.length() > 0) {
+                result.append(' ');
+            }
+            result.append(word);
+            wordCount++;
+            if (wordCount >= MAX_INPUT_WORDS) {
+                break;
+            }
+        }
+        return result.toString();
     }
 }

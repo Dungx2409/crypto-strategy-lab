@@ -85,6 +85,29 @@ class ContinuousDiscoveryServiceTest {
     }
 
     @Test
+    void failedLaunchKeepsPreviousLastSearchRunId() {
+        UUID previousResult = UUID.fromString("20000000-0000-0000-0000-000000000099");
+        InMemoryScheduleRepository schedules = new InMemoryScheduleRepository(new DiscoverySchedule(
+                SCHEDULE_ID, UUID.fromString("30000000-0000-0000-0000-000000000001"),
+                "BTCUSDT", Timeframe.H1, Duration.ofDays(30), new BigDecimal("10000"),
+                20, Duration.ofHours(24), DiscoveryScheduleStatus.ACTIVE, NOW,
+                null, previousResult, 1, null, NOW, NOW));
+        MarketDataProvider marketData = mock(MarketDataProvider.class);
+        when(marketData.loadHistorical(any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("Binance HTTP request failed"));
+
+        ContinuousDiscoveryService service = new ContinuousDiscoveryService(
+                schedules, marketData, mock(MarketDatasetService.class), mock(SearchCoordinator.class),
+                mock(StrategyRegistry.class), Clock.fixed(NOW, ZoneOffset.UTC), () -> SEARCH_ID);
+
+        service.tick();
+
+        assertThat(schedules.schedule.activeSearchRunId()).isNull();
+        assertThat(schedules.schedule.lastSearchRunId()).isEqualTo(previousResult);
+        assertThat(schedules.schedule.lastError()).contains("Binance HTTP request failed");
+    }
+
+    @Test
     void doesNotLaunchAnotherRunWhileActiveSearchIsRunning() {
         DiscoveryScheduleRepository schedules = mock(DiscoveryScheduleRepository.class);
         SearchCoordinator searches = mock(SearchCoordinator.class);
@@ -262,7 +285,8 @@ class ContinuousDiscoveryServiceTest {
             schedule = new DiscoverySchedule(
                     schedule.id(), schedule.accountId(), schedule.symbol(), schedule.timeframe(),
                     schedule.lookback(), schedule.initialCapital(), schedule.candidateLimit(),
-                    schedule.interval(), schedule.status(), nextRunAt, searchRunId, searchRunId,
+                    schedule.interval(), schedule.status(), nextRunAt, searchRunId,
+                    schedule.lastSearchRunId(),
                     schedule.completedRuns(), schedule.lastError(), schedule.createdAt(), updatedAt);
             return true;
         }
@@ -273,7 +297,7 @@ class ContinuousDiscoveryServiceTest {
                     schedule.id(), schedule.accountId(), schedule.symbol(), schedule.timeframe(),
                     schedule.lookback(), schedule.initialCapital(), schedule.candidateLimit(),
                     schedule.interval(), schedule.status(), schedule.nextRunAt(), null,
-                    schedule.lastSearchRunId(), schedule.completedRuns() + 1, null, schedule.createdAt(), updatedAt);
+                    schedule.activeSearchRunId(), schedule.completedRuns() + 1, null, schedule.createdAt(), updatedAt);
         }
 
         @Override

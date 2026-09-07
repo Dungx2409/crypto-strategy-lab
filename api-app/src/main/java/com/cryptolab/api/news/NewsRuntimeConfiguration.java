@@ -120,7 +120,7 @@ class NewsRuntimeConfiguration {
             GeminiStrategyAuthoringModel gemini,
             ObjectMapper objectMapper,
             Clock marketDataClock,
-            @Value("${crypto.ai.gemini.model:gemini-2.5-flash}") String model) {
+            @Value("${crypto.ai.gemini.model:gemini-3.6-flash}") String model) {
         return new GeminiSentimentAnalyzer(gemini, objectMapper, marketDataClock, model);
     }
 

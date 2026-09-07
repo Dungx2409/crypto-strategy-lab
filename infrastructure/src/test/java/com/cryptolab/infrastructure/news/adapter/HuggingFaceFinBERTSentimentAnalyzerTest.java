@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.cryptolab.news.domain.NewsItem;
 import com.cryptolab.news.domain.SentimentLabel;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
@@ -15,6 +16,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.stream.IntStream;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,11 +31,13 @@ class HuggingFaceFinBERTSentimentAnalyzerTest {
 
     private HttpServer server;
     private String endpoint;
+    private final AtomicReference<String> lastRequestBody = new AtomicReference<>();
 
     @BeforeEach
     void startServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/finbert", exchange -> {
+            lastRequestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             byte[] body = """
                     [[{"label":"positive","score":0.87},{"label":"neutral","score":0.1},{"label":"negative","score":0.03}]]
                     """.getBytes(StandardCharsets.UTF_8);
@@ -81,5 +86,30 @@ class HuggingFaceFinBERTSentimentAnalyzerTest {
         assertThatThrownBy(() -> analyzer.analyze(ITEM))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("HUGGINGFACE_API_KEY");
+    }
+
+    @Test
+    void truncatesLongArticleTextBeforeCallingFinBert() throws Exception {
+        String longText = IntStream.range(0, 700)
+                .mapToObj(index -> "token" + index)
+                .reduce((left, right) -> left + " " + right)
+                .orElseThrow();
+        NewsItem longItem = new NewsItem(
+                "news-2", "source", "Long article", "https://example.com/2",
+                NOW.minusSeconds(30), longText, "input-v1");
+        var analyzer = new HuggingFaceFinBERTSentimentAnalyzer(
+                new ObjectMapper(),
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                endpoint,
+                "hf-test-key");
+
+        analyzer.analyze(longItem);
+
+        JsonNode body = new ObjectMapper().readTree(lastRequestBody.get());
+        String inputs = body.path("inputs").asText();
+        assertThat(inputs.split("\\s+")).hasSizeLessThanOrEqualTo(180);
+        assertThat(inputs.length()).isLessThanOrEqualTo(1_000);
+        assertThat(inputs).contains("token0");
+        assertThat(inputs).doesNotContain("token500");
     }
 }

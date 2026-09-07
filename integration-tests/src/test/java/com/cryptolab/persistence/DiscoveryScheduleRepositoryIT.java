@@ -67,7 +67,7 @@ class DiscoveryScheduleRepositoryIT {
         assertThat(repository.find(accountId, scheduleId).orElseThrow().activeSearchRunId())
                 .isEqualTo(searchRunId);
         assertThat(repository.find(accountId, scheduleId).orElseThrow().lastSearchRunId())
-                .isEqualTo(searchRunId);
+                .isNull();
 
         repository.recoverInterrupted(now.plusSeconds(60));
 
@@ -111,6 +111,7 @@ class DiscoveryScheduleRepositoryIT {
                 new BigDecimal("10000"), 100, Duration.ofHours(24),
                 DiscoveryScheduleStatus.ACTIVE, now, null, null, 0, null, now, now));
         assertThat(repository.claim(scheduleId, searchRunId, now.plus(Duration.ofHours(24)), now)).isTrue();
+        assertThat(repository.find(accountId, scheduleId).orElseThrow().lastSearchRunId()).isNull();
 
         repository.completeRun(scheduleId, now.plusSeconds(30));
 
@@ -118,5 +119,22 @@ class DiscoveryScheduleRepositoryIT {
         assertThat(completed.activeSearchRunId()).isNull();
         assertThat(completed.lastSearchRunId()).isEqualTo(searchRunId);
         assertThat(completed.completedRuns()).isEqualTo(1);
+    }
+
+    @Test
+    void recoverInterruptedClearsOrphanLastSearchRunIds() {
+        Instant now = Instant.parse("2026-08-23T16:00:00Z");
+        UUID scheduleId = UUID.randomUUID();
+        UUID orphanSearchRunId = UUID.randomUUID();
+        repository.create(new DiscoverySchedule(
+                scheduleId, accountId, "BTCUSDT", Timeframe.H1, Duration.ofDays(30),
+                new BigDecimal("10000"), 100, Duration.ofHours(24),
+                DiscoveryScheduleStatus.STOPPED, now, null, orphanSearchRunId, 2,
+                "Binance HTTP request failed", now, now));
+
+        repository.recoverInterrupted(now.plusSeconds(5));
+
+        DiscoverySchedule repaired = repository.find(accountId, scheduleId).orElseThrow();
+        assertThat(repaired.lastSearchRunId()).isNull();
     }
 }

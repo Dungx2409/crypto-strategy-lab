@@ -31,7 +31,7 @@ function setAccount(account) {
 async function refreshAccount() {
     try { setAccount(await api("/api/v1/auth/me")); }
     catch (_) { setAccount(null); return; }
-    await Promise.all([loadSavedStrategies(), loadSchedules(), loadCrawlerTemplates(), loadManualHistory()])
+    await Promise.all([loadSavedStrategies(), loadSchedules(), loadManualHistory()])
         .catch(error => byId("auth-message").textContent = error.message);
 }
 
@@ -39,7 +39,7 @@ async function authenticate(path, usernameId = "auth-username", passwordId = "au
     try {
         const account = await api(`/api/v1/auth/${path}`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username:byId(usernameId).value,password:byId(passwordId).value})});
         setAccount(account); byId(messageId).textContent = `Signed in as ${account.username}.`; byId(passwordId).value = ""; showView("realtime");
-        await Promise.all([loadSavedStrategies(), loadSchedules(), loadCrawlerTemplates(), loadManualHistory()]);
+        await Promise.all([loadSavedStrategies(), loadSchedules(), loadManualHistory()]);
     } catch (error) { byId(messageId).textContent = error.message; }
 }
 
@@ -47,7 +47,7 @@ async function logout() {
     await api("/api/v1/auth/logout", {method:"POST"}); setAccount(null);
     accountFeatureState.strategies = []; accountFeatureState.draftId = null; window.cryptoLabUserStrategies = [];
     window.cryptoLabDiscovery?.refreshUserStrategies([]);
-    renderSavedStrategies(); renderSchedules([]); renderCrawlerTemplates([]);
+    renderSavedStrategies(); renderSchedules([]);
     byId("manual-history-count").textContent = "";
     renderManualHistory([]);
     byId("strategy-idea").hidden = true;
@@ -254,12 +254,20 @@ async function saveSchedule() {
 async function loadSchedules(){renderSchedules(await api("/api/v1/discovery-schedules"));}
 async function openDiscoveryResult(searchRunId) {
     if (!searchRunId) return;
-    labState.searchRunId = searchRunId;
-    const run = await api(`/api/v1/search-runs/${searchRunId}`);
-    if (typeof renderSearch === "function") renderSearch(run);
-    await loadLeaderboard();
-    if (typeof showView === "function") showView("discovery");
-    byId("schedule-message").textContent = `Showing discovery result ${searchRunId.slice(0, 8)}.`;
+    try {
+        if (typeof selectDiscoveryRun === "function") {
+            await selectDiscoveryRun(searchRunId);
+        } else {
+            labState.searchRunId = searchRunId;
+            const run = await api(`/api/v1/search-runs/${searchRunId}`);
+            if (typeof renderSearch === "function") renderSearch(run);
+            await loadLeaderboard();
+        }
+        if (typeof showView === "function") showView("discovery");
+        byId("schedule-message").textContent = `Showing discovery result ${searchRunId.slice(0, 8)}.`;
+    } catch (error) {
+        byId("schedule-message").textContent = error.message;
+    }
 }
 const TIMEFRAME_LABELS = {M1:"1m",M5:"5m",M15:"15m",M30:"30m",H1:"1h",H2:"2h",H4:"4h",D1:"1d"};
 
@@ -382,8 +390,8 @@ function renderSchedules(items) {
         versionsPanel.className = "schedule-versions";
         versionsPanel.hidden = true;
         versionsPanel.id = `schedule-versions-${item.id}`;
-        if (item.lastSearchRunId || item.activeSearchRunId) {
-            actions.append(featureButton("Open result", () => openDiscoveryResult(item.lastSearchRunId || item.activeSearchRunId), true, "♜"));
+        if (item.activeSearchRunId || item.lastSearchRunId) {
+            actions.append(featureButton("Open result", () => openDiscoveryResult(item.activeSearchRunId || item.lastSearchRunId), true, "♜"));
         }
         const versionsButton = featureButton("Versions", event => {
             event.stopPropagation();
@@ -579,9 +587,83 @@ function renderManualHistory(items) {
 }
 function applyTradeFilters(){const details=window.cryptoLabCurrentExperiment;if(!details)return;const minimum=byId("trade-filter-pnl").value===""?-Infinity:Number(byId("trade-filter-pnl").value),direction=byId("trade-filter-direction").value,reason=byId("trade-filter-reason").value;window.cryptoLabBacktest.render({...details,trades:(details.trades||[]).filter(trade=>Number(trade.pnl)>=minimum&&(!direction||trade.direction===direction)&&(!reason||trade.exitReason===reason))});}
 
-async function loadCrawlerTemplates(){renderCrawlerTemplates(await api("/api/v1/crawler-templates"));}
-async function createCrawlerTemplate(){try{await api("/api/v1/crawler-templates",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({siteUrl:byId("crawler-site-url").value,itemSelector:byId("crawler-item-selector").value,titleSelector:byId("crawler-title-selector").value,linkSelector:byId("crawler-link-selector").value,dateSelector:byId("crawler-date-selector").value})});await loadCrawlerTemplates();}catch(error){byId("crawler-message").textContent=error.message;}}
-function renderCrawlerTemplates(items){const host=byId("crawler-template-list");host.replaceChildren();if(!items.length){host.textContent=accountFeatureState.account?"🌐 No crawler templates.":"⇢ Sign in to manage templates.";return;}items.forEach(item=>{const row=document.createElement("article");row.className="saved-row";const text=document.createElement("div");text.innerHTML="<strong></strong><small></small>";text.querySelector("strong").textContent=`🌐 ${item.siteUrl} · v${item.version}`;text.querySelector("small").textContent=`${item.selectors.itemSelector} | ${item.selectors.titleSelector}`;const actions=document.createElement("div");actions.className="button-row";actions.append(featureButton("Collect articles",async()=>{try{const result=await api(`/api/v1/crawler-templates/${item.templateId}/collect`,{method:"POST"});byId("crawler-message").textContent=`Crawled ${result.fetched}, stored ${result.stored}, sentiment analyzed ${result.analyzed}${result.inferenceFailures?`, failed ${result.inferenceFailures}`:""}.`;const status=byId("news-message");if(status){status.dataset.keep="true";status.textContent=byId("crawler-message").textContent;}await loadStoredNews();}catch(error){byId("crawler-message").textContent=error.message;}},true,"⬇"),featureButton("Check now",async()=>{try{const result=await api(`/api/v1/crawler-templates/${item.templateId}/check`,{method:"POST"});if(result.status==="NEEDS_REVIEW"){byId("crawler-message").replaceChildren(document.createTextNode(`HTML changed. Review v${result.version}: ${JSON.stringify(result.selectors)} `),featureButton("Confirm",async()=>{await api(`/api/v1/crawler-templates/${item.templateId}/versions/${result.version}/confirm`,{method:"POST"});await loadCrawlerTemplates();},false,"✓"));}else byId("crawler-message").textContent="Active selectors still match.";}catch(error){byId("crawler-message").textContent=error.message;}},true,"◎"),featureButton("Repair with Gemini",async()=>{const sample=window.prompt("Paste the changed HTML sample");if(!sample)return;try{const repaired=await api(`/api/v1/crawler-templates/${item.templateId}/repair`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sampleHtml:sample,failure:"Stored selectors no longer match"})});byId("crawler-message").replaceChildren(document.createTextNode(`Review v${repaired.version}: ${JSON.stringify(repaired.selectors)} `),featureButton("Confirm",async()=>{await api(`/api/v1/crawler-templates/${item.templateId}/versions/${repaired.version}/confirm`,{method:"POST"});await loadCrawlerTemplates();},false,"✓"));}catch(error){byId("crawler-message").textContent=error.message;}},true,"✦"));row.append(text,actions);host.append(row);});}
+async function loadCrawlerTemplates(){if(!byId("crawler-template-list"))return;renderCrawlerTemplates(await api("/api/v1/news-websites"));}
+async function createCrawlerTemplate(){if(!byId("crawler-site-url"))return;try{await api("/api/v1/news-websites",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({siteUrl:byId("crawler-site-url").value,itemSelector:byId("crawler-item-selector").value,titleSelector:byId("crawler-title-selector").value,linkSelector:byId("crawler-link-selector").value,dateSelector:byId("crawler-date-selector").value})});await loadCrawlerTemplates();}catch(error){byId("crawler-message").textContent=error.message;}}
+function renderCrawlerTemplates(items){
+    const host=byId("crawler-template-list");
+    if(!host)return;
+    host.replaceChildren();
+    if(!items.length){
+        host.textContent=accountFeatureState.account?"🌐 No news websites.":"⇢ Sign in to manage news websites.";
+        return;
+    }
+    items.forEach(item=>{
+        const row=document.createElement("article");
+        row.className="saved-row";
+        const text=document.createElement("div");
+        text.innerHTML="<strong></strong><small></small>";
+        text.querySelector("strong").textContent=`🌐 ${item.siteUrl} · v${item.version}`;
+        text.querySelector("small").textContent="Crawler is using saved page structure rules.";
+        const actions=document.createElement("div");
+        actions.className="button-row";
+        actions.append(
+            featureButton("Collect articles",async()=>{
+                try{
+                    const result=await api(`/api/v1/news-websites/${item.templateId}/collect`,{method:"POST"});
+                    byId("crawler-message").textContent=`Crawled ${result.fetched}, stored ${result.stored}, sentiment analyzed ${result.analyzed}${result.inferenceFailures?`, failed ${result.inferenceFailures}`:""}.`;
+                    const status=byId("news-message");
+                    if(status){
+                        status.dataset.keep="true";
+                        status.textContent=byId("crawler-message").textContent;
+                    }
+                    await loadStoredNews();
+                }catch(error){
+                    byId("crawler-message").textContent=error.message;
+                }
+            },true,"⬇"),
+            featureButton("Check now",async()=>{
+                try{
+                    const result=await api(`/api/v1/news-websites/${item.templateId}/check`,{method:"POST"});
+                    if(result.status==="NEEDS_REVIEW"){
+                        byId("crawler-message").replaceChildren(
+                            document.createTextNode(`Website structure changed. Review v${result.version}: ${JSON.stringify(result.selectors)} `),
+                            featureButton("Confirm",async()=>{
+                                await api(`/api/v1/news-websites/${item.templateId}/versions/${result.version}/confirm`,{method:"POST"});
+                                await loadCrawlerTemplates();
+                            },false,"✓")
+                        );
+                    }else{
+                        byId("crawler-message").textContent="Website structure still works.";
+                    }
+                }catch(error){
+                    byId("crawler-message").textContent=error.message;
+                }
+            },true,"◎"),
+            featureButton("Repair",async()=>{
+                const sample=window.prompt("Paste a sample article page HTML");
+                if(!sample)return;
+                try{
+                    const repaired=await api(`/api/v1/news-websites/${item.templateId}/repair`,{
+                        method:"POST",
+                        headers:{"Content-Type":"application/json"},
+                        body:JSON.stringify({sampleHtml:sample,failure:"Stored match failed"})
+                    });
+                    byId("crawler-message").replaceChildren(
+                        document.createTextNode(`Review v${repaired.version}: ${JSON.stringify(repaired.selectors)} `),
+                        featureButton("Confirm",async()=>{
+                            await api(`/api/v1/news-websites/${item.templateId}/versions/${repaired.version}/confirm`,{method:"POST"});
+                            await loadCrawlerTemplates();
+                        },false,"✓")
+                    );
+                }catch(error){
+                    byId("crawler-message").textContent=error.message;
+                }
+            },true,"✦")
+        );
+        row.append(text,actions);
+        host.append(row);
+    });
+}
 
 byId("register-account").addEventListener("click",()=>authenticate("register"));byId("login-account").addEventListener("click",()=>authenticate("login"));byId("logout-account").addEventListener("click",logout);
 byId("auth-gate-form").addEventListener("submit",event=>{event.preventDefault();authenticate("login","auth-gate-username","auth-gate-password","auth-gate-message");});
@@ -594,7 +676,7 @@ byId("propose-strategy").addEventListener("click", proposeStrategy);
 byId("confirm-strategy").addEventListener("click", confirmStrategy);
 byId("save-strategy").addEventListener("click", saveStrategy);
 setAuthoringMode(byId("authoring-source").value || "prompt");
-byId("create-schedule").addEventListener("click",saveSchedule);byId("run-manual-backtest").addEventListener("click",runManualBacktest);byId("apply-trade-filters").addEventListener("click",applyTradeFilters);byId("create-crawler-template").addEventListener("click",createCrawlerTemplate);
+byId("create-schedule").addEventListener("click",saveSchedule);byId("run-manual-backtest").addEventListener("click",runManualBacktest);byId("apply-trade-filters").addEventListener("click",applyTradeFilters);
 document.addEventListener("click", event => {
     if (event.target.closest(".schedule-row")) return;
     closeScheduleVersionMenus();

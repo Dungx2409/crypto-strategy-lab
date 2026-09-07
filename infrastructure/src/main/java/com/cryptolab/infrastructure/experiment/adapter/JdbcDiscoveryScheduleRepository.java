@@ -80,17 +80,19 @@ public class JdbcDiscoveryScheduleRepository implements DiscoveryScheduleReposit
     public boolean claim(UUID scheduleId, UUID searchRunId, Instant nextRunAt, Instant updatedAt) {
         return jdbcTemplate.update("""
                 UPDATE discovery_schedules
-            SET active_search_run_id = ?, last_search_run_id = ?, next_run_at = ?, last_error = NULL, updated_at = ?
+                SET active_search_run_id = ?, next_run_at = ?, last_error = NULL, updated_at = ?
                 WHERE id = ? AND status = 'ACTIVE' AND active_search_run_id IS NULL AND next_run_at <= ?
-            """, searchRunId, searchRunId, utc(nextRunAt), utc(updatedAt), scheduleId, utc(updatedAt)) == 1;
+                """, searchRunId, utc(nextRunAt), utc(updatedAt), scheduleId, utc(updatedAt)) == 1;
     }
 
     @Override
     public void completeRun(UUID scheduleId, Instant updatedAt) {
         jdbcTemplate.update("""
                 UPDATE discovery_schedules
-                SET active_search_run_id = NULL, completed_runs = completed_runs + 1,
-                    last_error = NULL, updated_at = ? WHERE id = ?
+                SET last_search_run_id = COALESCE(active_search_run_id, last_search_run_id),
+                    active_search_run_id = NULL, completed_runs = completed_runs + 1,
+                    last_error = NULL, updated_at = ?
+                WHERE id = ?
                 """, utc(updatedAt), scheduleId);
     }
 
@@ -176,6 +178,14 @@ public class JdbcDiscoveryScheduleRepository implements DiscoveryScheduleReposit
                     last_error = 'API restarted while the discovery run was active', updated_at = ?
                 WHERE active_search_run_id IS NOT NULL
                 """, utc(now), utc(now));
+        jdbcTemplate.update("""
+                UPDATE discovery_schedules
+                SET last_search_run_id = NULL, updated_at = ?
+                WHERE last_search_run_id IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM search_runs WHERE search_runs.id = discovery_schedules.last_search_run_id
+                  )
+                """, utc(now));
     }
 
     private DiscoverySchedule schedule(ResultSet rs, int row) throws SQLException {

@@ -29,7 +29,7 @@ public final class GeminiStrategyAuthoringModel implements StrategyAuthoringMode
     public GeminiStrategyAuthoringModel(
             ObjectMapper objectMapper,
             @Value("${crypto.ai.gemini.api-key:}") String apiKey,
-            @Value("${crypto.ai.gemini.model:gemini-2.5-flash}") String model,
+            @Value("${crypto.ai.gemini.model:gemini-3.6-flash}") String model,
             @Value("${crypto.ai.gemini.timeout:30s}") Duration timeout) {
         this(HttpClient.newBuilder().connectTimeout(timeout).build(), objectMapper, apiKey, model, timeout);
     }
@@ -110,7 +110,7 @@ public final class GeminiStrategyAuthoringModel implements StrategyAuthoringMode
                     .build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() / 100 != 2) {
-                throw new IllegalStateException("Gemini request failed with HTTP " + response.statusCode());
+                throw new IllegalStateException(geminiFailureMessage(response.statusCode(), response.body()));
             }
             JsonNode root = objectMapper.readTree(response.body());
             JsonNode text = root.at("/candidates/0/content/parts/0/text");
@@ -132,5 +132,18 @@ public final class GeminiStrategyAuthoringModel implements StrategyAuthoringMode
         } catch (IOException exception) {
             throw new IllegalStateException("Could not serialize Gemini prompt", exception);
         }
+    }
+
+    private String geminiFailureMessage(int statusCode, String body) {
+        String detail = "";
+        try {
+            JsonNode message = objectMapper.readTree(body == null ? "{}" : body).at("/error/message");
+            if (message.isTextual() && !message.asText().isBlank()) {
+                detail = ": " + message.asText().trim();
+            }
+        } catch (IOException ignored) {
+            // Keep the status-only message when the error body is not JSON.
+        }
+        return "Gemini request failed with HTTP " + statusCode + detail;
     }
 }
