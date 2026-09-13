@@ -1,13 +1,24 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "20m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:17.6-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-crypto_strategy_lab}
       POSTGRES_USER: ${POSTGRES_USER:-crypto_lab}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crypto_lab_dev}
+      # No default fallback for secrets: CD must fail fast if this isn't set
+      # in the environment/.env, rather than silently deploying a known password.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       TZ: UTC
     ports:
-      - "${POSTGRES_PORT:-55432}:5432"
+      # Bound to localhost only — DB should never be reachable from outside the
+      # host directly. Use an SSH tunnel or a bastion for ad-hoc access.
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -16,35 +27,65 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    # NOTE: deploy.resources.limits/reservations only take effect under
+    # `docker stack deploy` (Swarm) or `docker compose --compatibility up`.
+    # A plain `docker compose up` on Compose CLI v2.20+ does honor limits
+    # natively, but confirm the Compose version your CD runner uses.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging: *default-logging
 
   rabbitmq:
     image: rabbitmq:4.1-management-alpine
+    restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-crypto_lab}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-crypto_lab_dev}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD must be set}
       TZ: UTC
     ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      # Persist queue/message data across restarts and deploys.
+      - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
       timeout: 5s
       retries: 12
       start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging: *default-logging
 
   api:
+    image: ${REGISTRY:-crypto-strategy-lab}/api:${IMAGE_TAG:-latest}
     build:
       context: .
       args:
         APP_MODULE: api-app
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    restart: unless-stopped
     environment:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-crypto_strategy_lab}
       POSTGRES_USER: ${POSTGRES_USER:-crypto_lab}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crypto_lab_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: ${RABBITMQ_USER:-crypto_lab}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-crypto_lab_dev}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD must be set}
       DEFAULT_ACCOUNT_ENABLED: ${DEFAULT_ACCOUNT_ENABLED:-true}
       DEFAULT_ACCOUNT_USERNAME: ${DEFAULT_ACCOUNT_USERNAME:-demo}
       DEFAULT_ACCOUNT_PASSWORD: ${DEFAULT_ACCOUNT_PASSWORD:-crypto-demo}
@@ -68,29 +109,67 @@ services:
       HUGGINGFACE_URL: ${HUGGINGFACE_URL:-https://router.huggingface.co/hf-inference/models/ProsusAI/finbert}
     ports:
       - "${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1536M
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    logging: *default-logging
 
   worker:
+    image: ${REGISTRY:-crypto-strategy-lab}/worker:${IMAGE_TAG:-latest}
     build:
       context: .
       args:
         APP_MODULE: worker-app
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    restart: unless-stopped
     environment:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-crypto_strategy_lab}
       POSTGRES_USER: ${POSTGRES_USER:-crypto_lab}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crypto_lab_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: ${RABBITMQ_USER:-crypto_lab}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-crypto_lab_dev}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD must be set}
+      SPRING_FLYWAY_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    logging: *default-logging
 
 volumes:
   postgres-data:
+  rabbitmq-data:

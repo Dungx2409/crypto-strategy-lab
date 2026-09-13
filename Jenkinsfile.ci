@@ -1,0 +1,137 @@
+// Jenkinsfile.ci
+// Runs on every push/PR. Responsibility: test + build + push image.
+// Does NOT touch any server — no deploy credentials needed here.
+//
+// Required Jenkins setup:
+//   - Credential (Username/Password or Secret Text) with ID "docker-registry-creds"
+//     for `docker login` to REGISTRY_HOST.
+//   - Downstream job named "crypto-lab-cd" must exist (see Jenkinsfile.cd).
+//   - Env var REGISTRY configured globally or below (e.g. your Docker Hub /
+//     GHCR / ECR namespace, e.g. "ghcr.io/your-org/crypto-strategy-lab").
+
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+
+    environment {
+        REGISTRY      = 'dungx2409' // TODO: chỉnh theo registry thật
+        REGISTRY_HOST = "${REGISTRY.split('/')[0]}"           // domain để docker login (ví dụ ghcr.io)
+        GIT_SHA       = "${env.GIT_COMMIT?.take(12) ?: ''}"
+        BUILD_DATE    = "${new Date().format('yyyy-MM-dd HH:mm:ss')}"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    // Đảm bảo GIT_SHA luôn chuẩn xác dù chạy ở Multibranch hay Pipeline đơn
+                    if (!env.GIT_SHA || env.GIT_SHA == 'unknown') {
+                        env.GIT_SHA = sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()
+                    }
+                    echo "Building commit: ${env.GIT_SHA} on branch: ${env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'unknown'}"
+                }
+            }
+        }crypto-strategy-lab-api
+
+        stage('Unit & Integration Tests') {
+            steps {
+                // Ưu tiên dùng Maven Wrapper có sẵn trong repo để đảm bảo tính nhất quán
+                sh './mvnw -B -pl core,infrastructure,api-app,worker-app -am test'
+            }
+            post {
+                always {
+                    junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+                }
+            }
+        }
+
+        stage('Build Images') {
+            parallel {
+                stage('api image') {
+                    steps {
+                        sh """
+                          docker build \
+                            --build-arg APP_MODULE=api-app \
+                            --build-arg GIT_SHA=${GIT_SHA} \
+                            --build-arg BUILD_DATE='${BUILD_DATE}' \
+                            -t ${REGISTRY}/crypto-strategy-lab-api:${GIT_SHA} \
+                            .
+                        """
+                    }
+                }
+                stage('worker image') {
+                    steps {
+                        sh """
+                          docker build \
+                            --build-arg APP_MODULE=worker-app \
+                            --build-arg GIT_SHA=${GIT_SHA} \
+                            --build-arg BUILD_DATE='${BUILD_DATE}' \
+                            -t ${REGISTRY}/crypto-strategy-lab-worker:${GIT_SHA} \
+                            .
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Push Images') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-registry-creds',
+                    usernameVariable: 'REG_USER',
+                    passwordVariable: 'REG_PASS'
+                )]) {
+                    sh '''
+                      echo "$REG_PASS" | docker login "$REGISTRY_HOST" -u "$REG_USER" --password-stdin
+                      docker push "$REGISTRY/api:$GIT_SHA"
+                      docker push "$REGISTRY/worker:$GIT_SHA"
+                    '''
+
+                    // Chỉ float "latest" khi merge vào main — không cho feature branches ghi đè
+                    script {
+                        def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: ''
+                        if (currentBranch == 'main' || currentBranch == 'origin/main') {
+                            sh '''
+                              docker tag "$REGISTRY/api:$GIT_SHA" "$REGISTRY/api:latest"
+                              docker tag "$REGISTRY/worker:$GIT_SHA" "$REGISTRY/worker:latest"
+                              docker push "$REGISTRY/api:latest"
+                              docker push "$REGISTRY/worker:latest"
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Trigger CD') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { (env.GIT_BRANCH ?: '') == 'origin/main' }
+                }
+            }
+            steps {
+                build job: 'crypto-lab-cd',
+                      parameters: [string(name: 'IMAGE_TAG', value: env.GIT_SHA)],
+                      wait: false
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker logout "$REGISTRY_HOST" || true'
+            cleanWs()
+        }
+        failure {
+            echo "CI failed for commit ${env.GIT_SHA} — CD was not triggered."
+        }
+    }
+}

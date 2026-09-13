@@ -1,0 +1,141 @@
+// Jenkinsfile.cd
+// Triggered by Jenkinsfile.ci (on main) or run manually with a chosen IMAGE_TAG.
+// Responsibility: deploy a pre-built, already-pushed image tag to the server.
+// Never builds from source — that guarantees prod always runs exactly what CI tested.
+//
+// Required Jenkins setup:
+//   - This job created with parameter IMAGE_TAG (string, default "latest").
+//   - Credential (SSH Username with private key) with ID "prod-server-ssh".
+//   - Env var REGISTRY / DEPLOY_HOST configured below.
+//   - Secrets used by docker-compose.yml (POSTGRES_PASSWORD, RABBITMQ_PASSWORD, ...)
+//     already live in a .env file ON THE SERVER — Jenkins does not manage them here.
+//   - remote path DEPLOY_DIR on the server contains docker-compose.yml + .env.
+
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'Image tag built by CI (git SHA)')
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+
+    environment {
+        REGISTRY    = 'ghcr.io/your-org/crypto-strategy-lab' // TODO: chỉnh theo registry thật
+        DEPLOY_HOST = 'deploy@your-prod-server'               // TODO: user@host thật
+        DEPLOY_DIR  = '/opt/crypto-strategy-lab'
+    }
+
+    stages {
+
+        stage('Confirm Deploy') {
+            steps {
+                input message: "Deploy image tag '${params.IMAGE_TAG}' to PRODUCTION?", ok: 'Deploy'
+            }
+        }
+
+        stage('Record Previous Tag') {
+            steps {
+                sshagent(credentials: ['prod-server-ssh']) {
+                    // Lưu lại tag đang chạy trước khi deploy để phục vụ rollback nếu có sự cố
+                    sh """
+                      ssh -o StrictHostKeyChecking=no ${DEPLOY_HOST} '
+                        cd ${DEPLOY_DIR} &&
+                        PREV=\$(grep "^IMAGE_TAG=" .env 2>/dev/null | cut -d= -f2)
+                        if [ -z "\$PREV" ]; then
+                          PREV="latest"
+                        fi
+                        echo "\$PREV" > .previous_tag
+                        echo "Recorded previous tag: \$PREV"
+                      '
+                    """
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sshagent(credentials: ['prod-server-ssh']) {
+                    sh """
+                      ssh -o StrictHostKeyChecking=no ${DEPLOY_HOST} '
+                        cd ${DEPLOY_DIR} &&
+                        touch .env &&
+                        sed -i "/^IMAGE_TAG=/d" .env &&
+                        echo "IMAGE_TAG=${params.IMAGE_TAG}" >> .env &&
+                        sed -i "/^REGISTRY=/d" .env &&
+                        echo "REGISTRY=${REGISTRY}" >> .env &&
+                        docker compose pull api worker &&
+                        docker compose up -d --no-deps api worker
+                      '
+                    """
+                }
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                sshagent(credentials: ['prod-server-ssh']) {
+                    script {
+                        def healthy = false
+                        for (int i = 0; i < 10; i++) {
+                            // 1. Kiểm tra HTTP health endpoint của API (port 8080)
+                            def apiStatus = sh(
+                                script: "ssh -o StrictHostKeyChecking=no ${DEPLOY_HOST} 'curl -sf http://localhost:8080/actuator/health'",
+                                returnStatus: true
+                            )
+
+                            // 2. Kiểm tra Docker container health status của Worker
+                            def workerStatus = sh(
+                                script: "ssh -o StrictHostKeyChecking=no ${DEPLOY_HOST} 'docker inspect --format=\"{{.State.Health.Status}}\" \$(docker compose -f ${DEPLOY_DIR}/docker-compose.yml ps -q worker) 2>/dev/null | grep -w healthy'",
+                                returnStatus: true
+                            )
+
+                            if (apiStatus == 0 && workerStatus == 0) {
+                                healthy = true
+                                echo "Health check passed: Both API and Worker are healthy!"
+                                break
+                            }
+
+                            echo "Health check attempt ${i + 1}/10: waiting for services to become healthy..."
+                            sleep(time: 10, unit: 'SECONDS')
+                        }
+
+                        if (!healthy) {
+                            error("Health check failed after deploy — rolling back")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "Deploy of ${params.IMAGE_TAG} failed — rolling back to previous tag"
+            sshagent(credentials: ['prod-server-ssh']) {
+                sh """
+                  ssh -o StrictHostKeyChecking=no ${DEPLOY_HOST} '
+                    cd ${DEPLOY_DIR} &&
+                    if [ -f .previous_tag ]; then
+                      PREV=\$(cat .previous_tag)
+                      echo "Rolling back to tag: \$PREV"
+                      sed -i "/^IMAGE_TAG=/d" .env &&
+                      echo "IMAGE_TAG=\$PREV" >> .env &&
+                      docker compose pull api worker &&
+                      docker compose up -d --no-deps api worker
+                    else
+                      echo "No .previous_tag found, cannot rollback automatically."
+                    fi
+                  '
+                """
+            }
+        }
+        success {
+            echo "Deployed ${params.IMAGE_TAG} successfully."
+        }
+    }
+}
