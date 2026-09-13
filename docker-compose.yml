@@ -4,6 +4,8 @@ x-logging: &default-logging
     max-size: "20m"
     max-file: "3"
 
+
+# Test ci pipe work 
 services:
   postgres:
     image: postgres:17.6-alpine
