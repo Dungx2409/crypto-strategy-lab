@@ -8,7 +8,7 @@
 //   - Downstream job named "crypto-lab-cd" must exist (see Jenkinsfile.cd).
 //   - Env var REGISTRY configured globally or below (e.g. your Docker Hub /
 //     GHCR / ECR namespace, e.g. "ghcr.io/your-org/crypto-strategy-lab").
-
+/// Test ci pipe work
 pipeline {
     agent any
 
