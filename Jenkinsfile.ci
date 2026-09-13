@@ -38,7 +38,7 @@ pipeline {
                     echo "Building commit: ${env.GIT_SHA} on branch: ${env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'unknown'}"
                 }
             }
-        }crypto-strategy-lab-api
+        }
 
         stage('Unit & Integration Tests') {
             steps {
