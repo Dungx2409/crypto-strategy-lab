@@ -83,7 +83,7 @@ pipeline {
         stage('Push Images') {
             steps {
                 withCredentials([usernamePassword(
-                    credentials Id: 'docker-registry-creds',
+                    credentialsId: 'docker-registry-creds',
                     usernameVariable: 'REG_USER',
                     passwordVariable: 'REG_PASS'
                 )]) {
