@@ -19,10 +19,9 @@ pipeline {
     }
 
     environment {
-        REGISTRY      = 'dungx2409' // TODO: chỉnh theo registry thật
-        REGISTRY_HOST = "${REGISTRY.split('/')[0]}"           // domain để docker login (ví dụ ghcr.io)
-        GIT_SHA       = "${env.GIT_COMMIT?.take(12) ?: ''}"
-        BUILD_DATE    = "${new Date().format('yyyy-MM-dd HH:mm:ss')}"
+        REGISTRY   = 'dungx2409'
+        GIT_SHA    = "${env.GIT_COMMIT?.take(12) ?: ''}"
+        BUILD_DATE = "${new Date().format('yyyy-MM-dd HH:mm:ss')}"
     }
 
     stages {
@@ -61,7 +60,7 @@ pipeline {
                             --build-arg APP_MODULE=api-app \
                             --build-arg GIT_SHA=${GIT_SHA} \
                             --build-arg BUILD_DATE='${BUILD_DATE}' \
-                            -t ${REGISTRY}/crypto-strategy-lab-api:${GIT_SHA} \
+                            -t ${REGISTRY}/api:${GIT_SHA} \
                             .
                         """
                     }
@@ -73,7 +72,7 @@ pipeline {
                             --build-arg APP_MODULE=worker-app \
                             --build-arg GIT_SHA=${GIT_SHA} \
                             --build-arg BUILD_DATE='${BUILD_DATE}' \
-                            -t ${REGISTRY}/crypto-strategy-lab-worker:${GIT_SHA} \
+                            -t ${REGISTRY}/worker:${GIT_SHA} \
                             .
                         """
                     }
@@ -84,12 +83,12 @@ pipeline {
         stage('Push Images') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'docker-registry-creds',
+                    credentials Id: 'docker-registry-creds',
                     usernameVariable: 'REG_USER',
                     passwordVariable: 'REG_PASS'
                 )]) {
                     sh '''
-                      echo "$REG_PASS" | docker login "$REGISTRY_HOST" -u "$REG_USER" --password-stdin
+                      echo "$REG_PASS" | docker login -u "$REG_USER" --password-stdin
                       docker push "$REGISTRY/api:$GIT_SHA"
                       docker push "$REGISTRY/worker:$GIT_SHA"
                     '''
@@ -127,7 +126,7 @@ pipeline {
 
     post {
         always {
-            sh 'docker logout "$REGISTRY_HOST" || true'
+            sh 'docker logout || true'
             cleanWs()
         }
         failure {
